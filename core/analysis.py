@@ -3,11 +3,95 @@ import numpy as np
 from core.utils import safe_div
 
 
+# ── Adaptive Weight Regime Detection ─────────────────────────
+def _detect_market_regime(last_close, ma50, ma200):
+    """
+    Detect market regime for adaptive scoring weights.
+    Returns: (tech_weight, mom_weight, regime_name)
+    """
+    if pd.isna(ma50) or pd.isna(ma200):
+        return 0.40, 0.60, "unknown"
+
+    if last_close > ma50 and ma50 > ma200:
+        return 0.45, 0.55, "uptrend"      # صاعد: تقنية أهم
+    elif last_close < ma50 and ma50 < ma200:
+        return 0.55, 0.45, "downtrend"     # هابط: تقنية أكثر أهمية للحماية
+    else:
+        return 0.35, 0.65, "sideways"      # تذبذب: الزخم يقود
+
+
+# ── Confluence Stars Calculator ──────────────────────────────
+def compute_confluence_stars(
+    is_wolf=False, keyword_verdict="", is_blue_sky=False,
+    vol_accel_ratio=0.0, final_score=0, news_adjustment=0,
+    accum_phase="neutral"
+) -> dict:
+    """
+    Calculate confluence stars (0-6) based on cross-signal agreement.
+    Returns: {stars, display, signals[], multiplier}
+    """
+    stars = 0
+    signals = []
+
+    # ⭐ Wolf institutional breakout
+    if is_wolf:
+        stars += 1
+        signals.append("🐺 وولف مؤسساتي")
+
+    # ⭐ Rocket keywords positive
+    if keyword_verdict == "🚀 إيجابي":
+        stars += 1
+        signals.append("🚀 كلمات صاروخية")
+
+    # ⭐ Blue sky (no resistance)
+    if is_blue_sky:
+        stars += 1
+        signals.append("🌌 سماء زرقاء")
+
+    # ⭐ Volume explosion (2x+)
+    if vol_accel_ratio >= 2.0:
+        stars += 1
+        signals.append("🌊 انفجار سيولة")
+
+    # ⭐ Positive news + strong score
+    if news_adjustment >= 5 and final_score >= 70:
+        stars += 1
+        signals.append("📰 أخبار داعمة")
+
+    # ⭐ Institutional accumulation (strong, late, or healthy pullback)
+    if accum_phase in ("strong", "late", "pullback_buy"):
+        stars += 1
+        signals.append("🏗️ تجميع مؤسساتي")
+
+    # Multiplier based on star count (max 6 stars)
+    if stars >= 6:
+        multiplier = 1.18
+    elif stars >= 5:
+        multiplier = 1.15
+    elif stars >= 4:
+        multiplier = 1.10
+    elif stars >= 3:
+        multiplier = 1.05
+    else:
+        multiplier = 1.0
+
+    display = "⭐" * stars if stars > 0 else ""
+
+    return {
+        "stars": stars,
+        "display": display,
+        "signals": signals,
+        "multiplier": multiplier,
+    }
+
+
 def get_ai_analysis(
     last_close, ma50, ma200, rsi, counter, zr_low, zr_high,
     event_text, bo_score_add, mom_score, vol_accel_ratio, pct_1d,
     macro_status, is_forex, is_crypto, last_vwap, rr_ratio,
-    daily_trend, interval
+    daily_trend, interval, news_adjustment=0, is_wolf=False,
+    rsi_divergence=None, vol_price_divergence=None, atr_regime=None,
+    accumulation_data=None
 ):
     if pd.isna(ma50) or pd.isna(ma200):
         return 0, "انتظار ⏳", "#808080", ["بيانات غير كافية للتحليل."]
@@ -224,8 +308,144 @@ def get_ai_analysis(
             "🧱 <b>تحذير زيرو:</b> السعر متضخم ويصطدم بسقف القناة كمقاومة."
         )
 
+    # ── Divergence Scoring ──────────────────────────────────
+    if rsi_divergence and rsi_divergence.get("type") != "none":
+        div_type = rsi_divergence["type"]
+        div_strength = rsi_divergence.get("strength", 0)
+        if div_type == "bearish" and div_strength >= 0.3:
+            penalty = int(-10 * div_strength)
+            tech_score += penalty
+            veto_max_79 = True
+            reasons.append(rsi_divergence.get("description_ar", "📉 تباين RSI هبوطي"))
+        elif div_type == "bullish" and div_strength >= 0.3:
+            bonus = int(8 * div_strength)
+            tech_score += bonus
+            reasons.append(rsi_divergence.get("description_ar", "📈 تباين RSI صعودي"))
+
+    if vol_price_divergence and vol_price_divergence.get("type") != "none":
+        vpd_type = vol_price_divergence["type"]
+        if vpd_type == "bearish":
+            tech_score -= 8
+            veto_max_79 = True
+            reasons.append(vol_price_divergence.get("description_ar", "📉 تباين حجم هبوطي"))
+        elif vpd_type == "bullish":
+            tech_score += 5
+            reasons.append(vol_price_divergence.get("description_ar", "📈 تباين حجم صعودي"))
+        elif vpd_type == "confirmed":
+            tech_score += 3
+            reasons.append(vol_price_divergence.get("description_ar", "✅ تأكيد حجم"))
+
+    if atr_regime and atr_regime.get("score_modifier", 0) != 0:
+        tech_score += atr_regime["score_modifier"]
+        if atr_regime.get("description_ar"):
+            reasons.append(atr_regime["description_ar"])
+
+    # ── Accumulation Phase Scoring ────────────────────────────
+    accum_veto_79 = False
+    if accumulation_data and isinstance(accumulation_data, dict):
+        a_phase = accumulation_data.get("phase", "neutral")
+        a_score = accumulation_data.get("score", 0)
+        a_days = accumulation_data.get("days", 0)
+        a_zr_bonus = accumulation_data.get("zr_bonus", 0)
+        a_cmf = accumulation_data.get("cmf", 0)
+
+        if a_phase == "late":
+            bonus = 12
+            if a_zr_bonus > 0:
+                bonus += 10
+            tech_score += bonus
+            zr_txt = " + 💎 قرب قاع زيرو" if a_zr_bonus > 0 else ""
+            reasons.append(
+                f"🏗️ <b>[نهاية تجميع 🟢]:</b> سكور التجميع {a_score}/100 "
+                f"({a_days} يوم تراكم){zr_txt}. جاهز للانطلاق!"
+            )
+        elif a_phase == "strong":
+            bonus = 8
+            if a_zr_bonus > 0:
+                bonus += 10
+            tech_score += bonus
+            zr_txt = " + 💎 قرب قاع زيرو" if a_zr_bonus > 0 else ""
+            reasons.append(
+                f"🏗️ <b>[تجميع قوي 🔵]:</b> سكور {a_score}/100 "
+                f"({a_days} يوم تراكم){zr_txt}. ضغط شرائي مستمر."
+            )
+        elif a_phase == "mid":
+            tech_score += 4
+            reasons.append(
+                f"🏗️ <b>[وسط التجميع 🟣]:</b> سكور {a_score}/100 "
+                f"({a_days} يوم). مرحلة بناء المراكز."
+            )
+        elif a_phase == "distribute":
+            tech_score -= 10
+            accum_veto_79 = True
+            reasons.append(
+                f"🏗️ <b>[تصريف مؤسساتي 🔴]:</b> CMF سلبي ({a_cmf:+.3f}) "
+                f"مع OBV هابط. المؤسسات تبيع!"
+            )
+        # ── Lifecycle phases (post-breakout) ──────────────
+        elif a_phase == "breakout":
+            tech_score += 5
+            reasons.append(
+                f"🏗️ <b>[انطلاق 🚀]:</b> السهم كسر بعد تجميع مؤسساتي. "
+                f"اللحاق محفوف بالمخاطر — راقب التراجع."
+            )
+        elif a_phase == "pullback_buy":
+            tech_score += 10
+            reasons.append(
+                f"🏗️ <b>[ارتداد صحي 🟢]:</b> السهم انطلق سابقاً وتراجع بشكل صحي. "
+                f"CMF إيجابي ({a_cmf:+.3f}) — فرصة دخول ثانية!"
+            )
+        elif a_phase == "pullback_wait":
+            tech_score += 0
+            reasons.append(
+                f"🏗️ <b>[ارتداد — انتظر 🟡]:</b> السهم انطلق سابقاً لكن التراجع غير مؤكد. "
+                f"انتظر تأكيد CMF."
+            )
+        elif a_phase == "exhausted":
+            tech_score -= 8
+            accum_veto_79 = True
+            reasons.append(
+                f"🏗️ <b>[استنفاد 🔴]:</b> السهم انطلق وأعاد معظم حركته. "
+                f"الفرصة انتهت — لا تدخل."
+            )
+
+    # ── Adaptive Weights ─────────────────────────────────────
     tech_score = int(max(0, min(100, tech_score)))
-    final_score = int((tech_score * 0.4) + (mom_score * 0.6))
+    tech_w, mom_w, _regime = _detect_market_regime(last_close, ma50, ma200)
+    final_score = int((tech_score * tech_w) + (mom_score * mom_w))
+
+    # --- News Sentiment Adjustment ---
+    if news_adjustment != 0:
+        final_score = final_score + news_adjustment
+        final_score = max(0, min(100, final_score))
+        if news_adjustment > 0:
+            reasons.append(
+                f"📰 <b>تأثير الأخبار:</b> أخبار إيجابية رفعت التقييم (+{news_adjustment})"
+            )
+        else:
+            reasons.append(
+                f"📰 <b>تأثير الأخبار:</b> أخبار سلبية خفضت التقييم ({news_adjustment})"
+            )
+        # Excellent news can override soft veto (veto_max_79 only)
+        if news_adjustment >= 8 and veto_max_79 and not veto_max_59 and not is_absolute_lockdown:
+            veto_max_79 = False
+            reasons.append(
+                "📰 <b>[تجاوز إخباري]:</b> أخبار ممتازة جداً تتجاوز الفيتو الخفيف!"
+            )
+
+    # --- Wolf V2 Confirmation Bonus ---
+    if is_wolf:
+        final_score = final_score + 10
+        final_score = max(0, min(100, final_score))
+        reasons.append(
+            "🐺 <b>[تأكيد وولف]:</b> اختراق مؤسساتي مدعوم بـ 8 مرشحات "
+            "(تغير يومي + سيولة + زخم + ترند + ماكرو)."
+        )
+        if veto_max_79 and not veto_max_59 and not is_absolute_lockdown:
+            veto_max_79 = False
+            reasons.append(
+                "🐺 <b>[تجاوز وولف]:</b> قوة الاختراق المؤسساتي تتجاوز الفيتو الخفيف!"
+            )
 
     reasons = [r for r in reasons if r]
     reasons.insert(
@@ -263,7 +483,7 @@ def get_ai_analysis(
                 "🛡️ <b>[فيتو المخاطر]:</b> تم فرض حظر الدخول بسبب "
                 "العيوب القاتلة (الفيتو)."
             )
-        elif (veto_max_79 or (pd.notna(rsi) and rsi > 72)) and not is_blue_sky:
+        elif (veto_max_79 or accum_veto_79 or (pd.notna(rsi) and rsi > 72)) and not is_blue_sky:
             final_score = min(final_score, 79)
             reasons.insert(
                 0,
