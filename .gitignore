@@ -2,3 +2,16 @@ __pycache__/
 *.pyc
 *.db
 .env
+
+# Test/experiment scripts
+analyze_*.py
+factor_analysis.py
+lifecycle_backtest.py
+masa_v94_backtest.py
+masa_wolf_hybrid.py
+pro_*_report.py
+scan_*_lifecycles.py
+verify_accuracy.py
+wolf_backtest*.py
+zr_bluesky_backtest.py
+backtest_report.json
