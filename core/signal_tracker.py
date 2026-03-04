@@ -441,6 +441,73 @@ def clear_signal_log():
         return False
 
 
+def get_ticker_signal_history(ticker: str) -> dict:
+    """
+    Get signal history for a specific ticker.
+    Returns: {'total': 5, 'wins': 3, 'win_pct': 60.0, 'last_signal': 'sell_warning', 'last_date': '2026-03-01'}
+    """
+    default = {'total': 0, 'wins': 0, 'win_pct': 0, 'last_signal': '', 'last_date': ''}
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            c = conn.cursor()
+            c.execute(
+                "SELECT v2_signal, outcome_20d, date_logged FROM signal_log "
+                "WHERE ticker = ? ORDER BY date_logged DESC",
+                (ticker,)
+            )
+            rows = c.fetchall()
+            if not rows:
+                return default
+
+            total = len(rows)
+            completed = [(s, o) for s, o, _ in rows if o is not None]
+            wins = sum(1 for _, o in completed if o == 'win')
+            win_pct = round(wins / len(completed) * 100, 0) if completed else 0
+
+            return {
+                'total': total,
+                'wins': wins,
+                'completed': len(completed),
+                'win_pct': win_pct,
+                'last_signal': rows[0][0],
+                'last_date': rows[0][2],
+            }
+    except Exception:
+        return default
+
+
+def get_distribution_summary() -> list:
+    """
+    Get active distribution signals for today's summary banner.
+    Returns list of dicts: [{'ticker': '2222.SR', 'company': 'أرامكو', 'score': 35, 'v2_signal': 'sell_warning'}, ...]
+    """
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            c = conn.cursor()
+            # Get latest distribution signals (last 3 days to catch recent ones)
+            c.execute("""
+                SELECT ticker, company, accum_score, v2_signal, date_logged
+                FROM signal_log
+                WHERE accum_phase = 'distribute'
+                  AND date_logged >= date('now', '-3 days')
+                ORDER BY date_logged DESC, accum_score ASC
+            """)
+            rows = c.fetchall()
+            # Deduplicate by ticker (keep latest)
+            seen = set()
+            result = []
+            for tk, co, sc, v2, dt in rows:
+                if tk not in seen:
+                    seen.add(tk)
+                    result.append({
+                        'ticker': tk, 'company': co, 'score': sc,
+                        'v2_signal': v2, 'date': dt,
+                    })
+            return result
+    except Exception:
+        return []
+
+
 def get_signal_count() -> int:
     """Get total number of signals in the log."""
     try:
