@@ -1177,6 +1177,22 @@ if scan_results and df is not None and not df.empty:
                     if vip_sector:
                         sector_html = f"<span class='sector-tag'>{sanitize_text(vip_sector)}</span>"
 
+                    # ══════════════════════════════════════
+                    # Confidence Score for VIP card
+                    # ══════════════════════════════════════
+                    vip_stars, vip_details, vip_verdict, vip_v_color, vip_v_icon = _calc_confidence(row)
+                    filled = "★" * vip_stars + "☆" * (5 - vip_stars)
+                    vip_confidence_html = (
+                        f"<div style='background:rgba(0,0,0,0.3); border:1px solid {vip_v_color}; "
+                        f"border-radius:10px; padding:10px 14px; margin:10px 0; text-align:center;'>"
+                        f"<span style='font-size:28px; font-weight:900; color:white;'>{vip_stars}</span>"
+                        f"<span style='font-size:14px; color:#aaa;'>/5</span> "
+                        f"<span style='font-size:18px; color:gold;'>{filled}</span><br>"
+                        f"<span style='font-size:14px; font-weight:700; color:{vip_v_color};'>"
+                        f"{vip_v_icon} {vip_verdict}</span>"
+                        f"</div>"
+                    )
+
                     # Use unified score for display
                     display_score = row.get('unified_score', row['raw_score'])
 
@@ -1186,6 +1202,7 @@ if scan_results and df is not None and not df.empty:
                         f"<div class='vip-title'>{clean_name} {sector_html}</div>"
                         f"<div class='vip-time'>{str(row['raw_time'])}</div><br>"
                         f"{quality_badge_html}"
+                        f"{vip_confidence_html}"
                         f"{contradiction_html}"
                         f"{confluence_html}"
                         f"{news_badge_html}"
