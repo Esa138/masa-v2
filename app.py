@@ -8,6 +8,8 @@ from plotly.subplots import make_subplots
 import sqlite3
 import requests
 import warnings
+import re
+import yfinance as yf
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from core.utils import (
@@ -65,53 +67,92 @@ def _diversify_vip(df_vip, max_picks=3, max_per_sector=2):
     return pd.DataFrame(selected)
 
 
-def _build_wolf_card(row, card_type, currency):
-    """Build HTML card for a Wolf V2 signal."""
-    card_cls = "wolf-card-confirmed" if card_type == "confirmed" else "wolf-card-only"
-    wolf_color = "#FF9800" if card_type == "confirmed" else "#CE93D8"
-    type_label = "🐺💎 MASA × Wolf مؤكد" if card_type == "confirmed" else "🐺 وولف فقط"
+def _calc_confidence(row):
+    """Calculate confidence score (0-5 stars) combining all key signals.
 
-    clean_name = sanitize_text(str(row['الشركة']))
-    tk = str(row['الرمز'])
-    wolf_rr = row.get('wolf_rr', 0)
-    wolf_sl = row.get('wolf_sl', row.get('raw_sl', 0))
-    wolf_target = row.get('wolf_target', row.get('raw_target', 0))
-    wolf_filters = row.get('wolf_filters', [])
+    The 4+1 keys discovered through live analysis:
+    ① CMF positive   = money flowing IN
+    ② Wolf ≥ 6       = technical filters aligned
+    ③ All green       = 3d, 5d, 10d momentum positive
+    ④ Score ≥ 60     = accumulation threshold
+    ⑤ V2 buy signal  = engine confirmation (bonus)
+    """
+    stars = 0
+    details = []
 
-    filter_html = ""
-    for fname, fpassed in wolf_filters:
-        cls = "wolf-filter-pass" if fpassed else "wolf-filter-fail"
-        icon = "✅" if fpassed else "❌"
-        filter_html += f"<div class='wolf-filter-item {cls}'>{icon} {sanitize_text(str(fname))}</div>"
+    # ① CMF — money flow direction
+    cmf = row.get('accum_cmf', 0)
+    if cmf > 0:
+        stars += 1
+        details.append(("CMF إيجابي", True, f"{cmf:+.3f}"))
+    else:
+        details.append(("CMF سلبي", False, f"{cmf:+.3f}"))
 
-    rr_disp = f"⚖️ R:R = 1 : {wolf_rr:.1f}"
+    # ② Wolf readiness — technical alignment
+    wolf = row.get('wolf_readiness', 0)
+    if wolf >= 6:
+        stars += 1
+        details.append(("وولف جاهز", True, f"{wolf}/9"))
+    else:
+        details.append(("وولف ضعيف", False, f"{wolf}/9"))
 
-    return (
-        f"<div class='wolf-card {card_cls}'>"
-        f"<div class='wolf-icon'>🐺</div>"
-        f"<div style='display:flex; justify-content:space-between; align-items:center;'>"
-        f"<div class='wolf-title'>{clean_name} "
-        f"<span style='font-size:14px; color:#888;'>({tk})</span></div>"
-        f"<div><span class='wolf-badge wolf-badge-{card_type}'>{type_label}</span></div>"
-        f"</div>"
-        f"<div style='margin-top:10px; font-size:28px; color:white; font-weight:bold;'>"
-        f"{row['السعر']} <span style='font-size:16px; color:#aaa;'>{currency}</span></div>"
-        f"<div style='margin-top:10px;'>"
-        f"<span class='vip-rr' style='border-color:{wolf_color}; color:{wolf_color};'>{rr_disp}</span>"
-        f"</div>"
-        f"<div class='vip-details' style='border-color:{wolf_color}40; margin-top:15px;'>"
-        f"<div>🐺 هدف وولف 🎯<br>"
-        f"<span class='vip-target'>{format_price(wolf_target, tk)}</span></div>"
-        f"<div>🛡️ وقف وولف<br>"
-        f"<span class='vip-stop'>{format_price(wolf_sl, tk)}</span></div>"
-        f"</div>"
-        f"<div style='margin-bottom:15px;'>{row['الحالة اللحظية ⚡']}</div>"
-        f"<div style='text-align:center;'>"
-        f"<span class='vip-score' style='background:{wolf_color};'>MASA: {row['raw_score']}/100</span>"
-        f"</div>"
-        f"<div class='wolf-filter-grid'>{filter_html}</div>"
-        f"</div>"
-    )
+    # ③ Momentum — all timeframes green
+    r3 = row.get('raw_3d', 0) or 0
+    r5 = row.get('raw_5d', 0) or 0
+    r10 = row.get('raw_10d', 0) or 0
+    all_green = r3 > 0 and r5 > 0 and r10 > 0
+    green_count = sum(1 for x in [r3, r5, r10] if x > 0)
+    if all_green:
+        stars += 1
+        details.append(("زخم ✅✅✅", True, f"{green_count}/3"))
+    else:
+        details.append(("زخم ناقص", False, f"{green_count}/3"))
+
+    # ④ Accumulation score threshold
+    score = row.get('accum_score', 0)
+    if score >= 60:
+        stars += 1
+        details.append(("سكور كافي", True, f"{score:.0f}/100"))
+    else:
+        details.append(("سكور ضعيف", False, f"{score:.0f}/100"))
+
+    # ⑤ V2 signal — bonus star
+    v2 = row.get('accum_v2_signal', 'none')
+    if v2 in ('buy_confirmed', 'buy_breakout'):
+        stars += 1
+        details.append(("V2 شراء", True, "✓"))
+    elif v2 == 'sell_confirmed':
+        stars = max(0, stars - 1)  # penalty
+        details.append(("V2 بيع", False, "✗"))
+    elif v2 == 'sell_warning':
+        details.append(("V2 تحذير", False, "⚠"))
+    else:
+        details.append(("V2 محايد", False, "—"))
+
+    # Determine verdict
+    phase = row.get('accum_phase', 'neutral')
+    if phase in ('distribute', 'exhausted'):
+        verdict = "تصريف — لا تدخل"
+        verdict_color = "#FF5252"
+        verdict_icon = "🔴"
+    elif stars >= 4:
+        verdict = "فرصة قوية — مراقبة للدخول"
+        verdict_color = "#00E676"
+        verdict_icon = "🟢"
+    elif stars == 3:
+        verdict = "واعد — انتظر تأكيد"
+        verdict_color = "#69F0AE"
+        verdict_icon = "🟡"
+    elif stars == 2:
+        verdict = "ضعيف — حذر"
+        verdict_color = "#FFD700"
+        verdict_icon = "🟠"
+    else:
+        verdict = "ارتداد مؤقت — لا تدخل"
+        verdict_color = "#FF5252"
+        verdict_icon = "🔴"
+
+    return stars, details, verdict, verdict_color, verdict_icon
 
 
 def _build_accum_card(row, currency, bt_win_rates=None):
@@ -156,6 +197,43 @@ def _build_accum_card(row, currency, bt_win_rates=None):
     has_cross_ma20 = row.get('accum_cross_ma20', False)
     has_break_20d = row.get('accum_break_20d', False)
     has_above_ma50 = row.get('accum_above_ma50', False)
+
+    # ══════════════════════════════════════
+    # Confidence Score (THE KEY ADDITION)
+    # ══════════════════════════════════════
+    conf_stars, conf_details, conf_verdict, conf_verdict_color, conf_verdict_icon = _calc_confidence(row)
+    _stars_display = "⭐" * conf_stars + "☆" * (5 - conf_stars)
+    _conf_details_html = ""
+    for _cd_label, _cd_pass, _cd_val in conf_details:
+        _cd_icon = "✅" if _cd_pass else "❌"
+        _cd_color = "#00E676" if _cd_pass else "#FF5252"
+        _conf_details_html += (
+            f"<div style='display:flex; justify-content:space-between; align-items:center; "
+            f"padding:3px 0; font-size:12px; direction:rtl;'>"
+            f"<span style='color:{_cd_color};'>{_cd_icon} {_cd_label}</span>"
+            f"<span style='color:#888;'>{_cd_val}</span>"
+            f"</div>"
+        )
+
+    confidence_badge = (
+        f"<div style='background:rgba(255,255,255,0.04); border:1px solid {conf_verdict_color}44; "
+        f"border-radius:10px; padding:10px 14px; margin:8px 0; direction:rtl;'>"
+        f"<div style='display:flex; justify-content:space-between; align-items:center;'>"
+        f"<div>"
+        f"<div style='font-size:16px; font-weight:900; color:{conf_verdict_color};'>"
+        f"{conf_verdict_icon} {conf_verdict}</div>"
+        f"<div style='font-size:20px; margin-top:2px;'>{_stars_display}</div>"
+        f"</div>"
+        f"<div style='font-size:36px; font-weight:900; color:{conf_verdict_color};'>"
+        f"{conf_stars}<span style='font-size:16px; color:#666;'>/5</span></div>"
+        f"</div>"
+        f"<details style='margin-top:8px;'>"
+        f"<summary style='cursor:pointer; font-size:11px; color:#666;'>تفاصيل التقييم</summary>"
+        f"<div style='margin-top:6px; padding:8px; background:rgba(0,0,0,0.2); border-radius:8px;'>"
+        f"{_conf_details_html}"
+        f"</div></details>"
+        f"</div>"
+    )
 
     clean_name = sanitize_text(str(row['الشركة']))
     sector = row.get('stock_sector', '')
@@ -388,9 +466,57 @@ def _build_accum_card(row, currency, bt_win_rates=None):
         )
 
     # ══════════════════════════════════════
+    # News / Announcement Badge
+    # ══════════════════════════════════════
+    news_badge = ""
+    _news_sent = row.get('news_sentiment', 'محايد')
+    _news_kw_score = row.get('keyword_score', 0)
+    _news_summary = str(row.get('news_summary', ''))
+    _news_conf = int(row.get('news_confidence', 0))
+    _has_real_news = (_news_sent != 'محايد') or (abs(_news_kw_score) >= 3) or (_news_conf > 20)
+
+    if _has_real_news:
+        if phase in ('distribute', 'exhausted') and (_news_sent == 'سلبي' or _news_kw_score <= -3):
+            _nb_bg = "rgba(255,82,82,0.15)"
+            _nb_border = "#FF5252"
+            _nb_icon = "🔴📰"
+            _nb_label = "تصريف مع إعلان سلبي"
+        elif phase in ('strong', 'late') and (_news_sent == 'إيجابي' or _news_kw_score >= 3):
+            _nb_bg = "rgba(0,230,118,0.12)"
+            _nb_border = "#00E676"
+            _nb_icon = "🟢📰"
+            _nb_label = "تجميع مع إعلان إيجابي"
+        elif _news_sent == 'سلبي' or _news_kw_score <= -3:
+            _nb_bg = "rgba(255,82,82,0.08)"
+            _nb_border = "#FF5252"
+            _nb_icon = "📰⚠️"
+            _nb_label = "إعلان سلبي"
+        elif _news_sent == 'إيجابي' or _news_kw_score >= 3:
+            _nb_bg = "rgba(0,230,118,0.06)"
+            _nb_border = "#00E676"
+            _nb_icon = "📰✅"
+            _nb_label = "إعلان إيجابي"
+        else:
+            _nb_bg = "rgba(255,215,0,0.06)"
+            _nb_border = "rgba(255,215,0,0.3)"
+            _nb_icon = "📰"
+            _nb_label = "يوجد إعلان"
+
+        _nb_summary = sanitize_text(_news_summary[:60]) + "..." if len(_news_summary) > 60 else sanitize_text(_news_summary)
+
+        news_badge = (
+            f"<div style='background:{_nb_bg}; border:1px solid {_nb_border}; "
+            f"border-radius:8px; padding:8px 12px; margin:6px 0; direction:rtl;'>"
+            f"<div style='font-size:14px; font-weight:700; color:{_nb_border};'>"
+            f"{_nb_icon} {_nb_label}</div>"
+            f"<div style='font-size:12px; color:#aaa; margin-top:4px;'>{_nb_summary}</div>"
+            f"</div>"
+        )
+
+    # ══════════════════════════════════════
     # ASSEMBLE CARD
     # ══════════════════════════════════════
-    return (
+    _card_html = (
         f"<div class='accum-card accum-card-{phase}'>"
         f"<div class='accum-icon'>🏗️</div>"
         # Header
@@ -401,8 +527,12 @@ def _build_accum_card(row, currency, bt_win_rates=None):
         f"<div style='margin:8px 0;'>"
         f"<span class='accum-phase-badge accum-phase-{phase}'>{sanitize_text(phase_label)}</span> {loc_html} {zr_html}"
         f"</div>"
-        # V2 Signal Banner (THE KEY ADDITION)
+        # Confidence Score Badge (THE KEY DECISION AID)
+        f"{confidence_badge}"
+        # V2 Signal Banner
         f"{v2_banner}"
+        # News / Announcement Badge
+        f"{news_badge}"
         # Lifecycle summary
         f"{lifecycle_html}"
         # Price
@@ -429,6 +559,8 @@ def _build_accum_card(row, currency, bt_win_rates=None):
         f"{tier2_html}"
         f"</div>"
     )
+    # Strip invalid DOM characters that cause InvalidCharacterError
+    return re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', _card_html)
 
 
 st.set_page_config(
@@ -777,16 +909,16 @@ if scan_results and df is not None and not df.empty:
     _sig_count = get_signal_count()
     _sig_tab_label = f"📋 سجل الإشارات ({_sig_count})" if _sig_count > 0 else "📋 سجل الإشارات"
 
-    tab_vip, tab_wolf, tab_accum, tab_news, tab_whales, tab_ai, tab1, tab5, tab6, tab_backtest, tab_strat_bt, tab_signal_log, tab_track, tab2, tab3, tab4 = st.tabs([
-        "👑 VIP ماسة", "🐺 وولف", "🛡️ التجميع والتصريف", "📰 أخبار ذكية", "🐋 رادار الحيتان", "🧠 التوصيات",
-        "🎯 الاختراقات", "🗂️ ماسح السوق", "🚨 التنبيهات",
-        "⏳ الباك تيست", "📊 تقرير الاستراتيجيات", _sig_tab_label, "📂 المراقبة", "🌐 TradingView",
-        "📊 الشارت", "📋 البيانات"
+
+    tab_accum, tab_vip, tab_news, tab_signal_log, tab_scan, tab_breakouts, tab_alerts, tab_chart, tab_tools = st.tabs([
+        "🛡️ التجميع والتصريف", "👑 VIP ماسة", "📰 الإعلانات",
+        _sig_tab_label, "🗂️ ماسح السوق", "🎯 الاختراقات",
+        "🚨 التنبيهات", "📊 الشارت", "⚙️ أدوات"
     ])
 
-    # ═══════════════════════════════════════════════════════════
+    # ===========================================================
     # TAB: VIP
-    # ═══════════════════════════════════════════════════════════
+    # ===========================================================
     with tab_vip:
         # ── Market Breadth Alert ──
         if _market_breadth_pct is not None and ("السعودي" in market_choice or "الأمريكي" in market_choice):
@@ -1085,81 +1217,206 @@ if scan_results and df is not None and not df.empty:
                 "<div class='empty-box'>السوق لا يحتوي على فرص حالياً.</div>",
                 unsafe_allow_html=True
             )
-
-    # ═══════════════════════════════════════════════════════════
-    # TAB: Wolf V2 Breakouts
-    # ═══════════════════════════════════════════════════════════
-    with tab_wolf:
+    # ===========================================================
+    # TAB: News / Announcements
+    # ===========================================================
+    with tab_news:
         st.markdown(
-            "<h3 style='text-align: center; color: #FF9800; font-weight: 900;'>"
-            "🐺 اختراقات وولف V2 — مرشحات الزخم المؤسساتي</h3>",
+            "<h3 style='text-align: center; color: #FFD700; font-weight: bold;'>"
+            "📰 تحليل الإعلانات + ماسح الكلمات المؤثرة (Gemini AI)</h3>",
             unsafe_allow_html=True
         )
 
+        if not gemini_key:
+            st.markdown(
+                "<div class='empty-box' style='border-color:#FFD700;'>"
+                "🔑 أدخل مفتاح Gemini API في الإعدادات أعلاه لتفعيل تحليل الأخبار الذكي.<br><br>"
+                "ماسح الكلمات المؤثرة يعمل بدون مفتاح — لكن Gemini يحتاج مفتاح للتحليل العميق.<br>"
+                "احصل على مفتاح مجاني من "
+                "<a href='https://ai.google.dev' target='_blank' style='color:#00d2ff;'>ai.google.dev</a>"
+                "</div>",
+                unsafe_allow_html=True
+            )
         if not df_ai_picks.empty:
-            df_wolf_all = pd.DataFrame(df_ai_picks)
-            wolf_col = 'is_wolf' if 'is_wolf' in df_wolf_all.columns else None
-            if wolf_col:
-                df_wolf = df_wolf_all[df_wolf_all['is_wolf'] == True].copy()
-            else:
-                df_wolf = pd.DataFrame()
+            df_news_disp = pd.DataFrame(df_ai_picks)
 
-            if not df_wolf.empty:
-                df_wolf_confirmed = df_wolf[df_wolf['wolf_type'] == 'مؤكد'].sort_values(
-                    'raw_score', ascending=False
-                )
-                df_wolf_only = df_wolf[df_wolf['wolf_type'] == 'فقط'].sort_values(
-                    'raw_score', ascending=False
-                )
+            # Filter: has real news (non-default sentiment or keyword hits)
+            _default_summaries = {"", "لا توجد أخبار", "لا يوجد ملخص"}
+            _sent_col = df_news_disp.get('news_sentiment', pd.Series(['محايد'] * len(df_news_disp)))
+            _sum_col = df_news_disp.get('news_summary', pd.Series([''] * len(df_news_disp)))
+            _conf_col = df_news_disp.get('news_confidence', pd.Series([0] * len(df_news_disp)))
+            has_sentiment = _sent_col != 'محايد'
+            has_real_summary = ~_sum_col.isin(_default_summaries) & (_sum_col.str.len() > 5)
+            has_confidence = _conf_col > 10
+            has_keywords = df_news_disp.get('keyword_score', pd.Series([0] * len(df_news_disp))) != 0
+            has_headlines = df_news_disp.get('news_headlines', pd.Series([[] for _ in range(len(df_news_disp))])).apply(
+                lambda x: isinstance(x, list) and len(x) > 0
+            )
+            df_news_disp = df_news_disp[has_sentiment | has_real_summary | has_confidence | has_keywords | has_headlines]
 
-                col_w1, col_w2, col_w3 = st.columns(3)
-                col_w1.metric("🐺 إشارات وولف", f"{len(df_wolf)}")
-                col_w2.metric("🐺💎 مؤكد (MASA×Wolf)", f"{len(df_wolf_confirmed)}")
-                col_w3.metric("🐺 وولف فقط", f"{len(df_wolf_only)}")
+            # Sort: by absolute keyword score, then confidence
+            if not df_news_disp.empty:
+                if 'keyword_score' in df_news_disp.columns:
+                    df_news_disp['_abs_kw'] = df_news_disp['keyword_score'].abs()
+                    df_news_disp = df_news_disp.sort_values(
+                        by=['_abs_kw', 'news_confidence'], ascending=[False, False]
+                    )
+                    df_news_disp = df_news_disp.drop(columns=['_abs_kw'], errors='ignore')
+                elif 'news_confidence' in df_news_disp.columns:
+                    df_news_disp = df_news_disp.sort_values('news_confidence', ascending=False)
+
+            if not df_news_disp.empty:
+                # Summary stats
+                n_pos = len(df_news_disp[df_news_disp.get('news_sentiment', '') == 'إيجابي'])
+                n_neg = len(df_news_disp[df_news_disp.get('news_sentiment', '') == 'سلبي'])
+                n_neu = len(df_news_disp) - n_pos - n_neg
+                total_killers = int(df_news_disp.get('killer_count', pd.Series([0])).sum())
+                total_rockets = int(df_news_disp.get('rocket_count', pd.Series([0])).sum())
+
+                col_s1, col_s2, col_s3, col_s4, col_s5 = st.columns(5)
+                col_s1.metric("📈 إيجابي", f"{n_pos} سهم")
+                col_s2.metric("📉 سلبي", f"{n_neg} سهم")
+                col_s3.metric("➖ محايد", f"{n_neu} سهم")
+                col_s4.metric("💣 كلمات قاتلة", f"{total_killers}")
+                col_s5.metric("🚀 كلمات صاروخية", f"{total_rockets}")
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # Confirmed signals (orange)
-                if not df_wolf_confirmed.empty:
-                    st.markdown(
-                        "<h4 style='color:#FF9800; text-align:center;'>"
-                        "🐺💎 إشارات مؤكدة (MASA × Wolf)</h4>",
-                        unsafe_allow_html=True
-                    )
-                    wolf_cards = "<div class='wolf-container'>"
-                    for _, wrow in df_wolf_confirmed.iterrows():
-                        wolf_cards += _build_wolf_card(wrow, "confirmed", currency)
-                    wolf_cards += "</div>"
-                    st.markdown(wolf_cards, unsafe_allow_html=True)
+                news_cards = ""
+                for _, row in df_news_disp.iterrows():
+                    n_sent = row.get('news_sentiment', 'محايد')
+                    n_sum = sanitize_text(str(row.get('news_summary', '')))
+                    n_conf = int(row.get('news_confidence', 0))
+                    n_adj = int(row.get('news_adjustment', 0))
+                    n_headlines = row.get('news_headlines', [])
+                    n_name = sanitize_text(str(row.get('الشركة', '')))
+                    n_ticker = str(row.get('الرمز', ''))
+                    kw_hits = row.get('keyword_hits', [])
+                    kw_score = int(row.get('keyword_score', 0))
+                    kw_verdict = str(row.get('keyword_verdict', '⚖️ محايد'))
+                    killer_hits = row.get('killer_hits', [])
+                    rocket_hits = row.get('rocket_hits', [])
 
-                # Wolf-only signals (purple)
-                if not df_wolf_only.empty:
-                    st.markdown(
-                        "<h4 style='color:#CE93D8; text-align:center;'>"
-                        "🐺 إشارات وولف فقط (زخم بدون تأكيد MASA)</h4>",
-                        unsafe_allow_html=True
+                    if n_sent == 'إيجابي':
+                        card_cls = 'news-positive'
+                        badge_cls = 'news-badge-pos'
+                        sent_icon = '📈'
+                        adj_color = '#00E676'
+                    elif n_sent == 'سلبي':
+                        card_cls = 'news-negative'
+                        badge_cls = 'news-badge-neg'
+                        sent_icon = '📉'
+                        adj_color = '#FF5252'
+                    else:
+                        card_cls = 'news-neutral'
+                        badge_cls = 'news-badge-neu'
+                        sent_icon = '➖'
+                        adj_color = '#FFD700'
+
+                    adj_text = f"+{n_adj}" if n_adj > 0 else str(n_adj) if n_adj < 0 else "0"
+
+                    # Confidence bar
+                    bar_color = adj_color
+                    conf_bar = (
+                        f"<div style='background:#2d303e; border-radius:4px; height:8px; width:100%; margin-top:8px;'>"
+                        f"<div style='background:{bar_color}; border-radius:4px; height:8px; width:{n_conf}%;'></div>"
+                        f"</div>"
                     )
-                    wolf_only_cards = "<div class='wolf-container'>"
-                    for _, wrow in df_wolf_only.iterrows():
-                        wolf_only_cards += _build_wolf_card(wrow, "only", currency)
-                    wolf_only_cards += "</div>"
-                    st.markdown(wolf_only_cards, unsafe_allow_html=True)
+
+                    # Keyword tags HTML
+                    kw_html = ""
+                    if isinstance(kw_hits, list) and kw_hits:
+                        kw_tags = ""
+                        for kw, ktype, weight, effect in kw_hits[:8]:
+                            kw_safe = sanitize_text(str(kw))
+                            eff_safe = sanitize_text(str(effect))
+                            if ktype == "💣":
+                                kw_tags += (
+                                    f"<span class='kw-tag kw-killer' title='{eff_safe}'>"
+                                    f"💣 {kw_safe} ({weight}/10)</span>"
+                                )
+                            else:
+                                kw_tags += (
+                                    f"<span class='kw-tag kw-rocket' title='{eff_safe}'>"
+                                    f"🚀 {kw_safe} ({weight}/10)</span>"
+                                )
+
+                        # Verdict badge
+                        if kw_score <= -5:
+                            v_cls = "kw-verdict-danger"
+                        elif kw_score >= 5:
+                            v_cls = "kw-verdict-rocket"
+                        else:
+                            v_cls = "kw-verdict-neutral"
+
+                        kw_html = (
+                            f"<div class='kw-section'>"
+                            f"<div style='font-size:13px; color:#aaa; margin-bottom:8px;'>"
+                            f"🔍 <b>ماسح الكلمات المؤثرة:</b></div>"
+                            f"<div>{kw_tags}</div>"
+                            f"<div style='margin-top:8px;'>"
+                            f"<span class='{v_cls}'>{kw_verdict} (صافي: {kw_score:+d})</span>"
+                            f"</div>"
+                            f"</div>"
+                        )
+
+                    # Headlines list
+                    headlines_html = ""
+                    if isinstance(n_headlines, list) and n_headlines:
+                        items = "".join(
+                            f"<li style='color:#bbb; font-size:13px; margin-bottom:4px;'>"
+                            f"{sanitize_text(str(h.get('title', '')))}"
+                            f"<span style='color:#666; font-size:11px;'> — {sanitize_text(str(h.get('publisher', '')))}</span>"
+                            f"</li>"
+                            for h in n_headlines[:5] if h.get('title')
+                        )
+                        headlines_html = (
+                            f"<details style='margin-top:10px;'>"
+                            f"<summary style='color:#00d2ff; cursor:pointer; font-size:13px;'>"
+                            f"📋 عناوين الأخبار ({len(n_headlines)})</summary>"
+                            f"<ul style='margin-top:5px; padding-right:20px;'>{items}</ul>"
+                            f"</details>"
+                        )
+
+                    news_cards += (
+                        f"<div class='news-card {card_cls}' dir='rtl'>"
+                        f"<div style='display:flex; justify-content:space-between; align-items:center;'>"
+                        f"<div>"
+                        f"<span style='font-size:20px; font-weight:900; color:white;'>{n_name}</span>"
+                        f" <span style='font-size:14px; color:#888;'>({n_ticker})</span>"
+                        f"</div>"
+                        f"<div>"
+                        f"<span class='news-badge {badge_cls}'>{sent_icon} {n_sent}</span>"
+                        f" <span style='color:{adj_color}; font-weight:bold; font-size:16px;'>"
+                        f"({adj_text} نقطة)</span>"
+                        f"</div>"
+                        f"</div>"
+                        f"<div style='margin-top:12px; color:#ddd; font-size:15px;'>{n_sum}</div>"
+                        f"<div style='margin-top:8px; font-size:12px; color:#888;'>"
+                        f"الثقة: {n_conf}%</div>"
+                        f"{conf_bar}"
+                        f"{kw_html}"
+                        f"{headlines_html}"
+                        f"</div>"
+                    )
+
+                st.markdown(news_cards, unsafe_allow_html=True)
             else:
                 st.markdown(
-                    "<div class='empty-box' style='border-color:#FF9800;'>"
-                    "🐺 لا توجد اختراقات وولف حالياً.<br><br>"
-                    "يتطلب اختراق وولف: تغير يومي ≥ 2% + تسارع سيولة ≥ 0.35 + 8 مرشحات إضافية."
-                    "</div>",
+                    "<div class='empty-box' style='border-color:#FFD700;'>"
+                    "📭 لم يتم العثور على أخبار أو كلمات مؤثرة للأسهم الحالية.</div>",
                     unsafe_allow_html=True
                 )
+        elif not gemini_key:
+            pass  # Already shown the API key message above
         else:
             st.markdown(
                 "<div class='empty-box'>📭 اضغط على استخراج الفرص أولاً.</div>",
                 unsafe_allow_html=True
             )
 
-    # ═══════════════════════════════════════════════════════════
-    # TAB: 🏗️ Accumulation Scanner
-    # ═══════════════════════════════════════════════════════════
+    # ===========================================================
+    # TAB: Accumulation & Distribution
+    # ===========================================================
     with tab_accum:
         # Combined decision matrix badge is rendered after pulse data is computed (below)
 
@@ -1230,6 +1487,12 @@ if scan_results and df is not None and not df.empty:
         if not df_ai_picks.empty and 'accum_phase' in df_ai_picks.columns:
             df_accum = pd.DataFrame(df_ai_picks)
             df_accum = df_accum[df_accum['accum_phase'] != 'neutral'].copy()
+
+            # Add confidence stars column for sorting
+            if not df_accum.empty:
+                df_accum['confidence_stars'] = df_accum.apply(
+                    lambda r: _calc_confidence(r)[0], axis=1
+                )
 
             if not df_accum.empty:
                 # Phase counts for metrics
@@ -1589,7 +1852,7 @@ if scan_results and df is not None and not df.empty:
                 _bt_rates = st.session_state.get('bt_win_rates', {})
 
                 # ── Section 1: Late accumulation (ready to launch)
-                df_late = df_accum[df_accum['accum_phase'] == 'late'].sort_values('accum_score', ascending=False)
+                df_late = df_accum[df_accum['accum_phase'] == 'late'].sort_values(['confidence_stars', 'accum_score'], ascending=[False, False])
                 if not df_late.empty:
                     st.markdown(
                         "<h4 style='color:#00E676; margin-top:20px;'>"
@@ -1603,7 +1866,7 @@ if scan_results and df is not None and not df.empty:
                     st.markdown(cards_html, unsafe_allow_html=True)
 
                 # ── Section 1b: Pullback Buy (healthy retest — second chance!)
-                df_pb_buy = df_accum[df_accum['accum_phase'] == 'pullback_buy'].sort_values('accum_score', ascending=False)
+                df_pb_buy = df_accum[df_accum['accum_phase'] == 'pullback_buy'].sort_values(['confidence_stars', 'accum_score'], ascending=[False, False])
                 if not df_pb_buy.empty:
                     st.markdown(
                         "<h4 style='color:#4CAF50; margin-top:20px;'>"
@@ -1619,7 +1882,7 @@ if scan_results and df is not None and not df.empty:
                     st.markdown(cards_html, unsafe_allow_html=True)
 
                 # ── Section 1c: Active Breakout
-                df_bo = df_accum[df_accum['accum_phase'] == 'breakout'].sort_values('accum_score', ascending=False)
+                df_bo = df_accum[df_accum['accum_phase'] == 'breakout'].sort_values(['confidence_stars', 'accum_score'], ascending=[False, False])
                 if not df_bo.empty:
                     st.markdown(
                         "<h4 style='color:#FF9800; margin-top:20px;'>"
@@ -1635,7 +1898,7 @@ if scan_results and df is not None and not df.empty:
                     st.markdown(cards_html, unsafe_allow_html=True)
 
                 # ── Section 2: Strong accumulation
-                df_strong = df_accum[df_accum['accum_phase'] == 'strong'].sort_values('accum_score', ascending=False)
+                df_strong = df_accum[df_accum['accum_phase'] == 'strong'].sort_values(['confidence_stars', 'accum_score'], ascending=[False, False])
                 if not df_strong.empty:
                     st.markdown(
                         "<h4 style='color:#2196F3; margin-top:20px;'>"
@@ -1651,7 +1914,7 @@ if scan_results and df is not None and not df.empty:
                 # ── Section 3: Early + Mid (table)
                 df_early_mid = df_accum[
                     df_accum['accum_phase'].isin(['early', 'mid'])
-                ].sort_values('accum_score', ascending=False)
+                ].sort_values(['confidence_stars', 'accum_score'], ascending=[False, False])
                 if not df_early_mid.empty:
                     st.markdown(
                         "<h4 style='color:#CE93D8; margin-top:20px;'>"
@@ -1660,7 +1923,7 @@ if scan_results and df is not None and not df.empty:
                     )
                     table_html = (
                         "<table class='whale-table'><thead><tr>"
-                        "<th>الأصل</th><th>المرحلة</th><th>السكور</th>"
+                        "<th>الأصل</th><th>الثقة ⭐</th><th>المرحلة</th><th>السكور</th>"
                         "<th>CMF</th><th>أيام التراكم</th>"
                         "<th>الضغط ⚡</th><th>وولف 🐺</th><th>MASA</th>"
                         "</tr></thead><tbody>"
@@ -1675,9 +1938,13 @@ if scan_results and df is not None and not df.empty:
                         pr_c = "#f44336" if pr_val >= 80 else "#FF9800" if pr_val >= 50 else "#4CAF50"
                         wr_val = row.get('wolf_readiness', 0)
                         wr_c = "#00E676" if wr_val >= 7 else "#FF9800" if wr_val >= 5 else "#FF5252"
+                        _row_stars = row.get('confidence_stars', 0)
+                        _row_stars_display = "⭐" * _row_stars + "☆" * (5 - _row_stars)
+                        _row_stars_color = "#00E676" if _row_stars >= 4 else "#69F0AE" if _row_stars >= 3 else "#FFD700" if _row_stars >= 2 else "#FF5252"
                         table_html += (
                             f"<tr>"
                             f"<td style='color:white; font-weight:bold;'>{sanitize_text(str(row['الشركة']))}</td>"
+                            f"<td style='color:{_row_stars_color}; font-weight:bold; font-size:12px;'>{_row_stars_display} {_row_stars}/5</td>"
                             f"<td><span class='accum-phase-badge accum-phase-{ph}'>{ph_label}</span></td>"
                             f"<td style='color:{ph_color}; font-weight:bold;'>{row.get('accum_score', 0):.0f}/100</td>"
                             f"<td style='color:{cmf_c};'>{cmf_val:+.3f}</td>"
@@ -1691,7 +1958,7 @@ if scan_results and df is not None and not df.empty:
                     st.markdown(table_html, unsafe_allow_html=True)
 
                 # ── Section 3b: Pullback Wait (uncertain)
-                df_pb_wait = df_accum[df_accum['accum_phase'] == 'pullback_wait'].sort_values('accum_score', ascending=False)
+                df_pb_wait = df_accum[df_accum['accum_phase'] == 'pullback_wait'].sort_values(['confidence_stars', 'accum_score'], ascending=[False, False])
                 if not df_pb_wait.empty:
                     st.markdown(
                         "<h4 style='color:#FFC107; margin-top:20px;'>"
@@ -1705,7 +1972,7 @@ if scan_results and df is not None and not df.empty:
                     st.markdown(cards_html, unsafe_allow_html=True)
 
                 # ── Section 3c: Exhausted (opportunity gone)
-                df_exhaust = df_accum[df_accum['accum_phase'] == 'exhausted'].sort_values('accum_score', ascending=False)
+                df_exhaust = df_accum[df_accum['accum_phase'] == 'exhausted'].sort_values(['confidence_stars', 'accum_score'], ascending=[False, False])
                 if not df_exhaust.empty:
                     st.markdown(
                         "<h4 style='color:#E91E63; margin-top:20px;'>"
@@ -1759,1130 +2026,9 @@ if scan_results and df is not None and not df.empty:
                 "<div class='empty-box'>📭 اضغط على استخراج الفرص أولاً.</div>",
                 unsafe_allow_html=True
             )
-
-    # ═══════════════════════════════════════════════════════════
-    # TAB: Smart News (Gemini AI)
-    # ═══════════════════════════════════════════════════════════
-    with tab_news:
-        st.markdown(
-            "<h3 style='text-align: center; color: #FFD700; font-weight: bold;'>"
-            "📰 تحليل الأخبار + ماسح الكلمات المؤثرة (Gemini AI)</h3>",
-            unsafe_allow_html=True
-        )
-
-        if not gemini_key:
-            st.markdown(
-                "<div class='empty-box' style='border-color:#FFD700;'>"
-                "🔑 أدخل مفتاح Gemini API في الإعدادات أعلاه لتفعيل تحليل الأخبار الذكي.<br><br>"
-                "ماسح الكلمات المؤثرة يعمل بدون مفتاح — لكن Gemini يحتاج مفتاح للتحليل العميق.<br>"
-                "احصل على مفتاح مجاني من "
-                "<a href='https://ai.google.dev' target='_blank' style='color:#00d2ff;'>ai.google.dev</a>"
-                "</div>",
-                unsafe_allow_html=True
-            )
-        if not df_ai_picks.empty:
-            df_news_disp = pd.DataFrame(df_ai_picks)
-
-            # Filter: has real news (non-default sentiment or keyword hits)
-            _default_summaries = {"", "لا توجد أخبار", "لا يوجد ملخص"}
-            _sent_col = df_news_disp.get('news_sentiment', pd.Series(['محايد'] * len(df_news_disp)))
-            _sum_col = df_news_disp.get('news_summary', pd.Series([''] * len(df_news_disp)))
-            _conf_col = df_news_disp.get('news_confidence', pd.Series([0] * len(df_news_disp)))
-            has_sentiment = _sent_col != 'محايد'
-            has_real_summary = ~_sum_col.isin(_default_summaries) & (_sum_col.str.len() > 5)
-            has_confidence = _conf_col > 10
-            has_keywords = df_news_disp.get('keyword_score', pd.Series([0] * len(df_news_disp))) != 0
-            has_headlines = df_news_disp.get('news_headlines', pd.Series([[] for _ in range(len(df_news_disp))])).apply(
-                lambda x: isinstance(x, list) and len(x) > 0
-            )
-            df_news_disp = df_news_disp[has_sentiment | has_real_summary | has_confidence | has_keywords | has_headlines]
-
-            # Sort: by absolute keyword score, then confidence
-            if not df_news_disp.empty:
-                if 'keyword_score' in df_news_disp.columns:
-                    df_news_disp['_abs_kw'] = df_news_disp['keyword_score'].abs()
-                    df_news_disp = df_news_disp.sort_values(
-                        by=['_abs_kw', 'news_confidence'], ascending=[False, False]
-                    )
-                    df_news_disp = df_news_disp.drop(columns=['_abs_kw'], errors='ignore')
-                elif 'news_confidence' in df_news_disp.columns:
-                    df_news_disp = df_news_disp.sort_values('news_confidence', ascending=False)
-
-            if not df_news_disp.empty:
-                # Summary stats
-                n_pos = len(df_news_disp[df_news_disp.get('news_sentiment', '') == 'إيجابي'])
-                n_neg = len(df_news_disp[df_news_disp.get('news_sentiment', '') == 'سلبي'])
-                n_neu = len(df_news_disp) - n_pos - n_neg
-                total_killers = int(df_news_disp.get('killer_count', pd.Series([0])).sum())
-                total_rockets = int(df_news_disp.get('rocket_count', pd.Series([0])).sum())
-
-                col_s1, col_s2, col_s3, col_s4, col_s5 = st.columns(5)
-                col_s1.metric("📈 إيجابي", f"{n_pos} سهم")
-                col_s2.metric("📉 سلبي", f"{n_neg} سهم")
-                col_s3.metric("➖ محايد", f"{n_neu} سهم")
-                col_s4.metric("💣 كلمات قاتلة", f"{total_killers}")
-                col_s5.metric("🚀 كلمات صاروخية", f"{total_rockets}")
-                st.markdown("<br>", unsafe_allow_html=True)
-
-                news_cards = ""
-                for _, row in df_news_disp.iterrows():
-                    n_sent = row.get('news_sentiment', 'محايد')
-                    n_sum = sanitize_text(str(row.get('news_summary', '')))
-                    n_conf = int(row.get('news_confidence', 0))
-                    n_adj = int(row.get('news_adjustment', 0))
-                    n_headlines = row.get('news_headlines', [])
-                    n_name = sanitize_text(str(row.get('الشركة', '')))
-                    n_ticker = str(row.get('الرمز', ''))
-                    kw_hits = row.get('keyword_hits', [])
-                    kw_score = int(row.get('keyword_score', 0))
-                    kw_verdict = str(row.get('keyword_verdict', '⚖️ محايد'))
-                    killer_hits = row.get('killer_hits', [])
-                    rocket_hits = row.get('rocket_hits', [])
-
-                    if n_sent == 'إيجابي':
-                        card_cls = 'news-positive'
-                        badge_cls = 'news-badge-pos'
-                        sent_icon = '📈'
-                        adj_color = '#00E676'
-                    elif n_sent == 'سلبي':
-                        card_cls = 'news-negative'
-                        badge_cls = 'news-badge-neg'
-                        sent_icon = '📉'
-                        adj_color = '#FF5252'
-                    else:
-                        card_cls = 'news-neutral'
-                        badge_cls = 'news-badge-neu'
-                        sent_icon = '➖'
-                        adj_color = '#FFD700'
-
-                    adj_text = f"+{n_adj}" if n_adj > 0 else str(n_adj) if n_adj < 0 else "0"
-
-                    # Confidence bar
-                    bar_color = adj_color
-                    conf_bar = (
-                        f"<div style='background:#2d303e; border-radius:4px; height:8px; width:100%; margin-top:8px;'>"
-                        f"<div style='background:{bar_color}; border-radius:4px; height:8px; width:{n_conf}%;'></div>"
-                        f"</div>"
-                    )
-
-                    # Keyword tags HTML
-                    kw_html = ""
-                    if isinstance(kw_hits, list) and kw_hits:
-                        kw_tags = ""
-                        for kw, ktype, weight, effect in kw_hits[:8]:
-                            kw_safe = sanitize_text(str(kw))
-                            eff_safe = sanitize_text(str(effect))
-                            if ktype == "💣":
-                                kw_tags += (
-                                    f"<span class='kw-tag kw-killer' title='{eff_safe}'>"
-                                    f"💣 {kw_safe} ({weight}/10)</span>"
-                                )
-                            else:
-                                kw_tags += (
-                                    f"<span class='kw-tag kw-rocket' title='{eff_safe}'>"
-                                    f"🚀 {kw_safe} ({weight}/10)</span>"
-                                )
-
-                        # Verdict badge
-                        if kw_score <= -5:
-                            v_cls = "kw-verdict-danger"
-                        elif kw_score >= 5:
-                            v_cls = "kw-verdict-rocket"
-                        else:
-                            v_cls = "kw-verdict-neutral"
-
-                        kw_html = (
-                            f"<div class='kw-section'>"
-                            f"<div style='font-size:13px; color:#aaa; margin-bottom:8px;'>"
-                            f"🔍 <b>ماسح الكلمات المؤثرة:</b></div>"
-                            f"<div>{kw_tags}</div>"
-                            f"<div style='margin-top:8px;'>"
-                            f"<span class='{v_cls}'>{kw_verdict} (صافي: {kw_score:+d})</span>"
-                            f"</div>"
-                            f"</div>"
-                        )
-
-                    # Headlines list
-                    headlines_html = ""
-                    if isinstance(n_headlines, list) and n_headlines:
-                        items = "".join(
-                            f"<li style='color:#bbb; font-size:13px; margin-bottom:4px;'>"
-                            f"{sanitize_text(str(h.get('title', '')))}"
-                            f"<span style='color:#666; font-size:11px;'> — {sanitize_text(str(h.get('publisher', '')))}</span>"
-                            f"</li>"
-                            for h in n_headlines[:5] if h.get('title')
-                        )
-                        headlines_html = (
-                            f"<details style='margin-top:10px;'>"
-                            f"<summary style='color:#00d2ff; cursor:pointer; font-size:13px;'>"
-                            f"📋 عناوين الأخبار ({len(n_headlines)})</summary>"
-                            f"<ul style='margin-top:5px; padding-right:20px;'>{items}</ul>"
-                            f"</details>"
-                        )
-
-                    news_cards += (
-                        f"<div class='news-card {card_cls}' dir='rtl'>"
-                        f"<div style='display:flex; justify-content:space-between; align-items:center;'>"
-                        f"<div>"
-                        f"<span style='font-size:20px; font-weight:900; color:white;'>{n_name}</span>"
-                        f" <span style='font-size:14px; color:#888;'>({n_ticker})</span>"
-                        f"</div>"
-                        f"<div>"
-                        f"<span class='news-badge {badge_cls}'>{sent_icon} {n_sent}</span>"
-                        f" <span style='color:{adj_color}; font-weight:bold; font-size:16px;'>"
-                        f"({adj_text} نقطة)</span>"
-                        f"</div>"
-                        f"</div>"
-                        f"<div style='margin-top:12px; color:#ddd; font-size:15px;'>{n_sum}</div>"
-                        f"<div style='margin-top:8px; font-size:12px; color:#888;'>"
-                        f"الثقة: {n_conf}%</div>"
-                        f"{conf_bar}"
-                        f"{kw_html}"
-                        f"{headlines_html}"
-                        f"</div>"
-                    )
-
-                st.markdown(news_cards, unsafe_allow_html=True)
-            else:
-                st.markdown(
-                    "<div class='empty-box' style='border-color:#FFD700;'>"
-                    "📭 لم يتم العثور على أخبار أو كلمات مؤثرة للأسهم الحالية.</div>",
-                    unsafe_allow_html=True
-                )
-        elif not gemini_key:
-            pass  # Already shown the API key message above
-        else:
-            st.markdown(
-                "<div class='empty-box'>📭 اضغط على استخراج الفرص أولاً.</div>",
-                unsafe_allow_html=True
-            )
-
-    # ═══════════════════════════════════════════════════════════
-    # TAB: Whales
-    # ═══════════════════════════════════════════════════════════
-    with tab_whales:
-        st.markdown(
-            "<h3 style='text-align: center; color: #00d2ff; font-weight: bold;'>"
-            "🧲 رادار تدفق السيولة (أثر الحيتان)</h3>",
-            unsafe_allow_html=True
-        )
-        if not df_loads.empty:
-            df_w = pd.DataFrame(df_loads).copy()
-            df_w['acc_score'] = df_w['raw_3d'] + df_w['raw_5d'] + df_w['raw_10d']
-            df_acc = df_w[(df_w['raw_3d'] > 0) & (df_w['raw_5d'] > 0) & (df_w['raw_10d'] > 0)]
-            df_acc = df_acc.sort_values('acc_score', ascending=False).head(10)
-            df_dist = df_w[(df_w['raw_3d'] < 0) & (df_w['raw_5d'] < 0) & (df_w['raw_10d'] < 0)]
-            df_dist = df_dist.sort_values('acc_score', ascending=True).head(10)
-
-            col_w1, col_w2 = st.columns(2)
-            with col_w1:
-                st.markdown(
-                    "<div style='background:rgba(0,230,118,0.15); border:1px solid #00E676; "
-                    "padding:10px; text-align:center; border-radius:8px; margin-bottom:10px;'>"
-                    "<h4 style='color:#00E676; margin:0;'>🟩 أقوى 10 أصول (تجميع مؤسساتي)</h4></div>",
-                    unsafe_allow_html=True
-                )
-                if not df_acc.empty:
-                    acc_html = (
-                        "<table class='whale-table whale-acc' dir='rtl'>"
-                        "<tr><th>الأصل</th><th>3 فترات</th><th>5 فترات</th>"
-                        "<th>10 فترات</th><th>الحالة</th></tr>"
-                    )
-                    for _, r in df_acc.iterrows():
-                        n = sanitize_text(str(r['الشركة']))
-                        acc_html += (
-                            f"<tr><td style='color:#00d2ff;'>{n}</td>"
-                            f"<td><span style='color:#00E676;'>+{r['raw_3d']:.2f}%</span></td>"
-                            f"<td><span style='color:#00E676;'>+{r['raw_5d']:.2f}%</span></td>"
-                            f"<td><span style='color:#00E676;'>+{r['raw_10d']:.2f}%</span></td>"
-                            f"<td>🔥 تجميع</td></tr>"
-                        )
-                    acc_html += "</table>"
-                    st.markdown(acc_html, unsafe_allow_html=True)
-                else:
-                    st.markdown(
-                        "<div class='empty-box' style='border-color:#00E676;'>"
-                        "لا توجد عمليات تجميع واضحة حالياً.</div>",
-                        unsafe_allow_html=True
-                    )
-
-            with col_w2:
-                st.markdown(
-                    "<div style='background:rgba(255,82,82,0.15); border:1px solid #FF5252; "
-                    "padding:10px; text-align:center; border-radius:8px; margin-bottom:10px;'>"
-                    "<h4 style='color:#FF5252; margin:0;'>🟥 أضعف 10 أصول (تصريف دموي)</h4></div>",
-                    unsafe_allow_html=True
-                )
-                if not df_dist.empty:
-                    dist_html = (
-                        "<table class='whale-table whale-dist' dir='rtl'>"
-                        "<tr><th>الأصل</th><th>3 فترات</th><th>5 فترات</th>"
-                        "<th>10 فترات</th><th>الحالة</th></tr>"
-                    )
-                    for _, r in df_dist.iterrows():
-                        n = sanitize_text(str(r['الشركة']))
-                        dist_html += (
-                            f"<tr><td style='color:#00d2ff;'>{n}</td>"
-                            f"<td><span style='color:#FF5252;'>{r['raw_3d']:.2f}%</span></td>"
-                            f"<td><span style='color:#FF5252;'>{r['raw_5d']:.2f}%</span></td>"
-                            f"<td><span style='color:#FF5252;'>{r['raw_10d']:.2f}%</span></td>"
-                            f"<td>🩸 تصريف</td></tr>"
-                        )
-                    dist_html += "</table>"
-                    st.markdown(dist_html, unsafe_allow_html=True)
-                else:
-                    st.markdown(
-                        "<div class='empty-box' style='border-color:#FF5252;'>"
-                        "لا توجد عمليات تصريف واضحة حالياً.</div>",
-                        unsafe_allow_html=True
-                    )
-        else:
-            st.info("لا توجد بيانات كافية.")
-
-    # ═══════════════════════════════════════════════════════════
-    # TAB: AI Recommendations
-    # ═══════════════════════════════════════════════════════════
-    with tab_ai:
-        # ── Market Breadth Alert ──
-        if _market_breadth_pct is not None and ("السعودي" in market_choice or "الأمريكي" in market_choice):
-            if _market_breadth_pct < 45:
-                st.markdown(
-                    f"<div style='background:rgba(255,82,82,0.1); border:1px solid #FF5252; border-radius:10px; "
-                    f"padding:10px 16px; margin-bottom:15px; text-align:center; direction:rtl;'>"
-                    f"<span style='font-size:15px; font-weight:700; color:#FF5252;'>"
-                    f"🚨 السوق غير مناسب للشراء — الاتساع {_market_breadth_pct}%</span></div>",
-                    unsafe_allow_html=True,
-                )
-            elif _market_breadth_pct >= 55:
-                st.markdown(
-                    f"<div style='background:rgba(0,230,118,0.08); border:1px solid #00E676; border-radius:10px; "
-                    f"padding:10px 16px; margin-bottom:15px; text-align:center; direction:rtl;'>"
-                    f"<span style='font-size:15px; font-weight:700; color:#00E676;'>"
-                    f"✅ السوق مناسب للشراء — الاتساع {_market_breadth_pct}%</span></div>",
-                    unsafe_allow_html=True,
-                )
-
-        st.markdown(
-            "<h3 style='text-align: center; color: #00d2ff; margin-bottom: 20px;'>"
-            "🧠 تقرير أشعة إكس (تحليل الخوارزمية المفصل)</h3>",
-            unsafe_allow_html=True
-        )
-        if not df_ai_picks.empty:
-            df_ai_disp = pd.DataFrame(df_ai_picks).sort_values("Score 💯", ascending=False)
-            for _, row in df_ai_disp.iterrows():
-                safe_reasons = [sanitize_text(str(r)) for r in row['raw_reasons']]
-                reasons_html = "".join(
-                    f"<li style='font-size:14px; color:#ddd; margin-bottom:8px; "
-                    f"line-height:1.6;'>{r}</li>" for r in safe_reasons
-                )
-
-                c_name = sanitize_text(str(row['الشركة']))
-                c_score = str(row['Score 💯'])
-                c_dec = sanitize_text(str(row['التوصية 🚦']))
-                c_col = str(row['اللون'])
-
-                # Wolf indicator for AI tab
-                ai_wolf_html = ""
-                if row.get('is_wolf', False):
-                    w_type = row.get('wolf_type', '')
-                    w_cls = "wolf-badge-confirmed" if w_type == "مؤكد" else "wolf-badge-only"
-                    w_lbl = "🐺💎 وولف مؤكد" if w_type == "مؤكد" else "🐺 وولف"
-                    ai_wolf_html = f"<span class='wolf-badge {w_cls}' style='margin-right:10px;'>{w_lbl}</span>"
-
-                # Confluence stars for AI tab
-                ai_conf_html = ""
-                ai_stars = int(row.get('confluence_stars', 0))
-                ai_conf_display = str(row.get('confluence_display', ''))
-                if ai_stars >= 2:
-                    ai_conf_html = (
-                        f"<span class='confluence-badge' style='margin-right:10px;'>"
-                        f"{ai_conf_display} {ai_stars} تلاقي</span>"
-                    )
-
-                # Sector tag for AI tab
-                ai_sector_html = ""
-                ai_sector = str(row.get('stock_sector', ''))
-                if ai_sector:
-                    ai_sector_html = f"<span class='sector-tag' style='margin-right:8px;'>{sanitize_text(ai_sector)}</span>"
-
-                # Divergence badges for AI tab
-                ai_div_html = ""
-                rsi_div_type = str(row.get('rsi_divergence_type', 'none'))
-                vol_div_type = str(row.get('vol_price_div_type', 'none'))
-                if rsi_div_type == "bearish":
-                    ai_div_html += "<span class='div-badge div-bearish'>📉 تباين RSI</span>"
-                elif rsi_div_type == "bullish":
-                    ai_div_html += "<span class='div-badge div-bullish'>📈 تباين RSI</span>"
-                if vol_div_type == "bearish":
-                    ai_div_html += "<span class='div-badge div-bearish'>📉 تباين حجم</span>"
-                elif vol_div_type == "bullish":
-                    ai_div_html += "<span class='div-badge div-bullish'>📈 تباين حجم</span>"
-
-                try:
-                    st.markdown(f"""
-                    <div style='background: linear-gradient(145deg, #1a1c24, #12141a);
-                         border: 1px solid {c_col}50; border-right: 6px solid {c_col};
-                         border-radius: 12px; padding: clamp(12px, 3vw, 20px); margin-bottom: 20px;
-                         box-shadow: 0 8px 20px rgba(0,0,0,0.4);' dir='rtl'>
-                        <div style='display: flex; flex-wrap:wrap; justify-content: space-between; align-items: center; gap:8px;
-                             border-bottom: 1px dashed #2d303e; padding-bottom: 12px; margin-bottom: 12px;'>
-                            <div style='font-size: clamp(16px, 4vw, 24px); font-weight: 900; color: #fff;'>
-                                {c_name} {ai_sector_html}<span style='font-size:clamp(12px, 3vw, 16px); color:#888;'>({row['الرمز']})</span>
-                            </div>
-                            <div>{ai_conf_html}{ai_wolf_html}{ai_div_html}<span style='font-size: clamp(20px, 5vw, 28px); font-weight: bold; color: {c_col};
-                                 text-shadow: 0 0 15px {c_col}40;'>{c_score}/100</span></div>
-                        </div>
-                        <div style='display: flex; flex-wrap: wrap; gap: 15px;'>
-                            <div style='flex: 1; min-width: 0;'>
-                                <div style='margin-bottom: 15px; font-size: 16px; color: #ccc;'>
-                                    <b>💵 السعر:</b>
-                                    <span style='color: white; font-weight: bold; font-size: 18px;'>
-                                        {row['السعر']}
-                                    </span>
-                                </div>
-                                <div style='margin-bottom: 18px; font-size: 16px;'>
-                                    <b>🚦 القرار:</b>
-                                    <span style='color:{c_col}; font-weight:900; background-color:{c_col}20;
-                                           padding:6px 12px; border-radius:8px; border: 1px solid {c_col}50;'>
-                                        {c_dec}
-                                    </span>
-                                </div>
-                                <div style='font-size: 16px; color: #ccc;'>
-                                    <b>⚡ الحدث:</b><br>
-                                    <div style='margin-top:10px;'>{row['الحالة اللحظية ⚡']}</div>
-                                </div>
-                            </div>
-                            <div style='flex: 2; min-width: 0; background: rgba(0,0,0,0.3);
-                                 padding: 20px; border-radius: 10px; border: 1px solid #2d303e;'>
-                                <b style='color:#00d2ff; font-size: 16px;'>🔬 تقرير الذكاء الاصطناعي:</b>
-                                <ul style='margin-top: 12px; padding-right: 25px; list-style-type: disc;'>
-                                    {reasons_html}
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                except Exception:
-                    st.error(f"⚠️ تعذر عرض بطاقة {row['الرمز']}.")
-        else:
-            st.markdown(
-                "<div class='empty-box'>📉 لا توجد أصول مطابقة للمعايير حالياً.</div>",
-                unsafe_allow_html=True
-            )
-
-    # ═══════════════════════════════════════════════════════════
-    # TAB: Breakouts Chart
-    # ═══════════════════════════════════════════════════════════
-    with tab1:
-        c1, c2, c3, c4 = st.columns(4)
-        show_3d = c1.checkbox(f"عرض 3 {lbl} 🟠", value=True)
-        show_4d = c2.checkbox(f"عرض 4 {lbl} 🟢", value=False)
-        show_10d = c3.checkbox(f"عرض 10 {lbl} 🟣", value=True)
-        show_15d = c4.checkbox(f"عرض 15 {lbl} 🔴", value=False)
-
-        df_plot2 = df.tail(150).copy()
-        fig2 = go.Figure()
-        fig2.add_trace(go.Scatter(
-            x=df_plot2.index, y=df_plot2['Close'], mode='lines+markers',
-            name='السعر', line=dict(color='dodgerblue', width=2), marker=dict(size=5)
-        ))
-
-        def add_channel(fig, h_col, l_col, color, dash, name, m_color, m_size, s_up, s_dn):
-            if h_col in df_plot2.columns and l_col in df_plot2.columns:
-                fig.add_trace(go.Scatter(
-                    x=df_plot2.index, y=df_plot2[h_col],
-                    line=dict(color=color, width=1.5, dash=dash, shape='hv'),
-                    name=f'مقاومة {name}'
-                ))
-                fig.add_trace(go.Scatter(
-                    x=df_plot2.index, y=df_plot2[l_col],
-                    line=dict(color=color, width=1.5, dash=dash, shape='hv'),
-                    name=f'دعم {name}'
-                ))
-                bo_up = df_plot2[
-                    (df_plot2['Close'] > df_plot2[h_col])
-                    & (df_plot2['Close'].shift(1) <= df_plot2[h_col].shift(1))
-                ]
-                bo_dn = df_plot2[
-                    (df_plot2['Close'] < df_plot2[l_col])
-                    & (df_plot2['Close'].shift(1) >= df_plot2[l_col].shift(1))
-                ]
-                fig.add_trace(go.Scatter(
-                    x=bo_up.index, y=bo_up['Close'], mode='markers',
-                    marker=dict(symbol=s_up, size=m_size, color=m_color,
-                                line=dict(width=1, color='black')),
-                    name=f'اختراق {name}'
-                ))
-                fig.add_trace(go.Scatter(
-                    x=bo_dn.index, y=bo_dn['Close'], mode='markers',
-                    marker=dict(symbol=s_dn, size=m_size, color='red',
-                                line=dict(width=1, color='black')),
-                    name=f'كسر {name}'
-                ))
-
-        if show_3d:
-            add_channel(fig2, 'High_3D', 'Low_3D', 'orange', 'dot',
-                        f'3 {lbl}', 'orange', 12, 'triangle-up', 'triangle-down')
-        if show_4d:
-            add_channel(fig2, 'High_4D', 'Low_4D', '#4caf50', 'dash',
-                        f'4 {lbl}', '#4caf50', 12, 'triangle-up', 'triangle-down')
-        if show_10d:
-            add_channel(fig2, 'High_10D', 'Low_10D', '#9c27b0', 'solid',
-                        f'10 {lbl}', '#9c27b0', 14, 'diamond', 'diamond-tall')
-        if show_15d:
-            add_channel(fig2, 'High_15D', 'Low_15D', '#f44336', 'dashdot',
-                        f'15 {lbl}', '#f44336', 16, 'star', 'star-triangle-down')
-
-        fig2.update_layout(
-            height=650, hovermode='x unified', template='plotly_dark',
-            margin=dict(l=10, r=10, t=10, b=10),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        )
-        if selected_interval != "1d":
-            if is_crypto_main:
-                pass
-            elif is_fx_main:
-                fig2.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
-            else:
-                fig2.update_xaxes(rangebreaks=[
-                    dict(bounds=["sat", "mon"]),
-                    dict(bounds=[16, 9], pattern="hour"),
-                ])
-        st.plotly_chart(fig2, use_container_width=True, config={'displayModeBar': False})
-
-    # ═══════════════════════════════════════════════════════════
-    # TAB: Market Scanner Table
-    # ═══════════════════════════════════════════════════════════
-    with tab5:
-        if not df_loads.empty:
-            df_ls = pd.DataFrame(df_loads).copy()
-            try:
-                # Build clean table like البيانات tab
-                _scan_table = {}
-
-                # Basic columns
-                if 'الشركة' in df_ls.columns:
-                    _scan_table['الشركة'] = df_ls['الشركة'].tolist()
-                if 'التاريخ' in df_ls.columns:
-                    _scan_table['التاريخ'] = df_ls['التاريخ'].tolist()
-                if 'الاتجاه' in df_ls.columns:
-                    _scan_table['الاتجاه'] = df_ls['الاتجاه'].tolist()
-
-                # Format change columns with colors (same style as البيانات)
-                for src_col, cat_col in [
-                    (col_change_name, '1d_cat'),
-                    (f'تراكمي 3 {lbl}', '3d_cat'),
-                    (f'تراكمي 5 {lbl}', '5d_cat'),
-                    (f'تراكمي 10 {lbl}', '10d_cat'),
-                ]:
-                    if src_col in df_ls.columns:
-                        cat_series = df_ls.get(cat_col, pd.Series([""] * len(df_ls)))
-                        _scan_table[src_col] = [
-                            _format_cat(v, c) for v, c in zip(df_ls[src_col], cat_series)
-                        ]
-
-                # Status columns (حالة)
-                for st_col in [f'حالة 3 {lbl}', f'حالة 5 {lbl}', f'حالة 10 {lbl}']:
-                    if st_col in df_ls.columns:
-                        _scan_table[st_col] = df_ls[st_col].tolist()
-
-                _df_scan = pd.DataFrame(_scan_table)
-                _df_scan = _df_scan.fillna('')
-
-                _style_cols = [
-                    c for c in [
-                        col_change_name,
-                        f'تراكمي 3 {lbl}', f'حالة 3 {lbl}',
-                        f'تراكمي 5 {lbl}', f'حالة 5 {lbl}',
-                        f'تراكمي 10 {lbl}', f'حالة 10 {lbl}',
-                    ]
-                    if c in _df_scan.columns
-                ]
-                if _style_cols:
-                    st.dataframe(
-                        _df_scan.style.map(safe_color_table, subset=_style_cols),
-                        use_container_width=True, height=550,
-                    )
-                else:
-                    st.dataframe(_df_scan, use_container_width=True, height=550)
-            except Exception:
-                st.dataframe(df_ls.astype(str), use_container_width=True, height=550)
-        else:
-            st.markdown(
-                "<div class='empty-box'>📭 لا توجد بيانات للتحليل.</div>",
-                unsafe_allow_html=True
-            )
-
-    # ═══════════════════════════════════════════════════════════
-    # TAB: Alerts
-    # ═══════════════════════════════════════════════════════════
-    with tab6:
-        if not df_alerts.empty:
-            df_al = pd.DataFrame(df_alerts).fillna('')
-            try:
-                if 'التنبيه' in df_al.columns:
-                    st.dataframe(
-                        df_al.style.map(safe_color_table, subset=['التنبيه']),
-                        use_container_width=True, height=550,
-                    )
-                else:
-                    st.dataframe(df_al.astype(str), use_container_width=True, height=550)
-            except Exception:
-                st.dataframe(df_al.astype(str), use_container_width=True, height=550)
-        else:
-            st.markdown(
-                "<div class='empty-box'>لم يتم رصد أي اختراقات أو كسور في السوق.</div>",
-                unsafe_allow_html=True
-            )
-
-    # ═══════════════════════════════════════════════════════════
-    # TAB: Backtest
-    # ═══════════════════════════════════════════════════════════
-    with tab_backtest:
-        st.markdown(
-            "<h3 style='text-align: center; color: #FFD700;'>"
-            "🔬 اختبار رجعي — دقة إشارات التجميع والتصريف</h3>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            "<p style='text-align:center; color:#888; font-size:13px; margin-top:-10px;'>"
-            "يختبر دقة إشارات المنصة تاريخياً: كم إشارة نجحت فعلاً؟</p>",
-            unsafe_allow_html=True,
-        )
-
-        # Determine tickers for current market
-        if "السعودي" in market_choice:
-            _bt_tickers = tuple(SAUDI_NAMES.keys())
-            _bt_market_label = "السوق السعودي"
-        elif "الأمريكي" in market_choice:
-            _bt_tickers = tuple(US_NAMES.keys())
-            _bt_market_label = "السوق الأمريكي"
-        else:
-            _bt_tickers = ()
-            _bt_market_label = ""
-
-        if not _bt_tickers:
-            st.info("الباك تيست متاح فقط للأسهم (السعودي والأمريكي).")
-        else:
-            _bt_run = st.button("📊 شغّل الباك تيست", use_container_width=True, type="primary")
-
-            if _bt_run:
-                with st.spinner("جاري تحليل الإشارات التاريخية + اتساع السوق... قد يستغرق 2-5 دقائق"):
-                    _bt_signals = backtest_accumulation_signals(_bt_tickers, period="2y")
-
-                if _bt_signals.empty:
-                    st.warning("لم يتم العثور على إشارات تاريخية كافية.")
-                else:
-                    _bt_summary_all = compute_backtest_summary(_bt_signals, aligned_only=False)
-                    _bt_summary_filtered = compute_backtest_summary(_bt_signals, aligned_only=True)
-                    _bt_total_all = len(_bt_signals)
-                    _bt_total_filtered = int(_bt_signals["aligned"].sum()) if "aligned" in _bt_signals.columns else _bt_total_all
-
-                    # Store win rates for accumulation cards
-                    st.session_state['bt_win_rates'] = {
-                        phase: stats.get("headline_win", 0)
-                        for phase, stats in _bt_summary_filtered.items()
-                    }
-
-                    _phase_labels = {
-                        "late": ("نهاية تجميع", "🟢", "#00E676"),
-                        "strong": ("تجميع قوي", "🔵", "#00d2ff"),
-                        "distribute": ("تصريف", "🔴", "#FF5252"),
-                    }
-
-                    # ══════════════════════════════════════════════
-                    # SECTION 1: COMPARISON — Before vs After Filter
-                    # ══════════════════════════════════════════════
-                    st.markdown(
-                        "<div class='scanner-header-gray' style='margin-top:10px; background:linear-gradient(90deg, #1a1c24, #2d303e);'>"
-                        "⚡ المقارنة: بدون فلتر vs مع فلتر اتساع السوق</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                    # Build comparison cards: each phase shows BEFORE → AFTER
-                    _cmp_html = "<div class='backtest-cards-row'>"
-                    for _ph_key, (_ph_label, _ph_icon, _ph_color) in _phase_labels.items():
-                        _s_all = _bt_summary_all.get(_ph_key, {})
-                        _s_flt = _bt_summary_filtered.get(_ph_key, {})
-                        _win_all = _s_all.get("headline_win", 0)
-                        _win_flt = _s_flt.get("headline_win", 0)
-                        _avg_all = _s_all.get("headline_avg", 0)
-                        _avg_flt = _s_flt.get("headline_avg", 0)
-                        _cnt_all = _s_all.get("count", 0)
-                        _cnt_flt = _s_flt.get("count", 0)
-                        _delta_win = _win_flt - _win_all
-                        _delta_sign = "+" if _delta_win > 0 else ""
-                        _delta_color = "#00E676" if _delta_win > 0 else "#FF5252" if _delta_win < 0 else "#888"
-                        _avg_flt_class = "backtest-win" if (_ph_key != "distribute" and _avg_flt > 0) or (_ph_key == "distribute" and _avg_flt < 0) else "backtest-lose"
-
-                        _cmp_html += f"""
-                        <div class='backtest-summary-card' style='border-top: 3px solid {_ph_color};'>
-                            <div style='font-size:24px; margin-bottom:2px;'>{_ph_icon}</div>
-                            <div style='font-size:14px; font-weight:700; color:{_ph_color};'>{_ph_label}</div>
-                            <div style='display:flex; align-items:center; justify-content:center; gap:8px; margin:8px 0;'>
-                                <div style='text-align:center;'>
-                                    <div style='font-size:11px; color:#666;'>بدون فلتر</div>
-                                    <div style='font-size:22px; font-weight:700; color:#888;'>{_win_all}%</div>
-                                    <div style='font-size:11px; color:#555;'>{_cnt_all} إشارة</div>
-                                </div>
-                                <div style='font-size:20px; color:#FFD700;'>→</div>
-                                <div style='text-align:center;'>
-                                    <div style='font-size:11px; color:#FFD700;'>مع الفلتر</div>
-                                    <div style='font-size:28px; font-weight:900; color:white;'>{_win_flt}%</div>
-                                    <div style='font-size:11px; color:#888;'>{_cnt_flt} إشارة</div>
-                                </div>
-                            </div>
-                            <div style='color:{_delta_color}; font-size:14px; font-weight:700;'>{_delta_sign}{_delta_win:.1f}% تحسّن</div>
-                            <div class='{_avg_flt_class}' style='font-size:13px; margin-top:4px;'>
-                                {"+" if _avg_flt > 0 else ""}{_avg_flt}% متوسط
-                            </div>
-                        </div>"""
-
-                    # Total card
-                    _cmp_html += f"""
-                    <div class='backtest-summary-card' style='border-top: 3px solid #FFD700;'>
-                        <div style='font-size:24px; margin-bottom:2px;'>📊</div>
-                        <div style='font-size:14px; font-weight:700; color:#FFD700;'>إجمالي</div>
-                        <div style='display:flex; align-items:center; justify-content:center; gap:8px; margin:8px 0;'>
-                            <div style='text-align:center;'>
-                                <div style='font-size:11px; color:#666;'>بدون فلتر</div>
-                                <div style='font-size:22px; font-weight:700; color:#888;'>{_bt_total_all}</div>
-                            </div>
-                            <div style='font-size:20px; color:#FFD700;'>→</div>
-                            <div style='text-align:center;'>
-                                <div style='font-size:11px; color:#FFD700;'>مع الفلتر</div>
-                                <div style='font-size:28px; font-weight:900; color:white;'>{_bt_total_filtered}</div>
-                            </div>
-                        </div>
-                        <div style='font-size:13px; color:#aaa;'>{_bt_market_label}</div>
-                        <div style='font-size:11px; color:#666; margin-top:2px;'>فترة: سنتين</div>
-                    </div>"""
-                    _cmp_html += "</div>"
-                    st.markdown(_cmp_html, unsafe_allow_html=True)
-
-                    # ══════════════════════════════════════════════
-                    # SECTION 2: Filtered Period Win Rate Table
-                    # ══════════════════════════════════════════════
-                    st.markdown(
-                        "<div class='scanner-header-gray' style='margin-top:25px;'>"
-                        "📋 نسبة النجاح بعد الفلتر — حسب الفترة الزمنية</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                    _period_labels = {5: "5 أيام", 10: "10 أيام", 20: "20 يوم", 40: "40 يوم"}
-                    _tbl = "<table class='whale-table' dir='rtl'><thead><tr>"
-                    _tbl += "<th>المرحلة</th>"
-                    for _d, _dl in _period_labels.items():
-                        _tbl += f"<th>{_dl}</th>"
-                    _tbl += "<th>العدد</th></tr></thead><tbody>"
-
-                    for _ph_key, (_ph_label, _ph_icon, _ph_color) in _phase_labels.items():
-                        _ph_stats = _bt_summary_filtered.get(_ph_key, {})
-                        _periods = _ph_stats.get("periods", {})
-                        _tbl += f"<tr><td style='color:{_ph_color}; font-weight:700;'>{_ph_icon} {_ph_label}</td>"
-                        for _d in [5, 10, 20, 40]:
-                            _p = _periods.get(_d, {})
-                            _wr = _p.get("win_rate", 0)
-                            _ar = _p.get("avg_return", 0)
-                            _wr_color = "#00E676" if _wr >= 60 else "#FFD700" if _wr >= 50 else "#FF5252"
-                            _tbl += f"<td><span style='color:{_wr_color}; font-weight:700;'>{_wr}%</span>"
-                            _tbl += f"<br><span style='font-size:11px; color:#888;'>{'+'if _ar>0 else ''}{_ar}%</span></td>"
-                        _ph_total = _ph_stats.get("count", 0)
-                        _tbl += f"<td>{_ph_total}</td></tr>"
-
-                    _tbl += "</tbody></table>"
-                    st.markdown(_tbl, unsafe_allow_html=True)
-
-                    # ══════════════════════════════════════════════
-                    # SECTION 3: Profit Factor (Filtered)
-                    # ══════════════════════════════════════════════
-                    st.markdown(
-                        "<div class='scanner-header-gray' style='margin-top:20px;'>"
-                        "💰 معامل الربح بعد الفلتر (Profit Factor) — 20 يوم</div>",
-                        unsafe_allow_html=True,
-                    )
-                    _pf_html = "<div style='display:flex; gap:15px; justify-content:center; flex-wrap:wrap; margin:15px 0;'>"
-                    for _ph_key, (_ph_label, _ph_icon, _ph_color) in _phase_labels.items():
-                        _ph_all = _bt_summary_all.get(_ph_key, {}).get("periods", {}).get(20, {})
-                        _ph_flt = _bt_summary_filtered.get(_ph_key, {}).get("periods", {}).get(20, {})
-                        _pf_old = _ph_all.get("profit_factor", 0)
-                        _pf_new = _ph_flt.get("profit_factor", 0)
-                        _best = _ph_flt.get("best", 0)
-                        _worst = _ph_flt.get("worst", 0)
-                        _pf_color = "#00E676" if _pf_new >= 1.5 else "#FFD700" if _pf_new >= 1.0 else "#FF5252"
-                        _pf_html += f"""
-                        <div style='background:#1a1c24; border:1px solid #2d303e; border-radius:10px;
-                                    padding:15px 20px; text-align:center; min-width:150px;'>
-                            <div style='color:{_ph_color}; font-weight:700; font-size:13px;'>{_ph_icon} {_ph_label}</div>
-                            <div style='color:{_pf_color}; font-size:30px; font-weight:900; margin:8px 0;'>{_pf_new}x</div>
-                            <div style='font-size:11px; color:#666;'>كان: <span style="color:#888">{_pf_old}x</span></div>
-                            <div style='font-size:11px; color:#888; margin-top:4px;'>أفضل: <span style="color:#00E676">+{_best}%</span></div>
-                            <div style='font-size:11px; color:#888;'>أسوأ: <span style="color:#FF5252">{_worst}%</span></div>
-                        </div>"""
-                    _pf_html += "</div>"
-                    st.markdown(_pf_html, unsafe_allow_html=True)
-
-                    # ══════════════════════════════════════════════
-                    # SECTION 4: Histogram (Filtered late signals)
-                    # ══════════════════════════════════════════════
-                    _late_filtered = _bt_signals[(_bt_signals["phase"] == "late") & (_bt_signals["aligned"] == True)]
-                    if not _late_filtered.empty and "ret_20d" in _late_filtered.columns:
-                        _ret_20 = _late_filtered["ret_20d"].dropna()
-                        if len(_ret_20) >= 3:
-                            st.markdown(
-                                "<div class='scanner-header-gray' style='margin-top:20px;'>"
-                                "📈 توزيع العوائد بعد 20 يوم — نهاية تجميع (مع فلتر الاتساع)</div>",
-                                unsafe_allow_html=True,
-                            )
-                            _fig_hist = go.Figure()
-                            _fig_hist.add_trace(go.Histogram(
-                                x=_ret_20.values,
-                                marker_color="#00d2ff",
-                                opacity=0.8,
-                                nbinsx=25,
-                                name="العائد %",
-                            ))
-                            _fig_hist.add_vline(x=0, line_dash="dash", line_color="#FFD700", line_width=2)
-                            _fig_hist.add_vline(
-                                x=_ret_20.mean(), line_dash="dot",
-                                line_color="#00E676", line_width=2,
-                                annotation_text=f"المتوسط: {_ret_20.mean():.1f}%",
-                                annotation_font_color="#00E676",
-                            )
-                            _fig_hist.update_layout(
-                                template="plotly_dark",
-                                paper_bgcolor="rgba(0,0,0,0)",
-                                plot_bgcolor="rgba(0,0,0,0)",
-                                height=350,
-                                margin=dict(l=40, r=20, t=30, b=40),
-                                xaxis_title="العائد %",
-                                yaxis_title="عدد الإشارات",
-                                showlegend=False,
-                                bargap=0.05,
-                            )
-                            st.plotly_chart(_fig_hist, use_container_width=True)
-
-                    # ══════════════════════════════════════════════
-                    # SECTION 5: Last 30 Aligned Signals
-                    # ══════════════════════════════════════════════
-                    st.markdown(
-                        "<div class='scanner-header-gray' style='margin-top:20px;'>"
-                        "📋 آخر 30 إشارة متوافقة مع اتجاه السوق</div>",
-                        unsafe_allow_html=True,
-                    )
-                    _aligned_signals = _bt_signals[_bt_signals["aligned"] == True] if "aligned" in _bt_signals.columns else _bt_signals
-                    _display_cols = ["stock", "date", "phase", "score", "cmf", "breadth", "entry_price"]
-                    _display_cols = [c for c in _display_cols if c in _aligned_signals.columns]
-                    for _d in [5, 10, 20, 40]:
-                        _col_name = f"ret_{_d}d"
-                        if _col_name in _aligned_signals.columns:
-                            _display_cols.append(_col_name)
-
-                    _df_display = _aligned_signals[_display_cols].head(30).copy()
-                    _rename_map = {
-                        "stock": "السهم", "date": "التاريخ", "phase": "المرحلة",
-                        "score": "السكور", "cmf": "CMF", "breadth": "الاتساع",
-                        "entry_price": "سعر الدخول",
-                        "ret_5d": "عائد 5د", "ret_10d": "عائد 10د",
-                        "ret_20d": "عائد 20د", "ret_40d": "عائد 40د",
-                    }
-                    _df_display = _df_display.rename(columns=_rename_map)
-
-                    _phase_map = {"late": "نهاية تجميع 🟢", "strong": "تجميع قوي 🔵", "distribute": "تصريف 🔴"}
-                    if "المرحلة" in _df_display.columns:
-                        _df_display["المرحلة"] = _df_display["المرحلة"].map(_phase_map).fillna(_df_display["المرحلة"])
-                    if "التاريخ" in _df_display.columns:
-                        _df_display["التاريخ"] = pd.to_datetime(_df_display["التاريخ"]).dt.strftime("%Y-%m-%d")
-
-                    st.dataframe(_df_display, use_container_width=True, height=500, hide_index=True)
-
-    # ═══════════════════════════════════════════════════════════
-    # TAB: Strategy Backtest Report (ZR + Blue Sky)
-    # ═══════════════════════════════════════════════════════════
-    with tab_strat_bt:
-        st.markdown(
-            "<h3 style='text-align: center; color: #FFD700;'>"
-            "📊 تقرير باك تيست: زيرو انعكاس + السماء الزرقاء</h3>",
-            unsafe_allow_html=True,
-        )
-
-        import json as _json
-        _bt_report_path = os.path.join(os.path.dirname(__file__), "backtest_report.json")
-        if os.path.exists(_bt_report_path):
-            try:
-                with open(_bt_report_path, 'r', encoding='utf-8') as _f:
-                    _report = _json.load(_f)
-
-                st.markdown(
-                    f"<p style='text-align:center; color:#888;'>الفترة: {_report.get('period','')} | "
-                    f"السوق: {_report.get('market','')}</p>",
-                    unsafe_allow_html=True,
-                )
-
-                # ── Summary Cards ──
-                _zr = _report.get('zr_reversal', {}).get('metrics', {})
-                _bs = _report.get('blue_sky', {}).get('metrics', {})
-                _cb = _report.get('combined', {}).get('metrics', {})
-
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    _pf_zr = _zr.get('profit_factor', 0)
-                    _rating_zr = "⭐⭐⭐" if _pf_zr >= 2.0 else "⭐⭐" if _pf_zr >= 1.5 else "⭐" if _pf_zr >= 1.0 else "❌"
-                    st.markdown(
-                        f"<div style='background:linear-gradient(135deg,#1a1a3e,#0d0d2b);border:1px solid #4a90d9;"
-                        f"border-radius:12px;padding:18px;text-align:center;'>"
-                        f"<h4 style='color:#4a90d9;margin:0;'>🔄 زيرو انعكاس</h4>"
-                        f"<p style='font-size:28px;color:#FFD700;margin:8px 0;'>{_zr.get('win_rate',0):.1f}%</p>"
-                        f"<p style='color:#aaa;margin:2px 0;'>نسبة النجاح</p>"
-                        f"<p style='color:#fff;margin:5px 0;'>PF: {_pf_zr:.2f} | العائد: {_zr.get('total_return',0):+.1f}%</p>"
-                        f"<p style='margin:5px 0;'>{_rating_zr}</p>"
-                        f"<p style='color:#888;font-size:12px;'>{_zr.get('total_trades',0)} صفقة</p>"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
-                with c2:
-                    _pf_bs = _bs.get('profit_factor', 0)
-                    _rating_bs = "⭐⭐⭐" if _pf_bs >= 2.0 else "⭐⭐" if _pf_bs >= 1.5 else "⭐" if _pf_bs >= 1.0 else "❌"
-                    st.markdown(
-                        f"<div style='background:linear-gradient(135deg,#1a3e1a,#0d2b0d);border:1px solid #00E676;"
-                        f"border-radius:12px;padding:18px;text-align:center;'>"
-                        f"<h4 style='color:#00E676;margin:0;'>🌌 السماء الزرقاء</h4>"
-                        f"<p style='font-size:28px;color:#FFD700;margin:8px 0;'>{_bs.get('win_rate',0):.1f}%</p>"
-                        f"<p style='color:#aaa;margin:2px 0;'>نسبة النجاح</p>"
-                        f"<p style='color:#fff;margin:5px 0;'>PF: {_pf_bs:.2f} | العائد: {_bs.get('total_return',0):+.1f}%</p>"
-                        f"<p style='margin:5px 0;'>{_rating_bs}</p>"
-                        f"<p style='color:#888;font-size:12px;'>{_bs.get('total_trades',0)} صفقة</p>"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
-                with c3:
-                    _pf_cb = _cb.get('profit_factor', 0)
-                    _rating_cb = "⭐⭐⭐" if _pf_cb >= 2.0 else "⭐⭐" if _pf_cb >= 1.5 else "⭐" if _pf_cb >= 1.0 else "❌"
-                    st.markdown(
-                        f"<div style='background:linear-gradient(135deg,#3e3e1a,#2b2b0d);border:1px solid #FFD700;"
-                        f"border-radius:12px;padding:18px;text-align:center;'>"
-                        f"<h4 style='color:#FFD700;margin:0;'>💼 المحفظة المدمجة</h4>"
-                        f"<p style='font-size:28px;color:#FFD700;margin:8px 0;'>{_cb.get('win_rate',0):.1f}%</p>"
-                        f"<p style='color:#aaa;margin:2px 0;'>نسبة النجاح</p>"
-                        f"<p style='color:#fff;margin:5px 0;'>PF: {_pf_cb:.2f} | العائد: {_cb.get('total_return',0):+.1f}%</p>"
-                        f"<p style='margin:5px 0;'>{_rating_cb}</p>"
-                        f"<p style='color:#888;font-size:12px;'>{_cb.get('total_trades',0)} صفقة</p>"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                st.markdown("<br>", unsafe_allow_html=True)
-
-                # ── Detailed Comparison Table ──
-                st.markdown(
-                    "<h4 style='color:#FFD700;text-align:center;'>📊 مقارنة الاستراتيجيات</h4>",
-                    unsafe_allow_html=True,
-                )
-                _comp_rows = []
-                _metric_labels = [
-                    ("إجمالي الصفقات", "total_trades"),
-                    ("نسبة النجاح %", "win_rate"),
-                    ("عامل الربح", "profit_factor"),
-                    ("العائد الكلي %", "total_return"),
-                    ("متوسط الصفقة %", "avg_pnl"),
-                    ("أقصى تراجع %", "max_drawdown"),
-                    ("متوسط الربح %", "avg_win"),
-                    ("متوسط الخسارة %", "avg_loss"),
-                    ("أفضل صفقة %", "best_trade"),
-                    ("أسوأ صفقة %", "worst_trade"),
-                    ("مدة الاحتفاظ (يوم)", "avg_hold_days"),
-                ]
-                for label, key in _metric_labels:
-                    _comp_rows.append({
-                        "المقياس": label,
-                        "🔄 زيرو انعكاس": _zr.get(key, 0),
-                        "🌌 السماء الزرقاء": _bs.get(key, 0),
-                        "💼 المدمج": _cb.get(key, 0),
-                    })
-                _comp_df = pd.DataFrame(_comp_rows).set_index("المقياس")
-                st.dataframe(_comp_df, use_container_width=True)
-
-                # ── Exit Analysis ──
-                st.markdown(
-                    "<h4 style='color:#FFD700;text-align:center;'>🔬 تحليل أسباب الخروج</h4>",
-                    unsafe_allow_html=True,
-                )
-                _exit_c1, _exit_c2 = st.columns(2)
-                with _exit_c1:
-                    st.markdown("**🔄 زيرو انعكاس:**")
-                    _exit_data_zr = {
-                        "خروج": ["وقف خسارة (SL)", "جني أرباح (TP)", "انتهاء وقت"],
-                        "العدد": [_zr.get("sl_exits", 0), _zr.get("tp_exits", 0), _zr.get("time_exits", 0)],
-                    }
-                    st.dataframe(pd.DataFrame(_exit_data_zr), use_container_width=True, hide_index=True)
-                with _exit_c2:
-                    st.markdown("**🌌 السماء الزرقاء:**")
-                    _exit_data_bs = {
-                        "خروج": ["وقف خسارة (SL)", "جني أرباح (TP)", "انتهاء وقت", "رفض السقف"],
-                        "العدد": [
-                            _bs.get("sl_exits", 0), _bs.get("tp_exits", 0),
-                            _bs.get("time_exits", 0), _bs.get("ceiling_reject_exits", 0),
-                        ],
-                    }
-                    st.dataframe(pd.DataFrame(_exit_data_bs), use_container_width=True, hide_index=True)
-
-                # ── Yearly Breakdown ──
-                st.markdown(
-                    "<h4 style='color:#FFD700;text-align:center;'>📅 الأداء السنوي</h4>",
-                    unsafe_allow_html=True,
-                )
-                _yr_c1, _yr_c2 = st.columns(2)
-
-                _zr_yearly = _report.get('zr_reversal', {}).get('yearly', {})
-                _bs_yearly = _report.get('blue_sky', {}).get('yearly', {})
-
-                with _yr_c1:
-                    st.markdown("**🔄 زيرو انعكاس:**")
-                    if _zr_yearly:
-                        _yr_rows_zr = []
-                        for yr, yd in _zr_yearly.items():
-                            _yr_rows_zr.append({
-                                "السنة": yr,
-                                "الصفقات": yd.get("trades", 0),
-                                "النجاح%": yd.get("win_rate", 0),
-                                "PF": yd.get("pf", 0),
-                                "العائد%": yd.get("return", 0),
-                            })
-                        st.dataframe(pd.DataFrame(_yr_rows_zr), use_container_width=True, hide_index=True)
-                    else:
-                        st.info("لا توجد بيانات سنوية")
-
-                with _yr_c2:
-                    st.markdown("**🌌 السماء الزرقاء:**")
-                    if _bs_yearly:
-                        _yr_rows_bs = []
-                        for yr, yd in _bs_yearly.items():
-                            _yr_rows_bs.append({
-                                "السنة": yr,
-                                "الصفقات": yd.get("trades", 0),
-                                "النجاح%": yd.get("win_rate", 0),
-                                "PF": yd.get("pf", 0),
-                                "العائد%": yd.get("return", 0),
-                            })
-                        st.dataframe(pd.DataFrame(_yr_rows_bs), use_container_width=True, hide_index=True)
-                    else:
-                        st.info("لا توجد بيانات سنوية")
-
-                # ── Variant Comparison ──
-                st.markdown(
-                    "<h4 style='color:#FFD700;text-align:center;'>🧪 تأثير الفلاتر</h4>",
-                    unsafe_allow_html=True,
-                )
-                _var_c1, _var_c2 = st.columns(2)
-                _zr_vars = _report.get('zr_reversal', {}).get('variants', {})
-                _bs_vars = _report.get('blue_sky', {}).get('variants', {})
-
-                with _var_c1:
-                    st.markdown("**🔄 زيرو انعكاس:**")
-                    if _zr_vars:
-                        _var_rows_zr = []
-                        for vn, vd in _zr_vars.items():
-                            _var_rows_zr.append({
-                                "الإصدار": vn,
-                                "الصفقات": vd.get("total_trades", 0),
-                                "النجاح%": vd.get("win_rate", 0),
-                                "PF": vd.get("profit_factor", 0),
-                                "العائد%": vd.get("total_return", 0),
-                            })
-                        st.dataframe(pd.DataFrame(_var_rows_zr), use_container_width=True, hide_index=True)
-
-                with _var_c2:
-                    st.markdown("**🌌 السماء الزرقاء:**")
-                    if _bs_vars:
-                        _var_rows_bs = []
-                        for vn, vd in _bs_vars.items():
-                            _var_rows_bs.append({
-                                "الإصدار": vn,
-                                "الصفقات": vd.get("total_trades", 0),
-                                "النجاح%": vd.get("win_rate", 0),
-                                "PF": vd.get("profit_factor", 0),
-                                "العائد%": vd.get("total_return", 0),
-                            })
-                        st.dataframe(pd.DataFrame(_var_rows_bs), use_container_width=True, hide_index=True)
-
-                # ── Sample Trades ──
-                with st.expander("📋 عينة من الصفقات (آخر 20)", expanded=False):
-                    _bs_samples = _report.get('blue_sky', {}).get('sample_trades', [])
-                    _zr_samples = _report.get('zr_reversal', {}).get('sample_trades', [])
-                    _all_samples = sorted(
-                        _zr_samples + _bs_samples,
-                        key=lambda x: str(x.get('entry_date', '')),
-                        reverse=True,
-                    )[:20]
-                    if _all_samples:
-                        _sample_rows = []
-                        for t in _all_samples:
-                            _sample_rows.append({
-                                "التاريخ": str(t.get('entry_date', ''))[:10],
-                                "السهم": t.get('ticker', ''),
-                                "الاستراتيجية": "🔄 زيرو" if t.get('strategy') == 'ZR_REVERSAL' else "🌌 سماء",
-                                "الدخول": t.get('entry_price', 0),
-                                "الخروج": t.get('exit_price', 0),
-                                "الربح%": t.get('pnl_pct', 0),
-                                "السبب": t.get('exit_reason', ''),
-                                "R:R": t.get('rr_ratio', 0),
-                            })
-                        st.dataframe(pd.DataFrame(_sample_rows), use_container_width=True, hide_index=True)
-
-                # ── Equity Curve Chart ──
-                _all_trades_for_chart = sorted(
-                    _zr_samples + _bs_samples,
-                    key=lambda x: str(x.get('entry_date', '')),
-                )
-                if _all_trades_for_chart:
-                    _cum = 0
-                    _cum_vals = []
-                    _dates = []
-                    for t in _all_trades_for_chart:
-                        _cum += t.get('pnl_pct', 0)
-                        _cum_vals.append(_cum)
-                        _dates.append(str(t.get('entry_date', ''))[:10])
-
-                    _fig_eq = go.Figure()
-                    _fig_eq.add_trace(go.Scatter(
-                        x=_dates, y=_cum_vals,
-                        mode='lines+markers',
-                        line=dict(color='#FFD700', width=2),
-                        marker=dict(
-                            color=['#00E676' if v >= 0 else '#FF5252' for v in [t.get('pnl_pct', 0) for t in _all_trades_for_chart]],
-                            size=6,
-                        ),
-                        name='العائد التراكمي %',
-                    ))
-                    _fig_eq.update_layout(
-                        title="📈 منحنى الأرباح التراكمي",
-                        xaxis_title="التاريخ",
-                        yaxis_title="العائد التراكمي %",
-                        plot_bgcolor='#0e1117',
-                        paper_bgcolor='#0e1117',
-                        font=dict(color='white'),
-                        height=400,
-                    )
-                    st.plotly_chart(_fig_eq, use_container_width=True)
-
-                st.markdown(
-                    f"<p style='text-align:center;color:#555;font-size:12px;'>"
-                    f"تم إنشاء التقرير: {_report.get('generated_at','')[:19]}</p>",
-                    unsafe_allow_html=True,
-                )
-
-            except Exception as e:
-                st.error(f"⚠️ خطأ في قراءة التقرير: {e}")
-        else:
-            st.info(
-                "📊 لم يتم إنشاء تقرير باك تيست بعد.\n\n"
-                "شغّل الأمر التالي لإنشاء التقرير:\n\n"
-                "`python zr_bluesky_backtest.py all`"
-            )
-
-    # ═══════════════════════════════════════════════════════════
-    # TAB: Live Signal Tracker (سجل الإشارات)
-    # ═══════════════════════════════════════════════════════════
+    # ===========================================================
+    # TAB: Live Signal Tracker
+    # ===========================================================
     with tab_signal_log:
         st.markdown(
             "<h3 style='text-align:center; color:#2196F3;'>"
@@ -3057,321 +2203,1015 @@ if scan_results and df is not None and not df.empty:
                     clear_signal_log()
                     st.success("✅ تم مسح سجل الإشارات")
                     st.rerun()
+    # ===========================================================
+    # TAB: Market Scanner
+    # ===========================================================
+    with tab_scan:
+        if not df_loads.empty:
+            df_ls = pd.DataFrame(df_loads).copy()
+            try:
+                # Build clean table like البيانات tab
+                _scan_table = {}
 
-    # ═══════════════════════════════════════════════════════════
-    # TAB: Tracker
-    # ═══════════════════════════════════════════════════════════
-    with tab_track:
-        st.markdown(
-            "<h3 style='text-align: center; color: #00d2ff;'>"
-            "📂 محفظة المراقبة الحية (Live Tracker)</h3>",
-            unsafe_allow_html=True
-        )
-        try:
-            with sqlite3.connect(DB_FILE) as conn:
-                df_saved = pd.read_sql_query(
-                    "SELECT * FROM tracker ORDER BY date_time DESC", conn
-                )
+                # Basic columns
+                if 'الشركة' in df_ls.columns:
+                    _scan_table['الشركة'] = df_ls['الشركة'].tolist()
+                if 'التاريخ' in df_ls.columns:
+                    _scan_table['التاريخ'] = df_ls['التاريخ'].tolist()
+                if 'الاتجاه' in df_ls.columns:
+                    _scan_table['الاتجاه'] = df_ls['الاتجاه'].tolist()
 
-            if not df_saved.empty:
-                c_f1, c_f2, c_btn = st.columns([2, 2, 1.5])
-                with c_f1:
-                    markets_opts = ["الكل"] + sorted(df_saved['market'].dropna().unique().tolist())
-                    sel_market = st.selectbox("🌐 تصفية حسب السوق:", markets_opts)
-                with c_f2:
-                    tf_opts = (
-                        ["الكل"] + sorted(df_saved['timeframe'].dropna().unique().tolist())
-                        if 'timeframe' in df_saved.columns else ["الكل"]
+                # Format change columns with colors (same style as البيانات)
+                for src_col, cat_col in [
+                    (col_change_name, '1d_cat'),
+                    (f'تراكمي 3 {lbl}', '3d_cat'),
+                    (f'تراكمي 5 {lbl}', '5d_cat'),
+                    (f'تراكمي 10 {lbl}', '10d_cat'),
+                ]:
+                    if src_col in df_ls.columns:
+                        cat_series = df_ls.get(cat_col, pd.Series([""] * len(df_ls)))
+                        _scan_table[src_col] = [
+                            _format_cat(v, c) for v, c in zip(df_ls[src_col], cat_series)
+                        ]
+
+                # Status columns (حالة)
+                for st_col in [f'حالة 3 {lbl}', f'حالة 5 {lbl}', f'حالة 10 {lbl}']:
+                    if st_col in df_ls.columns:
+                        _scan_table[st_col] = df_ls[st_col].tolist()
+
+                _df_scan = pd.DataFrame(_scan_table)
+                _df_scan = _df_scan.fillna('')
+
+                _style_cols = [
+                    c for c in [
+                        col_change_name,
+                        f'تراكمي 3 {lbl}', f'حالة 3 {lbl}',
+                        f'تراكمي 5 {lbl}', f'حالة 5 {lbl}',
+                        f'تراكمي 10 {lbl}', f'حالة 10 {lbl}',
+                    ]
+                    if c in _df_scan.columns
+                ]
+                if _style_cols:
+                    st.dataframe(
+                        _df_scan.style.map(safe_color_table, subset=_style_cols),
+                        use_container_width=True, height=550,
                     )
-                    sel_tf = st.selectbox("⏳ تصفية حسب الفريم:", tf_opts)
-                with c_btn:
-                    st.write("")
-                    st.write("")
-                    refresh_btn = st.button("🔄 تحديث الأسعار", type="primary", use_container_width=True)
-
-                df_filtered = df_saved.copy()
-                if sel_market != "الكل":
-                    df_filtered = df_filtered[df_filtered['market'] == sel_market]
-                if sel_tf != "الكل" and 'timeframe' in df_filtered.columns:
-                    df_filtered = df_filtered[df_filtered['timeframe'] == sel_tf]
-
-                if df_filtered.empty:
-                    st.warning("لا توجد صفقات تطابق الفلترة.")
                 else:
-                    if refresh_btn:
-                        with st.spinner("📡 جاري جلب الأسعار الحية..."):
-                            unique_tickers = df_filtered['ticker'].unique()
-                            live_prices = {}
-
-                            def fetch_live(tk_arg):
-                                try:
-                                    return tk_arg, yf.Ticker(tk_arg).history(period="1d")['Close'].iloc[-1]
-                                except Exception:
-                                    return tk_arg, None
-
-                            with ThreadPoolExecutor(max_workers=5) as ex:
-                                for f in as_completed([ex.submit(fetch_live, t) for t in unique_tickers]):
-                                    t, px = f.result()
-                                    if px is not None:
-                                        live_prices[t] = px
-                            st.session_state['live_prices'] = live_prices
-
-                    display_records = []
-                    for _, r in df_filtered.iterrows():
-                        tk_r = r['ticker']
-                        entry = float(r['entry'])
-                        tgt = float(r['target'])
-                        sl_r = float(r['stop_loss'])
-                        live_p = st.session_state.get('live_prices', {}).get(tk_r, entry)
-                        pnl = safe_div((live_p - entry) * 100, entry, 0)
-
-                        if live_p >= tgt:
-                            status = "🎯 تحقق الهدف"
-                        elif live_p <= sl_r:
-                            status = "🩸 ضرب الوقف"
-                        else:
-                            status = "⏳ جارية"
-
-                        fmt = ".5f" if entry < 2 else ".2f"
-                        display_records.append({
-                            "وقت الرصد": r['date_time'],
-                            "السوق": r['market'],
-                            "الفريم": r.get('timeframe', 'غير محدد'),
-                            "الشركة": r['company'],
-                            "الرمز": tk_r,
-                            "سعر الدخول": f"{entry:{fmt}}",
-                            "الهدف": f"{tgt:{fmt}}",
-                            "الوقف": f"{sl_r:{fmt}}",
-                            "السعر اللحظي 📡": f"{live_p:{fmt}}",
-                            "الربح/الخسارة": f"{pnl:+.2f}%",
-                            "حالة الصفقة": status,
-                        })
-
-                    if display_records:
-                        df_live = pd.DataFrame(display_records)
-                        st.dataframe(
-                            df_live.style.map(
-                                style_live_tracker,
-                                subset=['الربح/الخسارة', 'حالة الصفقة']
-                            ),
-                            use_container_width=True, hide_index=True,
-                        )
-
-                st.markdown("<br>", unsafe_allow_html=True)
-                _, col_del, _ = st.columns([1, 1, 1])
-                with col_del:
-                    if st.button("🗑️ تنظيف المحفظة بالكامل", type="secondary", use_container_width=True):
-                        with sqlite3.connect(DB_FILE) as conn:
-                            conn.execute("DELETE FROM tracker")
-                            conn.commit()
-                        st.rerun()
-            else:
-                st.info(
-                    "📂 المحفظة فارغة. اذهب إلى (👑 VIP) واضغط على [حفظ] لإضافة الفرص."
-                )
-        except Exception as e:
-            st.error(f"حدث خطأ في قراءة قاعدة البيانات: {e}")
-
-    # ═══════════════════════════════════════════════════════════
-    # TAB: TradingView
-    # ═══════════════════════════════════════════════════════════
-    with tab2:
-        if is_fx_main:
-            tv_ticker = chart_ticker.replace('=X', '')
-            if len(tv_ticker) == 3:
-                tv_ticker = "USD" + tv_ticker
-            tv_symbol = f"FX:{tv_ticker}"
-        elif is_crypto_main:
-            tv_ticker = chart_ticker.replace('-USD', '')
-            tv_symbol = f"BINANCE:{tv_ticker}USDT"
-        elif "السعودي" in market_choice:
-            tv_ticker = chart_ticker.replace('.SR', '')
-            tv_symbol = f"TADAWUL:{tv_ticker}"
+                    st.dataframe(_df_scan, use_container_width=True, height=550)
+            except Exception:
+                st.dataframe(df_ls.astype(str), use_container_width=True, height=550)
         else:
-            tv_symbol = chart_ticker
+            st.markdown(
+                "<div class='empty-box'>📭 لا توجد بيانات للتحليل.</div>",
+                unsafe_allow_html=True
+            )
+    # ===========================================================
+    # TAB: Breakouts
+    # ===========================================================
+    with tab_breakouts:
+        c1, c2, c3, c4 = st.columns(4)
+        show_3d = c1.checkbox(f"عرض 3 {lbl} 🟠", value=True)
+        show_4d = c2.checkbox(f"عرض 4 {lbl} 🟢", value=False)
+        show_10d = c3.checkbox(f"عرض 10 {lbl} 🟣", value=True)
+        show_15d = c4.checkbox(f"عرض 15 {lbl} 🔴", value=False)
 
-        tv_interval_tv = "D" if selected_interval == "1d" else selected_interval.replace("m", "")
-        tv_html = (
-            f'<div class="tradingview-widget-container" style="height:480px;width:100%">'
-            f'<div id="tradingview_masa" style="height:100%;width:100%"></div>'
-            f'<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>'
-            f'<script type="text/javascript">'
-            f'new TradingView.widget({{'
-            f'"autosize": true, "symbol": "{tv_symbol}", "interval": "{tv_interval_tv}", '
-            f'"timezone": "Asia/Riyadh", "theme": "dark", "style": "1", "locale": "ar_AE", '
-            f'"enable_publishing": false, "backgroundColor": "#1a1c24", "gridColor": "#2d303e", '
-            f'"hide_top_toolbar": false, "hide_legend": false, "save_image": false, '
-            f'"container_id": "tradingview_masa", "toolbar_bg": "#1e2129", '
-            f'"studies": ["Volume@tv-basicstudies","RSI@tv-basicstudies",'
-            f'"MASimple@tv-basicstudies","VWAP@tv-basicstudies"]'
-            f'}});</script></div>'
-        )
-        components.html(tv_html, height=500)
+        df_plot2 = df.tail(150).copy()
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(
+            x=df_plot2.index, y=df_plot2['Close'], mode='lines+markers',
+            name='السعر', line=dict(color='dodgerblue', width=2), marker=dict(size=5)
+        ))
 
-    # ═══════════════════════════════════════════════════════════
-    # TAB: Chart
-    # ═══════════════════════════════════════════════════════════
-    with tab3:
-        df_plot = df.tail(150) if selected_interval != '1d' else df.tail(300)
-        fig = make_subplots(
-            rows=3, cols=1, shared_xaxes=True,
-            vertical_spacing=0.03, row_heights=[0.6, 0.2, 0.2]
-        )
+        def add_channel(fig, h_col, l_col, color, dash, name, m_color, m_size, s_up, s_dn):
+            if h_col in df_plot2.columns and l_col in df_plot2.columns:
+                fig.add_trace(go.Scatter(
+                    x=df_plot2.index, y=df_plot2[h_col],
+                    line=dict(color=color, width=1.5, dash=dash, shape='hv'),
+                    name=f'مقاومة {name}'
+                ))
+                fig.add_trace(go.Scatter(
+                    x=df_plot2.index, y=df_plot2[l_col],
+                    line=dict(color=color, width=1.5, dash=dash, shape='hv'),
+                    name=f'دعم {name}'
+                ))
+                bo_up = df_plot2[
+                    (df_plot2['Close'] > df_plot2[h_col])
+                    & (df_plot2['Close'].shift(1) <= df_plot2[h_col].shift(1))
+                ]
+                bo_dn = df_plot2[
+                    (df_plot2['Close'] < df_plot2[l_col])
+                    & (df_plot2['Close'].shift(1) >= df_plot2[l_col].shift(1))
+                ]
+                fig.add_trace(go.Scatter(
+                    x=bo_up.index, y=bo_up['Close'], mode='markers',
+                    marker=dict(symbol=s_up, size=m_size, color=m_color,
+                                line=dict(width=1, color='black')),
+                    name=f'اختراق {name}'
+                ))
+                fig.add_trace(go.Scatter(
+                    x=bo_dn.index, y=bo_dn['Close'], mode='markers',
+                    marker=dict(symbol=s_dn, size=m_size, color='red',
+                                line=dict(width=1, color='black')),
+                    name=f'كسر {name}'
+                ))
 
-        fig.add_trace(go.Candlestick(
-            x=df_plot.index, open=df_plot['Open'], high=df_plot['High'],
-            low=df_plot['Low'], close=df_plot['Close'], name='السعر'
-        ), row=1, col=1)
+        if show_3d:
+            add_channel(fig2, 'High_3D', 'Low_3D', 'orange', 'dot',
+                        f'3 {lbl}', 'orange', 12, 'triangle-up', 'triangle-down')
+        if show_4d:
+            add_channel(fig2, 'High_4D', 'Low_4D', '#4caf50', 'dash',
+                        f'4 {lbl}', '#4caf50', 12, 'triangle-up', 'triangle-down')
+        if show_10d:
+            add_channel(fig2, 'High_10D', 'Low_10D', '#9c27b0', 'solid',
+                        f'10 {lbl}', '#9c27b0', 14, 'diamond', 'diamond-tall')
+        if show_15d:
+            add_channel(fig2, 'High_15D', 'Low_15D', '#f44336', 'dashdot',
+                        f'15 {lbl}', '#f44336', 16, 'star', 'star-triangle-down')
 
-        fig.add_trace(go.Scatter(
-            x=df_plot.index, y=df_plot['SMA_200'],
-            line=dict(color='#9c27b0', width=2), name='MA 200'
-        ), row=1, col=1)
-        fig.add_trace(go.Scatter(
-            x=df_plot.index, y=df_plot['SMA_50'],
-            line=dict(color='#00bcd4', width=2), name='MA 50'
-        ), row=1, col=1)
-        fig.add_trace(go.Scatter(
-            x=df_plot.index, y=df_plot['VWAP'],
-            line=dict(color='#ffeb3b', width=2, dash='dot'), name='VWAP'
-        ), row=1, col=1)
-
-        fig.add_trace(go.Scatter(
-            x=df_plot.index, y=df_plot['ZR_High'], mode='lines',
-            line=dict(color='white', width=3, dash='dash'),
-            name='سقف زيرو (الأساسي)', hoverinfo='skip'
-        ), row=1, col=1)
-        fig.add_trace(go.Scatter(
-            x=df_plot.index, y=df_plot['ZR_Low'], mode='lines',
-            line=dict(color='rgb(251, 140, 0)', width=3, dash='dash'),
-            name='قاع زيرو (الأساسي)', hoverinfo='skip'
-        ), row=1, col=1)
-        fig.add_trace(go.Scatter(
-            x=df_plot.index, y=df_plot['ZR2_High'], mode='lines',
-            line=dict(color='white', width=4, dash='dashdot'),
-            name='سقف زيرو (المطور)', hoverinfo='skip'
-        ), row=1, col=1)
-        fig.add_trace(go.Scatter(
-            x=df_plot.index, y=df_plot['ZR2_Low'], mode='lines',
-            line=dict(color='orange', width=4, dash='dashdot'),
-            name='قاع زيرو (المطور)', hoverinfo='skip'
-        ), row=1, col=1)
-
-        czr_h = df['ZR_High'].iloc[-1] if pd.notna(df['ZR_High'].iloc[-1]) else df_plot['High'].max()
-        czr_l = df['ZR_Low'].iloc[-1] if pd.notna(df['ZR_Low'].iloc[-1]) else df_plot['Low'].min()
-        czr2_h = df['ZR2_High'].iloc[-1] if pd.notna(df['ZR2_High'].iloc[-1]) else df_plot['High'].max()
-        czr2_l = df['ZR2_Low'].iloc[-1] if pd.notna(df['ZR2_Low'].iloc[-1]) else df_plot['Low'].min()
-
-        fig.add_annotation(
-            x=df_plot.index[-min(10, len(df_plot) - 1)], y=czr_h,
-            text=(
-                f"<b>ZR Basic (400,25)</b><br>H: {czr_h:.4f} | L: {czr_l:.4f}<br>"
-                f"<b>ZR Pro (300,30)</b><br>H: {czr2_h:.4f} | L: {czr2_l:.4f}"
-            ),
-            showarrow=False, yshift=40,
-            font=dict(color="white", size=10, family="Courier New"),
-            bgcolor="rgba(26, 28, 36, 0.85)",
-            bordercolor="rgba(255, 255, 255, 0.4)", borderwidth=1, borderpad=5,
-        )
-
-        colors = ['green' if row['Close'] >= row['Open'] else 'red' for _, row in df_plot.iterrows()]
-        fig.add_trace(go.Bar(
-            x=df_plot.index, y=df_plot['Volume'],
-            marker_color=colors, name='السيولة'
-        ), row=2, col=1)
-
-        fig.add_trace(go.Scatter(
-            x=df_plot.index, y=df_plot['RSI'],
-            line=dict(color='purple', width=2), name='RSI 14'
-        ), row=3, col=1)
-        fig.add_hline(y=70, line_dash="dot", row=3, col=1, line_color="red")
-        fig.add_hline(y=50, line_dash="solid", row=3, col=1, line_color="gray", opacity=0.5)
-        fig.add_hline(y=30, line_dash="dot", row=3, col=1, line_color="green")
-
-        fig.update_layout(
-            height=600, template='plotly_dark', showlegend=False,
-            xaxis_rangeslider_visible=False, margin=dict(l=10, r=10, t=10, b=10),
+        fig2.update_layout(
+            height=650, hovermode='x unified', template='plotly_dark',
+            margin=dict(l=10, r=10, t=10, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         )
         if selected_interval != "1d":
             if is_crypto_main:
                 pass
             elif is_fx_main:
-                fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
+                fig2.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
             else:
-                fig.update_xaxes(rangebreaks=[
+                fig2.update_xaxes(rangebreaks=[
                     dict(bounds=["sat", "mon"]),
                     dict(bounds=[16, 9], pattern="hour"),
                 ])
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        st.plotly_chart(fig2, use_container_width=True, config={'displayModeBar': False})
 
-    # ═══════════════════════════════════════════════════════════
-    # TAB: Data Table
-    # ═══════════════════════════════════════════════════════════
-    with tab4:
-        st.markdown(
-            "<h3 style='text-align: center; color: #00d2ff;'>📋 البيانات التاريخية المفصلة</h3>",
-            unsafe_allow_html=True
-        )
-        df_display = df.tail(20).iloc[::-1].copy()
-
-        time_list = []
-        for d in df_display.index:
+    # ===========================================================
+    # TAB: Alerts
+    # ===========================================================
+    with tab_alerts:
+        if not df_alerts.empty:
+            df_al = pd.DataFrame(df_alerts).fillna('')
             try:
-                time_list.append(
-                    d.strftime('%Y-%m-%d | 00:00') if selected_interval == '1d'
-                    else d.strftime('%Y-%m-%d | %H:%M')
-                )
+                if 'التنبيه' in df_al.columns:
+                    st.dataframe(
+                        df_al.style.map(safe_color_table, subset=['التنبيه']),
+                        use_container_width=True, height=550,
+                    )
+                else:
+                    st.dataframe(df_al.astype(str), use_container_width=True, height=550)
             except Exception:
-                time_list.append(str(d)[:16])
+                st.dataframe(df_al.astype(str), use_container_width=True, height=550)
+        else:
+            st.markdown(
+                "<div class='empty-box'>لم يتم رصد أي اختراقات أو كسور في السوق.</div>",
+                unsafe_allow_html=True
+            )
 
-        table_data = {
-            'الوقت': time_list,
-            'الإغلاق': [format_price(x, chart_ticker) for x in df_display['Close']],
-            'VWAP 🐋': [
-                format_price(x, chart_ticker) for x in df_display.get('VWAP', df_display['Close'])
-            ],
-            'الاتجاه': [
-                str(int(x)) if pd.notna(x) else "0"
-                for x in df_display.get('Counter', pd.Series([0] * len(df_display)))
-            ],
-            'MA 50': [format_price(x, chart_ticker) for x in df_display.get('SMA_50', df_display['Close'])],
-            'MA 200': [format_price(x, chart_ticker) for x in df_display.get('SMA_200', df_display['Close'])],
-        }
+    # ===========================================================
+    # TAB: Charts (merged)
+    # ===========================================================
+    with tab_chart:
+        chart_view = st.radio("", ["📊 الشارت", "🌐 TradingView", "📋 البيانات"], horizontal=True, key="chart_view_radio")
+        if chart_view == "📊 الشارت":
+            df_plot = df.tail(150) if selected_interval != '1d' else df.tail(300)
+            fig = make_subplots(
+                rows=3, cols=1, shared_xaxes=True,
+                vertical_spacing=0.03, row_heights=[0.6, 0.2, 0.2]
+            )
 
-        for col_name, src_name in [
-            (col_change_name, '1d_%'),
-            (f'تراكمي 3 {lbl}', '3d_%'),
-            (f'تراكمي 5 {lbl}', '5d_%'),
-            (f'تراكمي 10 {lbl}', '10d_%'),
-        ]:
-            series = df_display.get(src_name, pd.Series([0] * len(df_display)))
-            table_data[col_name] = [_format_cat(v, _get_cat(v)) for v in series]
+            fig.add_trace(go.Candlestick(
+                x=df_plot.index, open=df_plot['Open'], high=df_plot['High'],
+                low=df_plot['Low'], close=df_plot['Close'], name='السعر'
+            ), row=1, col=1)
 
-        if not is_fx_main and not is_crypto_main:
-            table_data['حجم السيولة'] = [
-                f"{int(x):,}" if pd.notna(x) and not np.isinf(x) else "0"
-                for x in df_display.get('Volume', pd.Series([0] * len(df_display)))
-            ]
+            fig.add_trace(go.Scatter(
+                x=df_plot.index, y=df_plot['SMA_200'],
+                line=dict(color='#9c27b0', width=2), name='MA 200'
+            ), row=1, col=1)
+            fig.add_trace(go.Scatter(
+                x=df_plot.index, y=df_plot['SMA_50'],
+                line=dict(color='#00bcd4', width=2), name='MA 50'
+            ), row=1, col=1)
+            fig.add_trace(go.Scatter(
+                x=df_plot.index, y=df_plot['VWAP'],
+                line=dict(color='#ffeb3b', width=2, dash='dot'), name='VWAP'
+            ), row=1, col=1)
 
-        try:
-            final_df = pd.DataFrame(table_data)
-            final_df.set_index('الوقت', inplace=True)
-            style_cols = [
-                c for c in [
-                    col_change_name, f'تراكمي 3 {lbl}',
-                    f'تراكمي 5 {lbl}', f'تراكمي 10 {lbl}',
-                ] if c in final_df.columns
-            ]
-            if style_cols:
-                st.dataframe(
-                    final_df.style.map(safe_color_table, subset=style_cols),
-                    use_container_width=True, height=600,
-                )
+            fig.add_trace(go.Scatter(
+                x=df_plot.index, y=df_plot['ZR_High'], mode='lines',
+                line=dict(color='white', width=3, dash='dash'),
+                name='سقف زيرو (الأساسي)', hoverinfo='skip'
+            ), row=1, col=1)
+            fig.add_trace(go.Scatter(
+                x=df_plot.index, y=df_plot['ZR_Low'], mode='lines',
+                line=dict(color='rgb(251, 140, 0)', width=3, dash='dash'),
+                name='قاع زيرو (الأساسي)', hoverinfo='skip'
+            ), row=1, col=1)
+            fig.add_trace(go.Scatter(
+                x=df_plot.index, y=df_plot['ZR2_High'], mode='lines',
+                line=dict(color='white', width=4, dash='dashdot'),
+                name='سقف زيرو (المطور)', hoverinfo='skip'
+            ), row=1, col=1)
+            fig.add_trace(go.Scatter(
+                x=df_plot.index, y=df_plot['ZR2_Low'], mode='lines',
+                line=dict(color='orange', width=4, dash='dashdot'),
+                name='قاع زيرو (المطور)', hoverinfo='skip'
+            ), row=1, col=1)
+
+            czr_h = df['ZR_High'].iloc[-1] if pd.notna(df['ZR_High'].iloc[-1]) else df_plot['High'].max()
+            czr_l = df['ZR_Low'].iloc[-1] if pd.notna(df['ZR_Low'].iloc[-1]) else df_plot['Low'].min()
+            czr2_h = df['ZR2_High'].iloc[-1] if pd.notna(df['ZR2_High'].iloc[-1]) else df_plot['High'].max()
+            czr2_l = df['ZR2_Low'].iloc[-1] if pd.notna(df['ZR2_Low'].iloc[-1]) else df_plot['Low'].min()
+
+            fig.add_annotation(
+                x=df_plot.index[-min(10, len(df_plot) - 1)], y=czr_h,
+                text=(
+                    f"<b>ZR Basic (400,25)</b><br>H: {czr_h:.4f} | L: {czr_l:.4f}<br>"
+                    f"<b>ZR Pro (300,30)</b><br>H: {czr2_h:.4f} | L: {czr2_l:.4f}"
+                ),
+                showarrow=False, yshift=40,
+                font=dict(color="white", size=10, family="Courier New"),
+                bgcolor="rgba(26, 28, 36, 0.85)",
+                bordercolor="rgba(255, 255, 255, 0.4)", borderwidth=1, borderpad=5,
+            )
+
+            colors = ['green' if row['Close'] >= row['Open'] else 'red' for _, row in df_plot.iterrows()]
+            fig.add_trace(go.Bar(
+                x=df_plot.index, y=df_plot['Volume'],
+                marker_color=colors, name='السيولة'
+            ), row=2, col=1)
+
+            fig.add_trace(go.Scatter(
+                x=df_plot.index, y=df_plot['RSI'],
+                line=dict(color='purple', width=2), name='RSI 14'
+            ), row=3, col=1)
+            fig.add_hline(y=70, line_dash="dot", row=3, col=1, line_color="red")
+            fig.add_hline(y=50, line_dash="solid", row=3, col=1, line_color="gray", opacity=0.5)
+            fig.add_hline(y=30, line_dash="dot", row=3, col=1, line_color="green")
+
+            fig.update_layout(
+                height=600, template='plotly_dark', showlegend=False,
+                xaxis_rangeslider_visible=False, margin=dict(l=10, r=10, t=10, b=10),
+            )
+            if selected_interval != "1d":
+                if is_crypto_main:
+                    pass
+                elif is_fx_main:
+                    fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
+                else:
+                    fig.update_xaxes(rangebreaks=[
+                        dict(bounds=["sat", "mon"]),
+                        dict(bounds=[16, 9], pattern="hour"),
+                    ])
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        elif chart_view == "🌐 TradingView":
+            if is_fx_main:
+                tv_ticker = chart_ticker.replace('=X', '')
+                if len(tv_ticker) == 3:
+                    tv_ticker = "USD" + tv_ticker
+                tv_symbol = f"FX:{tv_ticker}"
+            elif is_crypto_main:
+                tv_ticker = chart_ticker.replace('-USD', '')
+                tv_symbol = f"BINANCE:{tv_ticker}USDT"
+            elif "السعودي" in market_choice:
+                tv_ticker = chart_ticker.replace('.SR', '')
+                tv_symbol = f"TADAWUL:{tv_ticker}"
             else:
-                st.dataframe(final_df.astype(str), use_container_width=True, height=600)
-        except Exception:
-            st.dataframe(df_display, use_container_width=True, height=600)
+                tv_symbol = chart_ticker
 
+            tv_interval_tv = "D" if selected_interval == "1d" else selected_interval.replace("m", "")
+            tv_html = (
+                f'<div class="tradingview-widget-container" style="height:480px;width:100%">'
+                f'<div id="tradingview_masa" style="height:100%;width:100%"></div>'
+                f'<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>'
+                f'<script type="text/javascript">'
+                f'new TradingView.widget({{'
+                f'"autosize": true, "symbol": "{tv_symbol}", "interval": "{tv_interval_tv}", '
+                f'"timezone": "Asia/Riyadh", "theme": "dark", "style": "1", "locale": "ar_AE", '
+                f'"enable_publishing": false, "backgroundColor": "#1a1c24", "gridColor": "#2d303e", '
+                f'"hide_top_toolbar": false, "hide_legend": false, "save_image": false, '
+                f'"container_id": "tradingview_masa", "toolbar_bg": "#1e2129", '
+                f'"studies": ["Volume@tv-basicstudies","RSI@tv-basicstudies",'
+                f'"MASimple@tv-basicstudies","VWAP@tv-basicstudies"]'
+                f'}});</script></div>'
+            )
+            components.html(tv_html, height=500)
+        else:
+            st.markdown(
+                "<h3 style='text-align: center; color: #00d2ff;'>📋 البيانات التاريخية المفصلة</h3>",
+                unsafe_allow_html=True
+            )
+            df_display = df.tail(20).iloc[::-1].copy()
+
+            time_list = []
+            for d in df_display.index:
+                try:
+                    time_list.append(
+                        d.strftime('%Y-%m-%d | 00:00') if selected_interval == '1d'
+                        else d.strftime('%Y-%m-%d | %H:%M')
+                    )
+                except Exception:
+                    time_list.append(str(d)[:16])
+
+            table_data = {
+                'الوقت': time_list,
+                'الإغلاق': [format_price(x, chart_ticker) for x in df_display['Close']],
+                'VWAP 🐋': [
+                    format_price(x, chart_ticker) for x in df_display.get('VWAP', df_display['Close'])
+                ],
+                'الاتجاه': [
+                    str(int(x)) if pd.notna(x) else "0"
+                    for x in df_display.get('Counter', pd.Series([0] * len(df_display)))
+                ],
+                'MA 50': [format_price(x, chart_ticker) for x in df_display.get('SMA_50', df_display['Close'])],
+                'MA 200': [format_price(x, chart_ticker) for x in df_display.get('SMA_200', df_display['Close'])],
+            }
+
+            for col_name, src_name in [
+                (col_change_name, '1d_%'),
+                (f'تراكمي 3 {lbl}', '3d_%'),
+                (f'تراكمي 5 {lbl}', '5d_%'),
+                (f'تراكمي 10 {lbl}', '10d_%'),
+            ]:
+                series = df_display.get(src_name, pd.Series([0] * len(df_display)))
+                table_data[col_name] = [_format_cat(v, _get_cat(v)) for v in series]
+
+            if not is_fx_main and not is_crypto_main:
+                table_data['حجم السيولة'] = [
+                    f"{int(x):,}" if pd.notna(x) and not np.isinf(x) else "0"
+                    for x in df_display.get('Volume', pd.Series([0] * len(df_display)))
+                ]
+
+            try:
+                final_df = pd.DataFrame(table_data)
+                final_df.set_index('الوقت', inplace=True)
+                style_cols = [
+                    c for c in [
+                        col_change_name, f'تراكمي 3 {lbl}',
+                        f'تراكمي 5 {lbl}', f'تراكمي 10 {lbl}',
+                    ] if c in final_df.columns
+                ]
+                if style_cols:
+                    st.dataframe(
+                        final_df.style.map(safe_color_table, subset=style_cols),
+                        use_container_width=True, height=600,
+                    )
+                else:
+                    st.dataframe(final_df.astype(str), use_container_width=True, height=600)
+            except Exception:
+                st.dataframe(df_display, use_container_width=True, height=600)
+
+    # ===========================================================
+    # TAB: Tools (merged)
+    # ===========================================================
+    with tab_tools:
+        with st.expander("📂 المراقبة", expanded=True):
+            st.markdown(
+                "<h3 style='text-align: center; color: #00d2ff;'>"
+                "📂 محفظة المراقبة الحية (Live Tracker)</h3>",
+                unsafe_allow_html=True
+            )
+            try:
+                with sqlite3.connect(DB_FILE) as conn:
+                    df_saved = pd.read_sql_query(
+                        "SELECT * FROM tracker ORDER BY date_time DESC", conn
+                    )
+
+                if not df_saved.empty:
+                    c_f1, c_f2, c_btn = st.columns([2, 2, 1.5])
+                    with c_f1:
+                        markets_opts = ["الكل"] + sorted(df_saved['market'].dropna().unique().tolist())
+                        sel_market = st.selectbox("🌐 تصفية حسب السوق:", markets_opts)
+                    with c_f2:
+                        tf_opts = (
+                            ["الكل"] + sorted(df_saved['timeframe'].dropna().unique().tolist())
+                            if 'timeframe' in df_saved.columns else ["الكل"]
+                        )
+                        sel_tf = st.selectbox("⏳ تصفية حسب الفريم:", tf_opts)
+                    with c_btn:
+                        st.write("")
+                        st.write("")
+                        refresh_btn = st.button("🔄 تحديث الأسعار", type="primary", use_container_width=True)
+
+                    df_filtered = df_saved.copy()
+                    if sel_market != "الكل":
+                        df_filtered = df_filtered[df_filtered['market'] == sel_market]
+                    if sel_tf != "الكل" and 'timeframe' in df_filtered.columns:
+                        df_filtered = df_filtered[df_filtered['timeframe'] == sel_tf]
+
+                    if df_filtered.empty:
+                        st.warning("لا توجد صفقات تطابق الفلترة.")
+                    else:
+                        if refresh_btn:
+                            with st.spinner("📡 جاري جلب الأسعار الحية..."):
+                                unique_tickers = df_filtered['ticker'].unique()
+                                live_prices = {}
+
+                                def fetch_live(tk_arg):
+                                    try:
+                                        return tk_arg, yf.Ticker(tk_arg).history(period="1d")['Close'].iloc[-1]
+                                    except Exception:
+                                        return tk_arg, None
+
+                                with ThreadPoolExecutor(max_workers=5) as ex:
+                                    for f in as_completed([ex.submit(fetch_live, t) for t in unique_tickers]):
+                                        t, px = f.result()
+                                        if px is not None:
+                                            live_prices[t] = px
+                                st.session_state['live_prices'] = live_prices
+
+                        display_records = []
+                        for _, r in df_filtered.iterrows():
+                            tk_r = r['ticker']
+                            entry = float(r['entry'])
+                            tgt = float(r['target'])
+                            sl_r = float(r['stop_loss'])
+                            live_p = st.session_state.get('live_prices', {}).get(tk_r, entry)
+                            pnl = safe_div((live_p - entry) * 100, entry, 0)
+
+                            if live_p >= tgt:
+                                status = "🎯 تحقق الهدف"
+                            elif live_p <= sl_r:
+                                status = "🩸 ضرب الوقف"
+                            else:
+                                status = "⏳ جارية"
+
+                            fmt = ".5f" if entry < 2 else ".2f"
+                            display_records.append({
+                                "وقت الرصد": r['date_time'],
+                                "السوق": r['market'],
+                                "الفريم": r.get('timeframe', 'غير محدد'),
+                                "الشركة": r['company'],
+                                "الرمز": tk_r,
+                                "سعر الدخول": f"{entry:{fmt}}",
+                                "الهدف": f"{tgt:{fmt}}",
+                                "الوقف": f"{sl_r:{fmt}}",
+                                "السعر اللحظي 📡": f"{live_p:{fmt}}",
+                                "الربح/الخسارة": f"{pnl:+.2f}%",
+                                "حالة الصفقة": status,
+                            })
+
+                        if display_records:
+                            df_live = pd.DataFrame(display_records)
+                            st.dataframe(
+                                df_live.style.map(
+                                    style_live_tracker,
+                                    subset=['الربح/الخسارة', 'حالة الصفقة']
+                                ),
+                                use_container_width=True, hide_index=True,
+                            )
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    _, col_del, _ = st.columns([1, 1, 1])
+                    with col_del:
+                        if st.button("🗑️ تنظيف المحفظة بالكامل", type="secondary", use_container_width=True):
+                            with sqlite3.connect(DB_FILE) as conn:
+                                conn.execute("DELETE FROM tracker")
+                                conn.commit()
+                            st.rerun()
+                else:
+                    st.info(
+                        "📂 المحفظة فارغة. اذهب إلى (👑 VIP) واضغط على [حفظ] لإضافة الفرص."
+                    )
+            except Exception as e:
+                st.error(f"حدث خطأ في قراءة قاعدة البيانات: {e}")
+        with st.expander("⏳ الباك تيست"):
+            st.markdown(
+                "<h3 style='text-align: center; color: #FFD700;'>"
+                "🔬 اختبار رجعي — دقة إشارات التجميع والتصريف</h3>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<p style='text-align:center; color:#888; font-size:13px; margin-top:-10px;'>"
+                "يختبر دقة إشارات المنصة تاريخياً: كم إشارة نجحت فعلاً؟</p>",
+                unsafe_allow_html=True,
+            )
+
+            # Determine tickers for current market
+            if "السعودي" in market_choice:
+                _bt_tickers = tuple(SAUDI_NAMES.keys())
+                _bt_market_label = "السوق السعودي"
+            elif "الأمريكي" in market_choice:
+                _bt_tickers = tuple(US_NAMES.keys())
+                _bt_market_label = "السوق الأمريكي"
+            else:
+                _bt_tickers = ()
+                _bt_market_label = ""
+
+            if not _bt_tickers:
+                st.info("الباك تيست متاح فقط للأسهم (السعودي والأمريكي).")
+            else:
+                _bt_run = st.button("📊 شغّل الباك تيست", use_container_width=True, type="primary")
+
+                if _bt_run:
+                    with st.spinner("جاري تحليل الإشارات التاريخية + اتساع السوق... قد يستغرق 2-5 دقائق"):
+                        _bt_signals = backtest_accumulation_signals(_bt_tickers, period="2y")
+
+                    if _bt_signals.empty:
+                        st.warning("لم يتم العثور على إشارات تاريخية كافية.")
+                    else:
+                        _bt_summary_all = compute_backtest_summary(_bt_signals, aligned_only=False)
+                        _bt_summary_filtered = compute_backtest_summary(_bt_signals, aligned_only=True)
+                        _bt_total_all = len(_bt_signals)
+                        _bt_total_filtered = int(_bt_signals["aligned"].sum()) if "aligned" in _bt_signals.columns else _bt_total_all
+
+                        # Store win rates for accumulation cards
+                        st.session_state['bt_win_rates'] = {
+                            phase: stats.get("headline_win", 0)
+                            for phase, stats in _bt_summary_filtered.items()
+                        }
+
+                        _phase_labels = {
+                            "late": ("نهاية تجميع", "🟢", "#00E676"),
+                            "strong": ("تجميع قوي", "🔵", "#00d2ff"),
+                            "distribute": ("تصريف", "🔴", "#FF5252"),
+                        }
+
+                        # ══════════════════════════════════════════════
+                        # SECTION 1: COMPARISON — Before vs After Filter
+                        # ══════════════════════════════════════════════
+                        st.markdown(
+                            "<div class='scanner-header-gray' style='margin-top:10px; background:linear-gradient(90deg, #1a1c24, #2d303e);'>"
+                            "⚡ المقارنة: بدون فلتر vs مع فلتر اتساع السوق</div>",
+                            unsafe_allow_html=True,
+                        )
+
+                        # Build comparison cards: each phase shows BEFORE → AFTER
+                        _cmp_html = "<div class='backtest-cards-row'>"
+                        for _ph_key, (_ph_label, _ph_icon, _ph_color) in _phase_labels.items():
+                            _s_all = _bt_summary_all.get(_ph_key, {})
+                            _s_flt = _bt_summary_filtered.get(_ph_key, {})
+                            _win_all = _s_all.get("headline_win", 0)
+                            _win_flt = _s_flt.get("headline_win", 0)
+                            _avg_all = _s_all.get("headline_avg", 0)
+                            _avg_flt = _s_flt.get("headline_avg", 0)
+                            _cnt_all = _s_all.get("count", 0)
+                            _cnt_flt = _s_flt.get("count", 0)
+                            _delta_win = _win_flt - _win_all
+                            _delta_sign = "+" if _delta_win > 0 else ""
+                            _delta_color = "#00E676" if _delta_win > 0 else "#FF5252" if _delta_win < 0 else "#888"
+                            _avg_flt_class = "backtest-win" if (_ph_key != "distribute" and _avg_flt > 0) or (_ph_key == "distribute" and _avg_flt < 0) else "backtest-lose"
+
+                            _cmp_html += f"""
+                            <div class='backtest-summary-card' style='border-top: 3px solid {_ph_color};'>
+                                <div style='font-size:24px; margin-bottom:2px;'>{_ph_icon}</div>
+                                <div style='font-size:14px; font-weight:700; color:{_ph_color};'>{_ph_label}</div>
+                                <div style='display:flex; align-items:center; justify-content:center; gap:8px; margin:8px 0;'>
+                                    <div style='text-align:center;'>
+                                        <div style='font-size:11px; color:#666;'>بدون فلتر</div>
+                                        <div style='font-size:22px; font-weight:700; color:#888;'>{_win_all}%</div>
+                                        <div style='font-size:11px; color:#555;'>{_cnt_all} إشارة</div>
+                                    </div>
+                                    <div style='font-size:20px; color:#FFD700;'>→</div>
+                                    <div style='text-align:center;'>
+                                        <div style='font-size:11px; color:#FFD700;'>مع الفلتر</div>
+                                        <div style='font-size:28px; font-weight:900; color:white;'>{_win_flt}%</div>
+                                        <div style='font-size:11px; color:#888;'>{_cnt_flt} إشارة</div>
+                                    </div>
+                                </div>
+                                <div style='color:{_delta_color}; font-size:14px; font-weight:700;'>{_delta_sign}{_delta_win:.1f}% تحسّن</div>
+                                <div class='{_avg_flt_class}' style='font-size:13px; margin-top:4px;'>
+                                    {"+" if _avg_flt > 0 else ""}{_avg_flt}% متوسط
+                                </div>
+                            </div>"""
+
+                        # Total card
+                        _cmp_html += f"""
+                        <div class='backtest-summary-card' style='border-top: 3px solid #FFD700;'>
+                            <div style='font-size:24px; margin-bottom:2px;'>📊</div>
+                            <div style='font-size:14px; font-weight:700; color:#FFD700;'>إجمالي</div>
+                            <div style='display:flex; align-items:center; justify-content:center; gap:8px; margin:8px 0;'>
+                                <div style='text-align:center;'>
+                                    <div style='font-size:11px; color:#666;'>بدون فلتر</div>
+                                    <div style='font-size:22px; font-weight:700; color:#888;'>{_bt_total_all}</div>
+                                </div>
+                                <div style='font-size:20px; color:#FFD700;'>→</div>
+                                <div style='text-align:center;'>
+                                    <div style='font-size:11px; color:#FFD700;'>مع الفلتر</div>
+                                    <div style='font-size:28px; font-weight:900; color:white;'>{_bt_total_filtered}</div>
+                                </div>
+                            </div>
+                            <div style='font-size:13px; color:#aaa;'>{_bt_market_label}</div>
+                            <div style='font-size:11px; color:#666; margin-top:2px;'>فترة: سنتين</div>
+                        </div>"""
+                        _cmp_html += "</div>"
+                        st.markdown(_cmp_html, unsafe_allow_html=True)
+
+                        # ══════════════════════════════════════════════
+                        # SECTION 2: Filtered Period Win Rate Table
+                        # ══════════════════════════════════════════════
+                        st.markdown(
+                            "<div class='scanner-header-gray' style='margin-top:25px;'>"
+                            "📋 نسبة النجاح بعد الفلتر — حسب الفترة الزمنية</div>",
+                            unsafe_allow_html=True,
+                        )
+
+                        _period_labels = {5: "5 أيام", 10: "10 أيام", 20: "20 يوم", 40: "40 يوم"}
+                        _tbl = "<table class='whale-table' dir='rtl'><thead><tr>"
+                        _tbl += "<th>المرحلة</th>"
+                        for _d, _dl in _period_labels.items():
+                            _tbl += f"<th>{_dl}</th>"
+                        _tbl += "<th>العدد</th></tr></thead><tbody>"
+
+                        for _ph_key, (_ph_label, _ph_icon, _ph_color) in _phase_labels.items():
+                            _ph_stats = _bt_summary_filtered.get(_ph_key, {})
+                            _periods = _ph_stats.get("periods", {})
+                            _tbl += f"<tr><td style='color:{_ph_color}; font-weight:700;'>{_ph_icon} {_ph_label}</td>"
+                            for _d in [5, 10, 20, 40]:
+                                _p = _periods.get(_d, {})
+                                _wr = _p.get("win_rate", 0)
+                                _ar = _p.get("avg_return", 0)
+                                _wr_color = "#00E676" if _wr >= 60 else "#FFD700" if _wr >= 50 else "#FF5252"
+                                _tbl += f"<td><span style='color:{_wr_color}; font-weight:700;'>{_wr}%</span>"
+                                _tbl += f"<br><span style='font-size:11px; color:#888;'>{'+'if _ar>0 else ''}{_ar}%</span></td>"
+                            _ph_total = _ph_stats.get("count", 0)
+                            _tbl += f"<td>{_ph_total}</td></tr>"
+
+                        _tbl += "</tbody></table>"
+                        st.markdown(_tbl, unsafe_allow_html=True)
+
+                        # ══════════════════════════════════════════════
+                        # SECTION 3: Profit Factor (Filtered)
+                        # ══════════════════════════════════════════════
+                        st.markdown(
+                            "<div class='scanner-header-gray' style='margin-top:20px;'>"
+                            "💰 معامل الربح بعد الفلتر (Profit Factor) — 20 يوم</div>",
+                            unsafe_allow_html=True,
+                        )
+                        _pf_html = "<div style='display:flex; gap:15px; justify-content:center; flex-wrap:wrap; margin:15px 0;'>"
+                        for _ph_key, (_ph_label, _ph_icon, _ph_color) in _phase_labels.items():
+                            _ph_all = _bt_summary_all.get(_ph_key, {}).get("periods", {}).get(20, {})
+                            _ph_flt = _bt_summary_filtered.get(_ph_key, {}).get("periods", {}).get(20, {})
+                            _pf_old = _ph_all.get("profit_factor", 0)
+                            _pf_new = _ph_flt.get("profit_factor", 0)
+                            _best = _ph_flt.get("best", 0)
+                            _worst = _ph_flt.get("worst", 0)
+                            _pf_color = "#00E676" if _pf_new >= 1.5 else "#FFD700" if _pf_new >= 1.0 else "#FF5252"
+                            _pf_html += f"""
+                            <div style='background:#1a1c24; border:1px solid #2d303e; border-radius:10px;
+                                        padding:15px 20px; text-align:center; min-width:150px;'>
+                                <div style='color:{_ph_color}; font-weight:700; font-size:13px;'>{_ph_icon} {_ph_label}</div>
+                                <div style='color:{_pf_color}; font-size:30px; font-weight:900; margin:8px 0;'>{_pf_new}x</div>
+                                <div style='font-size:11px; color:#666;'>كان: <span style="color:#888">{_pf_old}x</span></div>
+                                <div style='font-size:11px; color:#888; margin-top:4px;'>أفضل: <span style="color:#00E676">+{_best}%</span></div>
+                                <div style='font-size:11px; color:#888;'>أسوأ: <span style="color:#FF5252">{_worst}%</span></div>
+                            </div>"""
+                        _pf_html += "</div>"
+                        st.markdown(_pf_html, unsafe_allow_html=True)
+
+                        # ══════════════════════════════════════════════
+                        # SECTION 4: Histogram (Filtered late signals)
+                        # ══════════════════════════════════════════════
+                        _late_filtered = _bt_signals[(_bt_signals["phase"] == "late") & (_bt_signals["aligned"] == True)]
+                        if not _late_filtered.empty and "ret_20d" in _late_filtered.columns:
+                            _ret_20 = _late_filtered["ret_20d"].dropna()
+                            if len(_ret_20) >= 3:
+                                st.markdown(
+                                    "<div class='scanner-header-gray' style='margin-top:20px;'>"
+                                    "📈 توزيع العوائد بعد 20 يوم — نهاية تجميع (مع فلتر الاتساع)</div>",
+                                    unsafe_allow_html=True,
+                                )
+                                _fig_hist = go.Figure()
+                                _fig_hist.add_trace(go.Histogram(
+                                    x=_ret_20.values,
+                                    marker_color="#00d2ff",
+                                    opacity=0.8,
+                                    nbinsx=25,
+                                    name="العائد %",
+                                ))
+                                _fig_hist.add_vline(x=0, line_dash="dash", line_color="#FFD700", line_width=2)
+                                _fig_hist.add_vline(
+                                    x=_ret_20.mean(), line_dash="dot",
+                                    line_color="#00E676", line_width=2,
+                                    annotation_text=f"المتوسط: {_ret_20.mean():.1f}%",
+                                    annotation_font_color="#00E676",
+                                )
+                                _fig_hist.update_layout(
+                                    template="plotly_dark",
+                                    paper_bgcolor="rgba(0,0,0,0)",
+                                    plot_bgcolor="rgba(0,0,0,0)",
+                                    height=350,
+                                    margin=dict(l=40, r=20, t=30, b=40),
+                                    xaxis_title="العائد %",
+                                    yaxis_title="عدد الإشارات",
+                                    showlegend=False,
+                                    bargap=0.05,
+                                )
+                                st.plotly_chart(_fig_hist, use_container_width=True)
+
+                        # ══════════════════════════════════════════════
+                        # SECTION 5: Last 30 Aligned Signals
+                        # ══════════════════════════════════════════════
+                        st.markdown(
+                            "<div class='scanner-header-gray' style='margin-top:20px;'>"
+                            "📋 آخر 30 إشارة متوافقة مع اتجاه السوق</div>",
+                            unsafe_allow_html=True,
+                        )
+                        _aligned_signals = _bt_signals[_bt_signals["aligned"] == True] if "aligned" in _bt_signals.columns else _bt_signals
+                        _display_cols = ["stock", "date", "phase", "score", "cmf", "breadth", "entry_price"]
+                        _display_cols = [c for c in _display_cols if c in _aligned_signals.columns]
+                        for _d in [5, 10, 20, 40]:
+                            _col_name = f"ret_{_d}d"
+                            if _col_name in _aligned_signals.columns:
+                                _display_cols.append(_col_name)
+
+                        _df_display = _aligned_signals[_display_cols].head(30).copy()
+                        _rename_map = {
+                            "stock": "السهم", "date": "التاريخ", "phase": "المرحلة",
+                            "score": "السكور", "cmf": "CMF", "breadth": "الاتساع",
+                            "entry_price": "سعر الدخول",
+                            "ret_5d": "عائد 5د", "ret_10d": "عائد 10د",
+                            "ret_20d": "عائد 20د", "ret_40d": "عائد 40د",
+                        }
+                        _df_display = _df_display.rename(columns=_rename_map)
+
+                        _phase_map = {"late": "نهاية تجميع 🟢", "strong": "تجميع قوي 🔵", "distribute": "تصريف 🔴"}
+                        if "المرحلة" in _df_display.columns:
+                            _df_display["المرحلة"] = _df_display["المرحلة"].map(_phase_map).fillna(_df_display["المرحلة"])
+                        if "التاريخ" in _df_display.columns:
+                            _df_display["التاريخ"] = pd.to_datetime(_df_display["التاريخ"]).dt.strftime("%Y-%m-%d")
+
+                        st.dataframe(_df_display, use_container_width=True, height=500, hide_index=True)
+        with st.expander("📊 تقرير الاستراتيجيات"):
+            st.markdown(
+                "<h3 style='text-align: center; color: #FFD700;'>"
+                "📊 تقرير باك تيست: زيرو انعكاس + السماء الزرقاء</h3>",
+                unsafe_allow_html=True,
+            )
+
+            import json as _json
+            _bt_report_path = os.path.join(os.path.dirname(__file__), "backtest_report.json")
+            if os.path.exists(_bt_report_path):
+                try:
+                    with open(_bt_report_path, 'r', encoding='utf-8') as _f:
+                        _report = _json.load(_f)
+
+                    st.markdown(
+                        f"<p style='text-align:center; color:#888;'>الفترة: {_report.get('period','')} | "
+                        f"السوق: {_report.get('market','')}</p>",
+                        unsafe_allow_html=True,
+                    )
+
+                    # ── Summary Cards ──
+                    _zr = _report.get('zr_reversal', {}).get('metrics', {})
+                    _bs = _report.get('blue_sky', {}).get('metrics', {})
+                    _cb = _report.get('combined', {}).get('metrics', {})
+
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        _pf_zr = _zr.get('profit_factor', 0)
+                        _rating_zr = "⭐⭐⭐" if _pf_zr >= 2.0 else "⭐⭐" if _pf_zr >= 1.5 else "⭐" if _pf_zr >= 1.0 else "❌"
+                        st.markdown(
+                            f"<div style='background:linear-gradient(135deg,#1a1a3e,#0d0d2b);border:1px solid #4a90d9;"
+                            f"border-radius:12px;padding:18px;text-align:center;'>"
+                            f"<h4 style='color:#4a90d9;margin:0;'>🔄 زيرو انعكاس</h4>"
+                            f"<p style='font-size:28px;color:#FFD700;margin:8px 0;'>{_zr.get('win_rate',0):.1f}%</p>"
+                            f"<p style='color:#aaa;margin:2px 0;'>نسبة النجاح</p>"
+                            f"<p style='color:#fff;margin:5px 0;'>PF: {_pf_zr:.2f} | العائد: {_zr.get('total_return',0):+.1f}%</p>"
+                            f"<p style='margin:5px 0;'>{_rating_zr}</p>"
+                            f"<p style='color:#888;font-size:12px;'>{_zr.get('total_trades',0)} صفقة</p>"
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
+                    with c2:
+                        _pf_bs = _bs.get('profit_factor', 0)
+                        _rating_bs = "⭐⭐⭐" if _pf_bs >= 2.0 else "⭐⭐" if _pf_bs >= 1.5 else "⭐" if _pf_bs >= 1.0 else "❌"
+                        st.markdown(
+                            f"<div style='background:linear-gradient(135deg,#1a3e1a,#0d2b0d);border:1px solid #00E676;"
+                            f"border-radius:12px;padding:18px;text-align:center;'>"
+                            f"<h4 style='color:#00E676;margin:0;'>🌌 السماء الزرقاء</h4>"
+                            f"<p style='font-size:28px;color:#FFD700;margin:8px 0;'>{_bs.get('win_rate',0):.1f}%</p>"
+                            f"<p style='color:#aaa;margin:2px 0;'>نسبة النجاح</p>"
+                            f"<p style='color:#fff;margin:5px 0;'>PF: {_pf_bs:.2f} | العائد: {_bs.get('total_return',0):+.1f}%</p>"
+                            f"<p style='margin:5px 0;'>{_rating_bs}</p>"
+                            f"<p style='color:#888;font-size:12px;'>{_bs.get('total_trades',0)} صفقة</p>"
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
+                    with c3:
+                        _pf_cb = _cb.get('profit_factor', 0)
+                        _rating_cb = "⭐⭐⭐" if _pf_cb >= 2.0 else "⭐⭐" if _pf_cb >= 1.5 else "⭐" if _pf_cb >= 1.0 else "❌"
+                        st.markdown(
+                            f"<div style='background:linear-gradient(135deg,#3e3e1a,#2b2b0d);border:1px solid #FFD700;"
+                            f"border-radius:12px;padding:18px;text-align:center;'>"
+                            f"<h4 style='color:#FFD700;margin:0;'>💼 المحفظة المدمجة</h4>"
+                            f"<p style='font-size:28px;color:#FFD700;margin:8px 0;'>{_cb.get('win_rate',0):.1f}%</p>"
+                            f"<p style='color:#aaa;margin:2px 0;'>نسبة النجاح</p>"
+                            f"<p style='color:#fff;margin:5px 0;'>PF: {_pf_cb:.2f} | العائد: {_cb.get('total_return',0):+.1f}%</p>"
+                            f"<p style='margin:5px 0;'>{_rating_cb}</p>"
+                            f"<p style='color:#888;font-size:12px;'>{_cb.get('total_trades',0)} صفقة</p>"
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+                    # ── Detailed Comparison Table ──
+                    st.markdown(
+                        "<h4 style='color:#FFD700;text-align:center;'>📊 مقارنة الاستراتيجيات</h4>",
+                        unsafe_allow_html=True,
+                    )
+                    _comp_rows = []
+                    _metric_labels = [
+                        ("إجمالي الصفقات", "total_trades"),
+                        ("نسبة النجاح %", "win_rate"),
+                        ("عامل الربح", "profit_factor"),
+                        ("العائد الكلي %", "total_return"),
+                        ("متوسط الصفقة %", "avg_pnl"),
+                        ("أقصى تراجع %", "max_drawdown"),
+                        ("متوسط الربح %", "avg_win"),
+                        ("متوسط الخسارة %", "avg_loss"),
+                        ("أفضل صفقة %", "best_trade"),
+                        ("أسوأ صفقة %", "worst_trade"),
+                        ("مدة الاحتفاظ (يوم)", "avg_hold_days"),
+                    ]
+                    for label, key in _metric_labels:
+                        _comp_rows.append({
+                            "المقياس": label,
+                            "🔄 زيرو انعكاس": _zr.get(key, 0),
+                            "🌌 السماء الزرقاء": _bs.get(key, 0),
+                            "💼 المدمج": _cb.get(key, 0),
+                        })
+                    _comp_df = pd.DataFrame(_comp_rows).set_index("المقياس")
+                    st.dataframe(_comp_df, use_container_width=True)
+
+                    # ── Exit Analysis ──
+                    st.markdown(
+                        "<h4 style='color:#FFD700;text-align:center;'>🔬 تحليل أسباب الخروج</h4>",
+                        unsafe_allow_html=True,
+                    )
+                    _exit_c1, _exit_c2 = st.columns(2)
+                    with _exit_c1:
+                        st.markdown("**🔄 زيرو انعكاس:**")
+                        _exit_data_zr = {
+                            "خروج": ["وقف خسارة (SL)", "جني أرباح (TP)", "انتهاء وقت"],
+                            "العدد": [_zr.get("sl_exits", 0), _zr.get("tp_exits", 0), _zr.get("time_exits", 0)],
+                        }
+                        st.dataframe(pd.DataFrame(_exit_data_zr), use_container_width=True, hide_index=True)
+                    with _exit_c2:
+                        st.markdown("**🌌 السماء الزرقاء:**")
+                        _exit_data_bs = {
+                            "خروج": ["وقف خسارة (SL)", "جني أرباح (TP)", "انتهاء وقت", "رفض السقف"],
+                            "العدد": [
+                                _bs.get("sl_exits", 0), _bs.get("tp_exits", 0),
+                                _bs.get("time_exits", 0), _bs.get("ceiling_reject_exits", 0),
+                            ],
+                        }
+                        st.dataframe(pd.DataFrame(_exit_data_bs), use_container_width=True, hide_index=True)
+
+                    # ── Yearly Breakdown ──
+                    st.markdown(
+                        "<h4 style='color:#FFD700;text-align:center;'>📅 الأداء السنوي</h4>",
+                        unsafe_allow_html=True,
+                    )
+                    _yr_c1, _yr_c2 = st.columns(2)
+
+                    _zr_yearly = _report.get('zr_reversal', {}).get('yearly', {})
+                    _bs_yearly = _report.get('blue_sky', {}).get('yearly', {})
+
+                    with _yr_c1:
+                        st.markdown("**🔄 زيرو انعكاس:**")
+                        if _zr_yearly:
+                            _yr_rows_zr = []
+                            for yr, yd in _zr_yearly.items():
+                                _yr_rows_zr.append({
+                                    "السنة": yr,
+                                    "الصفقات": yd.get("trades", 0),
+                                    "النجاح%": yd.get("win_rate", 0),
+                                    "PF": yd.get("pf", 0),
+                                    "العائد%": yd.get("return", 0),
+                                })
+                            st.dataframe(pd.DataFrame(_yr_rows_zr), use_container_width=True, hide_index=True)
+                        else:
+                            st.info("لا توجد بيانات سنوية")
+
+                    with _yr_c2:
+                        st.markdown("**🌌 السماء الزرقاء:**")
+                        if _bs_yearly:
+                            _yr_rows_bs = []
+                            for yr, yd in _bs_yearly.items():
+                                _yr_rows_bs.append({
+                                    "السنة": yr,
+                                    "الصفقات": yd.get("trades", 0),
+                                    "النجاح%": yd.get("win_rate", 0),
+                                    "PF": yd.get("pf", 0),
+                                    "العائد%": yd.get("return", 0),
+                                })
+                            st.dataframe(pd.DataFrame(_yr_rows_bs), use_container_width=True, hide_index=True)
+                        else:
+                            st.info("لا توجد بيانات سنوية")
+
+                    # ── Variant Comparison ──
+                    st.markdown(
+                        "<h4 style='color:#FFD700;text-align:center;'>🧪 تأثير الفلاتر</h4>",
+                        unsafe_allow_html=True,
+                    )
+                    _var_c1, _var_c2 = st.columns(2)
+                    _zr_vars = _report.get('zr_reversal', {}).get('variants', {})
+                    _bs_vars = _report.get('blue_sky', {}).get('variants', {})
+
+                    with _var_c1:
+                        st.markdown("**🔄 زيرو انعكاس:**")
+                        if _zr_vars:
+                            _var_rows_zr = []
+                            for vn, vd in _zr_vars.items():
+                                _var_rows_zr.append({
+                                    "الإصدار": vn,
+                                    "الصفقات": vd.get("total_trades", 0),
+                                    "النجاح%": vd.get("win_rate", 0),
+                                    "PF": vd.get("profit_factor", 0),
+                                    "العائد%": vd.get("total_return", 0),
+                                })
+                            st.dataframe(pd.DataFrame(_var_rows_zr), use_container_width=True, hide_index=True)
+
+                    with _var_c2:
+                        st.markdown("**🌌 السماء الزرقاء:**")
+                        if _bs_vars:
+                            _var_rows_bs = []
+                            for vn, vd in _bs_vars.items():
+                                _var_rows_bs.append({
+                                    "الإصدار": vn,
+                                    "الصفقات": vd.get("total_trades", 0),
+                                    "النجاح%": vd.get("win_rate", 0),
+                                    "PF": vd.get("profit_factor", 0),
+                                    "العائد%": vd.get("total_return", 0),
+                                })
+                            st.dataframe(pd.DataFrame(_var_rows_bs), use_container_width=True, hide_index=True)
+
+                    # ── Sample Trades ──
+                    with st.expander("📋 عينة من الصفقات (آخر 20)", expanded=False):
+                        _bs_samples = _report.get('blue_sky', {}).get('sample_trades', [])
+                        _zr_samples = _report.get('zr_reversal', {}).get('sample_trades', [])
+                        _all_samples = sorted(
+                            _zr_samples + _bs_samples,
+                            key=lambda x: str(x.get('entry_date', '')),
+                            reverse=True,
+                        )[:20]
+                        if _all_samples:
+                            _sample_rows = []
+                            for t in _all_samples:
+                                _sample_rows.append({
+                                    "التاريخ": str(t.get('entry_date', ''))[:10],
+                                    "السهم": t.get('ticker', ''),
+                                    "الاستراتيجية": "🔄 زيرو" if t.get('strategy') == 'ZR_REVERSAL' else "🌌 سماء",
+                                    "الدخول": t.get('entry_price', 0),
+                                    "الخروج": t.get('exit_price', 0),
+                                    "الربح%": t.get('pnl_pct', 0),
+                                    "السبب": t.get('exit_reason', ''),
+                                    "R:R": t.get('rr_ratio', 0),
+                                })
+                            st.dataframe(pd.DataFrame(_sample_rows), use_container_width=True, hide_index=True)
+
+                    # ── Equity Curve Chart ──
+                    _all_trades_for_chart = sorted(
+                        _zr_samples + _bs_samples,
+                        key=lambda x: str(x.get('entry_date', '')),
+                    )
+                    if _all_trades_for_chart:
+                        _cum = 0
+                        _cum_vals = []
+                        _dates = []
+                        for t in _all_trades_for_chart:
+                            _cum += t.get('pnl_pct', 0)
+                            _cum_vals.append(_cum)
+                            _dates.append(str(t.get('entry_date', ''))[:10])
+
+                        _fig_eq = go.Figure()
+                        _fig_eq.add_trace(go.Scatter(
+                            x=_dates, y=_cum_vals,
+                            mode='lines+markers',
+                            line=dict(color='#FFD700', width=2),
+                            marker=dict(
+                                color=['#00E676' if v >= 0 else '#FF5252' for v in [t.get('pnl_pct', 0) for t in _all_trades_for_chart]],
+                                size=6,
+                            ),
+                            name='العائد التراكمي %',
+                        ))
+                        _fig_eq.update_layout(
+                            title="📈 منحنى الأرباح التراكمي",
+                            xaxis_title="التاريخ",
+                            yaxis_title="العائد التراكمي %",
+                            plot_bgcolor='#0e1117',
+                            paper_bgcolor='#0e1117',
+                            font=dict(color='white'),
+                            height=400,
+                        )
+                        st.plotly_chart(_fig_eq, use_container_width=True)
+
+                    st.markdown(
+                        f"<p style='text-align:center;color:#555;font-size:12px;'>"
+                        f"تم إنشاء التقرير: {_report.get('generated_at','')[:19]}</p>",
+                        unsafe_allow_html=True,
+                    )
+
+                except Exception as e:
+                    st.error(f"⚠️ خطأ في قراءة التقرير: {e}")
+            else:
+                st.info(
+                    "📊 لم يتم إنشاء تقرير باك تيست بعد.\n\n"
+                    "شغّل الأمر التالي لإنشاء التقرير:\n\n"
+                    "`python zr_bluesky_backtest.py all`"
+                )
 elif not scan_results:
     st.markdown(
         "<div style='text-align:center; padding:50px; color:#888; font-size:18px;'>"

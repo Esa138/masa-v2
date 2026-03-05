@@ -476,34 +476,54 @@ def scan_market(
 
             tk_alerts = []
             bo_today, bd_today = [], []
+            _pullback_from_high = False   # above ZR High but declining
+            _rebound_from_low = False     # below ZR Low but rising
 
             if pd.notna(last_zr_h) and last_c > last_zr_h:
                 if pd.notna(prev_zr_h) and prev_c <= prev_zr_h:
+                    # Fresh ZR High breakout TODAY — always strong signal
                     tk_alerts.append({
                         "الشركة": stock_name, "التاريخ": candle_time,
                         "الفريم": tf_label, "التنبيه": "اختراق سقف زيرو 👑🚀"
                     })
                     bo_today.append("اختراق زيرو 👑")
-                else:
+                elif pct_3d > 0:
+                    # Above ZR High + 3-day momentum positive = true blue sky
                     tk_alerts.append({
                         "الشركة": stock_name, "التاريخ": candle_time,
                         "الفريم": tf_label, "التنبيه": "سماء زرقاء 🌌"
                     })
                     bo_today.append("سماء زرقاء 🌌")
+                else:
+                    # Above ZR High but 3-day momentum negative = pullback warning
+                    tk_alerts.append({
+                        "الشركة": stock_name, "التاريخ": candle_time,
+                        "الفريم": tf_label, "التنبيه": "تراجع من القمة ⚠️"
+                    })
+                    _pullback_from_high = True
 
             if pd.notna(last_zr_l) and last_c < last_zr_l:
                 if pd.notna(prev_zr_l) and prev_c >= prev_zr_l:
+                    # Fresh ZR Low breakdown TODAY — always strong signal
                     tk_alerts.append({
                         "الشركة": stock_name, "التاريخ": candle_time,
                         "الفريم": tf_label, "التنبيه": "كسر قاع زيرو 🩸📉"
                     })
                     bd_today.append("كسر زيرو 🩸")
-                else:
+                elif pct_3d < 0:
+                    # Below ZR Low + 3-day momentum negative = true deep breakdown
                     tk_alerts.append({
                         "الشركة": stock_name, "التاريخ": candle_time,
                         "الفريم": tf_label, "التنبيه": "انهيار سحيق 🔻"
                     })
                     bd_today.append("سقوط 🩸")
+                else:
+                    # Below ZR Low but 3-day momentum positive = rebound attempt
+                    tk_alerts.append({
+                        "الشركة": stock_name, "التاريخ": candle_time,
+                        "الفريم": tf_label, "التنبيه": "ارتداد من الانهيار 🟢"
+                    })
+                    _rebound_from_low = True
 
             if (
                 pd.notna(h3.iloc[-1]) and pd.notna(h3.iloc[-2])
@@ -551,6 +571,14 @@ def scan_market(
             elif bd_today:
                 events.append(f"سقوط 🩸 ({'+'.join(bd_today)})")
                 bo_score_add -= 20
+            elif _pullback_from_high:
+                # Above channel but declining — warning, not bullish
+                events.append("تراجع من القمة ⚠️")
+                bo_score_add -= 5
+            elif _rebound_from_low:
+                # Below channel but rising — recovery attempt
+                events.append("ارتداد من الانهيار 🟢")
+                bo_score_add += 5
             elif bo_yest and pd.notna(h3.iloc[-1]) and last_c > h3.iloc[-1]:
                 events.append("اختراق سابق 🟢")
                 bo_score_add += 10
