@@ -5,7 +5,6 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import sqlite3
 import requests
 import warnings
 import re
@@ -14,8 +13,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from core.utils import (
     init_db, sanitize_text, format_price, save_to_tracker,
-    DB_FILE, get_now, get_today_str, safe_div,
+    get_now, get_today_str, safe_div,
 )
+from core.database import db_select, db_delete
 from core.indicators import (
     calculate_zero_reflection, compute_rsi, compute_atr,
     compute_vwap, compute_direction_counter, ACCUM_PHASES,
@@ -2589,10 +2589,8 @@ if scan_results and df is not None and not df.empty:
                 unsafe_allow_html=True
             )
             try:
-                with sqlite3.connect(DB_FILE) as conn:
-                    df_saved = pd.read_sql_query(
-                        "SELECT * FROM tracker ORDER BY date_time DESC", conn
-                    )
+                _tracker_rows = db_select("tracker", order_by="-date_time")
+                df_saved = pd.DataFrame(_tracker_rows) if _tracker_rows else pd.DataFrame()
 
                 if not df_saved.empty:
                     c_f1, c_f2, c_btn = st.columns([2, 2, 1.5])
@@ -2682,9 +2680,7 @@ if scan_results and df is not None and not df.empty:
                     _, col_del, _ = st.columns([1, 1, 1])
                     with col_del:
                         if st.button("🗑️ تنظيف المحفظة بالكامل", type="secondary", use_container_width=True):
-                            with sqlite3.connect(DB_FILE) as conn:
-                                conn.execute("DELETE FROM tracker")
-                                conn.commit()
+                            db_delete("tracker")
                             st.rerun()
                 else:
                     st.info(

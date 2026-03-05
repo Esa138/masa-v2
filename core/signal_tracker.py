@@ -2,15 +2,19 @@
 MASA QUANT V95 — Live Signal Tracker
 Records accumulation/distribution signals, tracks outcomes over 5/10/20 days,
 and computes live win-rate statistics.
+Supports Supabase (cloud) with SQLite fallback (local).
 """
 
-import sqlite3
 import datetime
 import pandas as pd
 import numpy as np
 import yfinance as yf
 
-from core.utils import DB_FILE, SAUDI_TZ, get_today_str
+from core.database import (
+    db_insert, db_select, db_select_where, db_update,
+    db_delete, db_count, is_cloud,
+)
+from core.utils import SAUDI_TZ, get_today_str
 
 
 # ═══════════════════════════════════════════════════════
@@ -18,36 +22,8 @@ from core.utils import DB_FILE, SAUDI_TZ, get_today_str
 # ═══════════════════════════════════════════════════════
 
 def init_signal_log():
-    """Create signal_log table if it doesn't exist."""
-    with sqlite3.connect(DB_FILE) as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS signal_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                date_logged TEXT NOT NULL,
-                ticker TEXT NOT NULL,
-                company TEXT,
-                market TEXT,
-                accum_phase TEXT,
-                v2_signal TEXT,
-                v2_confidence INTEGER DEFAULT 0,
-                accum_score REAL DEFAULT 0,
-                entry_price REAL NOT NULL,
-                cmf REAL DEFAULT 0,
-                obv_slope REAL DEFAULT 0,
-                price_5d REAL,
-                price_10d REAL,
-                price_20d REAL,
-                return_5d REAL,
-                return_10d REAL,
-                return_20d REAL,
-                outcome_5d TEXT,
-                outcome_10d TEXT,
-                outcome_20d TEXT,
-                last_updated TEXT,
-                UNIQUE(date_logged, ticker, v2_signal)
-            )
-        """)
-        conn.commit()
+    """Tables are created by init_database() in core/database.py — nothing to do here."""
+    pass
 
 
 # ═══════════════════════════════════════════════════════
@@ -66,53 +42,50 @@ def log_signals_from_scan(df_ai_picks: pd.DataFrame, market_name: str) -> int:
     today = get_today_str()
     count = 0
 
-    try:
-        with sqlite3.connect(DB_FILE) as conn:
-            c = conn.cursor()
-            for _, row in df_ai_picks.iterrows():
-                phase = str(row.get('accum_phase', 'neutral'))
-                v2_signal = str(row.get('accum_v2_signal', 'none'))
+    for _, row in df_ai_picks.iterrows():
+        phase = str(row.get('accum_phase', 'neutral'))
+        v2_signal = str(row.get('accum_v2_signal', 'none'))
 
-                # Skip neutral/none — only track real signals
-                if phase == 'neutral' and v2_signal == 'none':
-                    continue
+        if phase == 'neutral' and v2_signal == 'none':
+            continue
 
-                ticker = str(row.get('الرمز', ''))
-                if not ticker:
-                    continue
+        ticker = str(row.get('\u0627\u0644\u0631\u0645\u0632', ''))
+        if not ticker:
+            continue
 
-                entry_price = float(row.get('raw_price', 0))
-                if entry_price <= 0:
-                    continue
+        entry_price = float(row.get('raw_price', 0))
+        if entry_price <= 0:
+            continue
 
-                company = str(row.get('الشركة', ''))
-                accum_score = float(row.get('accum_score', 0))
-                v2_confidence = int(row.get('accum_v2_confidence', 0))
-                cmf = float(row.get('accum_cmf', 0))
-                obv_slope = float(row.get('accum_obv_slope', 0))
+        company = str(row.get('\u0627\u0644\u0634\u0631\u0643\u0629', ''))
+        accum_score = float(row.get('accum_score', 0))
+        v2_confidence = int(row.get('accum_v2_confidence', 0))
+        cmf = float(row.get('accum_cmf', 0))
+        obv_slope = float(row.get('accum_obv_slope', 0))
+        effective_signal = v2_signal if v2_signal != 'none' else f"phase_{phase}"
 
-                # Use v2_signal if available, else use phase as signal type
-                effective_signal = v2_signal if v2_signal != 'none' else f"phase_{phase}"
-
-                try:
-                    c.execute(
-                        """INSERT OR IGNORE INTO signal_log
-                           (date_logged, ticker, company, market, accum_phase,
-                            v2_signal, v2_confidence, accum_score, entry_price,
-                            cmf, obv_slope)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (today, ticker, company, market_name, phase,
-                         effective_signal, v2_confidence, accum_score,
-                         entry_price, cmf, obv_slope)
-                    )
-                    if c.rowcount > 0:
-                        count += 1
-                except sqlite3.IntegrityError:
-                    continue
-
-            conn.commit()
-    except Exception:
-        pass
+        # Check for duplicate
+        existing = db_select("signal_log", {
+            "date_logged": today,
+            "ticker": ticker,
+            "v2_signal": effective_signal,
+        })
+        if not existing:
+            ok = db_insert("signal_log", {
+                "date_logged": today,
+                "ticker": ticker,
+                "company": company,
+                "market": market_name,
+                "accum_phase": phase,
+                "v2_signal": effective_signal,
+                "v2_confidence": v2_confidence,
+                "accum_score": accum_score,
+                "entry_price": entry_price,
+                "cmf": cmf,
+                "obv_slope": obv_slope,
+            })
+            if ok:
+                count += 1
 
     return count
 
@@ -130,7 +103,7 @@ def _trading_days_elapsed(date_logged_str: str) -> int:
         current = logged
         while current < today:
             current += datetime.timedelta(days=1)
-            if current.weekday() < 5:  # Mon-Fri
+            if current.weekday() < 5:
                 count += 1
         return count
     except Exception:
@@ -138,11 +111,7 @@ def _trading_days_elapsed(date_logged_str: str) -> int:
 
 
 def _classify_outcome(v2_signal: str, ret: float) -> str:
-    """
-    Classify win/loss based on signal type and return.
-    Buy signals: win if return > 0 (price went up)
-    Sell signals: win if return < 0 (price went down = signal was correct)
-    """
+    """Classify win/loss based on signal type and return."""
     is_sell = v2_signal in ('sell_confirmed', 'sell_warning', 'phase_distribute')
     if is_sell:
         return 'win' if ret < 0 else 'loss'
@@ -170,76 +139,67 @@ def update_signal_outcomes(max_signals: int = 50) -> int:
     now_str = datetime.datetime.now(SAUDI_TZ).strftime("%Y-%m-%d %H:%M")
     updated = 0
 
-    try:
-        with sqlite3.connect(DB_FILE) as conn:
-            c = conn.cursor()
+    # Get signals with NULL outcomes
+    rows = db_select_where(
+        "signal_log",
+        where_sql="(outcome_5d IS NULL OR outcome_10d IS NULL OR outcome_20d IS NULL) AND entry_price > 0",
+        order_by="-date_logged",
+        limit=max_signals,
+    )
 
-            # Get signals that still have NULL outcomes to fill
-            c.execute("""
-                SELECT id, date_logged, ticker, v2_signal, entry_price,
-                       price_5d, price_10d, price_20d
-                FROM signal_log
-                WHERE (outcome_5d IS NULL OR outcome_10d IS NULL OR outcome_20d IS NULL)
-                  AND entry_price > 0
-                ORDER BY date_logged DESC
-                LIMIT ?
-            """, (max_signals,))
+    if not rows:
+        return 0
 
-            rows = c.fetchall()
-            if not rows:
-                return 0
+    ticker_prices = {}
 
-            # Group by ticker to minimize API calls
-            ticker_prices = {}
+    for row in rows:
+        row_id = row.get('id')
+        date_logged = row.get('date_logged', '')
+        ticker = row.get('ticker', '')
+        v2_signal = row.get('v2_signal', '')
+        entry_price = row.get('entry_price', 0)
+        p5 = row.get('price_5d')
+        p10 = row.get('price_10d')
+        p20 = row.get('price_20d')
 
-            for row_id, date_logged, ticker, v2_signal, entry_price, p5, p10, p20 in rows:
-                days = _trading_days_elapsed(date_logged)
-                if days < 3:
-                    continue  # Too early for any outcome
+        days = _trading_days_elapsed(date_logged)
+        if days < 3:
+            continue
 
-                # Fetch price if not cached
-                if ticker not in ticker_prices:
-                    price = _fetch_current_price(ticker)
-                    if price <= 0:
-                        continue
-                    ticker_prices[ticker] = price
+        if ticker not in ticker_prices:
+            price = _fetch_current_price(ticker)
+            if price <= 0:
+                continue
+            ticker_prices[ticker] = price
 
-                current_price = ticker_prices[ticker]
-                ret = (current_price / entry_price - 1) * 100
+        current_price = ticker_prices[ticker]
+        ret = (current_price / entry_price - 1) * 100
 
-                updates = {}
+        updates = {}
 
-                # 5-day outcome
-                if p5 is None and days >= 5:
-                    outcome = _classify_outcome(v2_signal, ret)
-                    updates['price_5d'] = current_price
-                    updates['return_5d'] = round(ret, 2)
-                    updates['outcome_5d'] = outcome
+        if p5 is None and days >= 5:
+            outcome = _classify_outcome(v2_signal, ret)
+            updates['price_5d'] = current_price
+            updates['return_5d'] = round(ret, 2)
+            updates['outcome_5d'] = outcome
 
-                # 10-day outcome
-                if p10 is None and days >= 10:
-                    outcome = _classify_outcome(v2_signal, ret)
-                    updates['price_10d'] = current_price
-                    updates['return_10d'] = round(ret, 2)
-                    updates['outcome_10d'] = outcome
+        if p10 is None and days >= 10:
+            outcome = _classify_outcome(v2_signal, ret)
+            updates['price_10d'] = current_price
+            updates['return_10d'] = round(ret, 2)
+            updates['outcome_10d'] = outcome
 
-                # 20-day outcome
-                if p20 is None and days >= 20:
-                    outcome = _classify_outcome(v2_signal, ret)
-                    updates['price_20d'] = current_price
-                    updates['return_20d'] = round(ret, 2)
-                    updates['outcome_20d'] = outcome
+        if p20 is None and days >= 20:
+            outcome = _classify_outcome(v2_signal, ret)
+            updates['price_20d'] = current_price
+            updates['return_20d'] = round(ret, 2)
+            updates['outcome_20d'] = outcome
 
-                if updates:
-                    updates['last_updated'] = now_str
-                    set_clause = ', '.join(f"{k} = ?" for k in updates)
-                    values = list(updates.values()) + [row_id]
-                    c.execute(f"UPDATE signal_log SET {set_clause} WHERE id = ?", values)
-                    updated += 1
-
-            conn.commit()
-    except Exception:
-        pass
+        if updates:
+            updates['last_updated'] = now_str
+            if row_id:
+                db_update("signal_log", {"id": row_id}, updates)
+                updated += 1
 
     return updated
 
@@ -253,10 +213,7 @@ def compute_signal_stats(
     v2_filter: str = None,
     market_filter: str = None,
 ) -> dict:
-    """
-    Compute win-rate statistics from signal log.
-    Returns dict with overall, by_v2, and by_phase breakdowns.
-    """
+    """Compute win-rate statistics from signal log."""
     default = {
         'total': 0, 'active': 0, 'completed': 0,
         'by_v2': {}, 'by_phase': {},
@@ -264,27 +221,24 @@ def compute_signal_stats(
     }
 
     try:
-        with sqlite3.connect(DB_FILE) as conn:
-            query = "SELECT * FROM signal_log WHERE 1=1"
-            params = []
+        filters = {}
+        if phase_filter and phase_filter != "\u0627\u0644\u0643\u0644":
+            filters["accum_phase"] = phase_filter
+        if v2_filter and v2_filter != "\u0627\u0644\u0643\u0644":
+            filters["v2_signal"] = v2_filter
+        if market_filter and market_filter != "\u0627\u0644\u0643\u0644":
+            filters["market"] = market_filter
 
-            if phase_filter and phase_filter != "الكل":
-                query += " AND accum_phase = ?"
-                params.append(phase_filter)
-            if v2_filter and v2_filter != "الكل":
-                query += " AND v2_signal = ?"
-                params.append(v2_filter)
-            if market_filter and market_filter != "الكل":
-                query += " AND market = ?"
-                params.append(market_filter)
+        rows = db_select("signal_log", filters if filters else None)
+        if not rows:
+            return default
 
-            df = pd.read_sql_query(query, conn, params=params)
-
+        df = pd.DataFrame(rows)
         if df.empty:
             return default
 
         total = len(df)
-        completed = int(df['outcome_20d'].notna().sum())
+        completed = int(df['outcome_20d'].notna().sum()) if 'outcome_20d' in df.columns else 0
         active = total - completed
 
         stats = {
@@ -296,26 +250,17 @@ def compute_signal_stats(
             'overall': _calc_win_rates(df),
         }
 
-        # By V2 signal type
         for sig in df['v2_signal'].unique():
             if sig and sig != 'none':
                 sub = df[df['v2_signal'] == sig]
-                stats['by_v2'][sig] = {
-                    'count': len(sub),
-                    **_calc_win_rates(sub),
-                }
+                stats['by_v2'][sig] = {'count': len(sub), **_calc_win_rates(sub)}
 
-        # By accumulation phase
         for phase in df['accum_phase'].unique():
             if phase and phase != 'neutral':
                 sub = df[df['accum_phase'] == phase]
-                stats['by_phase'][phase] = {
-                    'count': len(sub),
-                    **_calc_win_rates(sub),
-                }
+                stats['by_phase'][phase] = {'count': len(sub), **_calc_win_rates(sub)}
 
         return stats
-
     except Exception:
         return default
 
@@ -342,18 +287,17 @@ def _calc_win_rates(df: pd.DataFrame) -> dict:
 # 5. Get Signal Log DataFrame for Display
 # ═══════════════════════════════════════════════════════
 
-# Signal display labels
 _V2_LABELS = {
-    'buy_confirmed': '🟢 شراء مؤكد',
-    'buy_breakout': '🔵 كسر مؤكد',
-    'sell_confirmed': '🔴 بيع مؤكد',
-    'sell_warning': '🟠 تحذير تصريف',
-    'watch': '👁️ مراقبة',
-    'phase_early': '⚪ تجميع مبكر',
-    'phase_mid': '🟡 تجميع متوسط',
-    'phase_strong': '🔵 تجميع قوي',
-    'phase_late': '🟢 نهاية تجميع',
-    'phase_distribute': '🔴 تصريف',
+    'buy_confirmed': '\U0001f7e2 شراء مؤكد',
+    'buy_breakout': '\U0001f535 كسر مؤكد',
+    'sell_confirmed': '\U0001f534 بيع مؤكد',
+    'sell_warning': '\U0001f7e0 تحذير تصريف',
+    'watch': '\U0001f441\ufe0f مراقبة',
+    'phase_early': '\u26aa تجميع مبكر',
+    'phase_mid': '\U0001f7e1 تجميع متوسط',
+    'phase_strong': '\U0001f535 تجميع قوي',
+    'phase_late': '\U0001f7e2 نهاية تجميع',
+    'phase_distribute': '\U0001f534 تصريف',
 }
 
 _PHASE_LABELS = {
@@ -371,52 +315,48 @@ def get_signal_log_df(
     market_filter: str = None,
     limit: int = 200,
 ) -> pd.DataFrame:
-    """
-    Fetch signal log as a display-ready DataFrame with Arabic column names.
-    """
+    """Fetch signal log as a display-ready DataFrame with Arabic column names."""
     try:
-        with sqlite3.connect(DB_FILE) as conn:
-            query = "SELECT * FROM signal_log WHERE 1=1"
-            params = []
+        filters = {}
+        if phase_filter and phase_filter != "\u0627\u0644\u0643\u0644":
+            filters["accum_phase"] = phase_filter
+        if v2_filter and v2_filter != "\u0627\u0644\u0643\u0644":
+            filters["v2_signal"] = v2_filter
+        if market_filter and market_filter != "\u0627\u0644\u0643\u0644":
+            filters["market"] = market_filter
 
-            if phase_filter and phase_filter != "الكل":
-                query += " AND accum_phase = ?"
-                params.append(phase_filter)
-            if v2_filter and v2_filter != "الكل":
-                query += " AND v2_signal = ?"
-                params.append(v2_filter)
-            if market_filter and market_filter != "الكل":
-                query += " AND market = ?"
-                params.append(market_filter)
+        rows = db_select(
+            "signal_log",
+            filters if filters else None,
+            order_by="-date_logged",
+            limit=limit,
+        )
 
-            query += " ORDER BY date_logged DESC, accum_score DESC LIMIT ?"
-            params.append(limit)
+        if not rows:
+            return pd.DataFrame()
 
-            df = pd.read_sql_query(query, conn, params=params)
-
+        df = pd.DataFrame(rows)
         if df.empty:
             return pd.DataFrame()
 
-        # Format for display
         display = pd.DataFrame()
-        display['التاريخ'] = df['date_logged']
-        display['الرمز'] = df['ticker']
-        display['الشركة'] = df['company']
-        display['المرحلة'] = df['accum_phase'].map(lambda x: _PHASE_LABELS.get(x, x))
-        display['الإشارة'] = df['v2_signal'].map(lambda x: _V2_LABELS.get(x, x))
-        display['السكور'] = df['accum_score'].round(0).astype(int)
-        display['سعر الدخول'] = df['entry_price'].round(2)
+        display['\u0627\u0644\u062a\u0627\u0631\u064a\u062e'] = df['date_logged']
+        display['\u0627\u0644\u0631\u0645\u0632'] = df['ticker']
+        display['\u0627\u0644\u0634\u0631\u0643\u0629'] = df['company']
+        display['\u0627\u0644\u0645\u0631\u062d\u0644\u0629'] = df['accum_phase'].map(lambda x: _PHASE_LABELS.get(x, x))
+        display['\u0627\u0644\u0625\u0634\u0627\u0631\u0629'] = df['v2_signal'].map(lambda x: _V2_LABELS.get(x, x))
+        display['\u0627\u0644\u0633\u0643\u0648\u0631'] = df['accum_score'].round(0).astype(int)
+        display['\u0633\u0639\u0631 \u0627\u0644\u062f\u062e\u0648\u0644'] = df['entry_price'].round(2)
 
-        # Returns with formatting
         for period, label in [('5d', '5 أيام'), ('10d', '10 أيام'), ('20d', '20 يوم')]:
             ret_col = f'return_{period}'
             outcome_col = f'outcome_{period}'
             if ret_col in df.columns:
                 display[label] = df.apply(
                     lambda r: (
-                        f"{'✅' if r[outcome_col] == 'win' else '❌'} "
+                        f"{'✅' if r.get(outcome_col) == 'win' else '❌'} "
                         f"{r[ret_col]:+.1f}%"
-                        if pd.notna(r[ret_col])
+                        if pd.notna(r.get(ret_col))
                         else '⏳'
                     ),
                     axis=1
@@ -425,94 +365,64 @@ def get_signal_log_df(
                 display[label] = '⏳'
 
         return display
-
     except Exception:
         return pd.DataFrame()
 
 
 def clear_signal_log():
     """Delete all records from signal_log table."""
-    try:
-        with sqlite3.connect(DB_FILE) as conn:
-            conn.execute("DELETE FROM signal_log")
-            conn.commit()
-        return True
-    except Exception:
-        return False
+    return db_delete("signal_log")
 
 
 def get_ticker_signal_history(ticker: str) -> dict:
-    """
-    Get signal history for a specific ticker.
-    Returns: {'total': 5, 'wins': 3, 'win_pct': 60.0, 'last_signal': 'sell_warning', 'last_date': '2026-03-01'}
-    """
+    """Get signal history for a specific ticker."""
     default = {'total': 0, 'wins': 0, 'win_pct': 0, 'last_signal': '', 'last_date': ''}
     try:
-        with sqlite3.connect(DB_FILE) as conn:
-            c = conn.cursor()
-            c.execute(
-                "SELECT v2_signal, outcome_20d, date_logged FROM signal_log "
-                "WHERE ticker = ? ORDER BY date_logged DESC",
-                (ticker,)
-            )
-            rows = c.fetchall()
-            if not rows:
-                return default
+        rows = db_select("signal_log", {"ticker": ticker}, order_by="-date_logged")
+        if not rows:
+            return default
 
-            total = len(rows)
-            completed = [(s, o) for s, o, _ in rows if o is not None]
-            wins = sum(1 for _, o in completed if o == 'win')
-            win_pct = round(wins / len(completed) * 100, 0) if completed else 0
+        total = len(rows)
+        completed = [(r['v2_signal'], r.get('outcome_20d')) for r in rows if r.get('outcome_20d')]
+        wins = sum(1 for _, o in completed if o == 'win')
+        win_pct = round(wins / len(completed) * 100, 0) if completed else 0
 
-            return {
-                'total': total,
-                'wins': wins,
-                'completed': len(completed),
-                'win_pct': win_pct,
-                'last_signal': rows[0][0],
-                'last_date': rows[0][2],
-            }
+        return {
+            'total': total,
+            'wins': wins,
+            'completed': len(completed),
+            'win_pct': win_pct,
+            'last_signal': rows[0].get('v2_signal', ''),
+            'last_date': rows[0].get('date_logged', ''),
+        }
     except Exception:
         return default
 
 
 def get_distribution_summary() -> list:
-    """
-    Get active distribution signals for today's summary banner.
-    Returns list of dicts: [{'ticker': '2222.SR', 'company': 'أرامكو', 'score': 35, 'v2_signal': 'sell_warning'}, ...]
-    """
+    """Get active distribution signals for summary banner."""
     try:
-        with sqlite3.connect(DB_FILE) as conn:
-            c = conn.cursor()
-            # Get latest distribution signals (last 3 days to catch recent ones)
-            c.execute("""
-                SELECT ticker, company, accum_score, v2_signal, date_logged
-                FROM signal_log
-                WHERE accum_phase = 'distribute'
-                  AND date_logged >= date('now', '-3 days')
-                ORDER BY date_logged DESC, accum_score ASC
-            """)
-            rows = c.fetchall()
-            # Deduplicate by ticker (keep latest)
-            seen = set()
-            result = []
-            for tk, co, sc, v2, dt in rows:
-                if tk not in seen:
-                    seen.add(tk)
-                    result.append({
-                        'ticker': tk, 'company': co, 'score': sc,
-                        'v2_signal': v2, 'date': dt,
-                    })
-            return result
+        rows = db_select("signal_log", {"accum_phase": "distribute"}, order_by="-date_logged")
+        # Filter last 3 days
+        cutoff = (datetime.datetime.now(SAUDI_TZ) - datetime.timedelta(days=3)).strftime("%Y-%m-%d")
+        seen = set()
+        result = []
+        for r in rows:
+            tk = r.get('ticker', '')
+            if r.get('date_logged', '') >= cutoff and tk not in seen:
+                seen.add(tk)
+                result.append({
+                    'ticker': tk,
+                    'company': r.get('company', ''),
+                    'score': r.get('accum_score', 0),
+                    'v2_signal': r.get('v2_signal', ''),
+                    'date': r.get('date_logged', ''),
+                })
+        return result
     except Exception:
         return []
 
 
 def get_signal_count() -> int:
     """Get total number of signals in the log."""
-    try:
-        with sqlite3.connect(DB_FILE) as conn:
-            result = conn.execute("SELECT COUNT(*) FROM signal_log").fetchone()
-            return result[0] if result else 0
-    except Exception:
-        return 0
+    return db_count("signal_log")

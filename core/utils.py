@@ -1,10 +1,9 @@
-import sqlite3
 import html as html_mod
 import datetime
 import pandas as pd
 import numpy as np
 
-DB_FILE = "masa_database.db"
+from core.database import init_database, db_insert, db_select, is_cloud, DB_FILE
 
 SAUDI_TZ = datetime.timezone(datetime.timedelta(hours=3))
 
@@ -18,15 +17,8 @@ def get_today_str() -> str:
 
 
 def init_db():
-    with sqlite3.connect(DB_FILE) as conn:
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS tracker (
-                date_time TEXT, market TEXT, ticker TEXT, company TEXT,
-                entry REAL, target REAL, stop_loss REAL, score TEXT,
-                mom TEXT, date_only TEXT, timeframe TEXT DEFAULT 'غير محدد'
-            )"""
-        )
-        conn.commit()
+    """Initialize database (Supabase or SQLite fallback)."""
+    init_database()
 
 
 def sanitize_text(text) -> str:
@@ -73,32 +65,35 @@ def localize_timezone(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def save_to_tracker(df_vip: pd.DataFrame, market_name: str, tf_label: str) -> bool:
+    """Save VIP picks to tracker table."""
     if df_vip.empty:
         return False
     try:
-        with sqlite3.connect(DB_FILE) as conn:
-            c = conn.cursor()
-            for _, row in df_vip.iterrows():
-                date_time = str(row['raw_time']).replace('⏱️ ', '')
-                date_only = date_time.split(' | ')[1] if ' | ' in date_time else date_time
-                ticker = str(row['الرمز'])
+        for _, row in df_vip.iterrows():
+            date_time = str(row['raw_time']).replace('\u23f1\ufe0f ', '')
+            date_only = date_time.split(' | ')[1] if ' | ' in date_time else date_time
+            ticker = str(row['\u0627\u0644\u0631\u0645\u0632'])
 
-                c.execute(
-                    "SELECT 1 FROM tracker WHERE date_only=? AND ticker=? AND timeframe=?",
-                    (date_only, ticker, tf_label)
-                )
-                if not c.fetchone():
-                    c.execute(
-                        """INSERT INTO tracker
-                           (date_time, market, ticker, company, entry, target,
-                            stop_loss, score, mom, date_only, timeframe)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (date_time, market_name, ticker, str(row['الشركة']),
-                         float(row['raw_price']), float(row['raw_target']),
-                         float(row['raw_sl']), str(row['raw_score']),
-                         str(row['raw_mom']), date_only, tf_label)
-                    )
-            conn.commit()
+            # Check for duplicate
+            existing = db_select("tracker", {
+                "date_only": date_only,
+                "ticker": ticker,
+                "timeframe": tf_label,
+            })
+            if not existing:
+                db_insert("tracker", {
+                    "date_time": date_time,
+                    "market": market_name,
+                    "ticker": ticker,
+                    "company": str(row['\u0627\u0644\u0634\u0631\u0643\u0629']),
+                    "entry": float(row['raw_price']),
+                    "target": float(row['raw_target']),
+                    "stop_loss": float(row['raw_sl']),
+                    "score": str(row['raw_score']),
+                    "mom": str(row['raw_mom']),
+                    "date_only": date_only,
+                    "timeframe": tf_label,
+                })
         return True
     except Exception:
         return False
