@@ -758,9 +758,9 @@ def build_breakouts_chart(r, composite_dates=None, composite_vals=None):
             fig.add_trace(go.Scatter(
                 x=matched_dates_comp, y=matched_comp,
                 mode="lines",
-                line=dict(color="#FFD700", width=1.5, dash="dot"),
+                line=dict(color="#FFD700", width=2.5),
                 name="المؤشر المركب",
-                opacity=0.7,
+                opacity=0.9,
                 hovertemplate="المؤشر المركب: %{y:.1f}<extra></extra>",
             ), secondary_y=True)
 
