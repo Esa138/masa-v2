@@ -1,78 +1,36 @@
 """
-MASA QUANT — Database Abstraction Layer
-Supports Supabase (cloud) with SQLite fallback (local).
+MASA V2 — Database Layer
+SQLite for signal tracking and performance measurement.
 """
 
-import os
 import sqlite3
-import streamlit as st
+import os
 
-_supabase_client = None
-_USE_SUPABASE = False
-
-DB_FILE = "masa_database.db"
-
-
-def _get_supabase_creds():
-    """Get Supabase credentials from st.secrets or environment."""
-    url = ""
-    key = ""
-    try:
-        url = st.secrets.get("SUPABASE_URL", "")
-        key = st.secrets.get("SUPABASE_KEY", "")
-    except Exception:
-        pass
-    if not url:
-        url = os.environ.get("SUPABASE_URL", "")
-    if not key:
-        key = os.environ.get("SUPABASE_KEY", "")
-    return url, key
+DB_FILE = "masa_v2.db"
 
 
 def init_database():
-    """Initialize database connection — Supabase if available, else SQLite."""
-    global _supabase_client, _USE_SUPABASE
-
-    url, key = _get_supabase_creds()
-    if url and key:
-        try:
-            from supabase import create_client
-            _supabase_client = create_client(url, key)
-            _USE_SUPABASE = True
-            return
-        except Exception:
-            pass
-
-    # Fallback to SQLite
-    _USE_SUPABASE = False
-    _supabase_client = None
-    _init_sqlite_tables()
-
-
-def _init_sqlite_tables():
-    """Create SQLite tables (fallback mode)."""
+    """Create tables if they don't exist."""
     with sqlite3.connect(DB_FILE) as conn:
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS tracker (
-                date_time TEXT, market TEXT, ticker TEXT, company TEXT,
-                entry REAL, target REAL, stop_loss REAL, score TEXT,
-                mom TEXT, date_only TEXT, timeframe TEXT DEFAULT '\u063a\u064a\u0631 \u0645\u062d\u062f\u062f'
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS signal_log (
+            CREATE TABLE IF NOT EXISTS signals (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 date_logged TEXT NOT NULL,
                 ticker TEXT NOT NULL,
                 company TEXT,
-                market TEXT,
-                accum_phase TEXT,
-                v2_signal TEXT,
-                v2_confidence INTEGER DEFAULT 0,
-                accum_score REAL DEFAULT 0,
-                entry_price REAL NOT NULL,
+                sector TEXT,
+                decision TEXT NOT NULL,
+                accum_level TEXT,
+                accum_days INTEGER DEFAULT 0,
+                location TEXT,
                 cmf REAL DEFAULT 0,
-                obv_slope REAL DEFAULT 0,
+                entry_price REAL DEFAULT 0,
+                stop_loss REAL DEFAULT 0,
+                target REAL DEFAULT 0,
+                rr_ratio REAL DEFAULT 0,
+                reasons_for TEXT,
+                reasons_against TEXT,
+                -- Outcomes (filled later)
                 price_5d REAL,
                 price_10d REAL,
                 price_20d REAL,
@@ -83,220 +41,134 @@ def _init_sqlite_tables():
                 outcome_10d TEXT,
                 outcome_20d TEXT,
                 last_updated TEXT,
-                UNIQUE(date_logged, ticker, v2_signal)
+                UNIQUE(date_logged, ticker, decision)
             )
         """)
-        conn.commit()
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS performance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL,
+                signal_type TEXT NOT NULL,
+                total_signals INTEGER DEFAULT 0,
+                wins_5d INTEGER DEFAULT 0,
+                wins_10d INTEGER DEFAULT 0,
+                wins_20d INTEGER DEFAULT 0,
+                total_completed INTEGER DEFAULT 0,
+                win_rate_10d REAL DEFAULT 0,
+                UNIQUE(date, signal_type)
+            )
+        """)
 
 
-def is_cloud():
-    """Check if using Supabase (cloud) or SQLite (local)."""
-    return _USE_SUPABASE
-
-
-# ═══════════════════════════════════════════════════════
-# CRUD Operations
-# ═══════════════════════════════════════════════════════
-
-def db_insert(table: str, data: dict) -> bool:
-    """Insert a row. Returns True on success."""
-    if _USE_SUPABASE and _supabase_client:
-        try:
-            _supabase_client.table(table).insert(data).execute()
+def log_signal(signal: dict) -> bool:
+    """Log a signal to the database."""
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.execute("""
+                INSERT OR IGNORE INTO signals
+                (date_logged, ticker, company, sector, decision,
+                 accum_level, accum_days, location, cmf,
+                 entry_price, stop_loss, target, rr_ratio,
+                 reasons_for, reasons_against)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                signal.get("date_logged", ""),
+                signal.get("ticker", ""),
+                signal.get("company", ""),
+                signal.get("sector", ""),
+                signal.get("decision", ""),
+                signal.get("accum_level", ""),
+                signal.get("accum_days", 0),
+                signal.get("location", ""),
+                signal.get("cmf", 0),
+                signal.get("entry_price", 0),
+                signal.get("stop_loss", 0),
+                signal.get("target", 0),
+                signal.get("rr_ratio", 0),
+                "|".join(signal.get("reasons_for", [])),
+                "|".join(signal.get("reasons_against", [])),
+            ))
             return True
-        except Exception:
-            return False
-    else:
-        cols = ", ".join(data.keys())
-        placeholders = ", ".join(["?"] * len(data))
-        try:
-            with sqlite3.connect(DB_FILE) as conn:
-                conn.execute(
-                    f"INSERT OR IGNORE INTO {table} ({cols}) VALUES ({placeholders})",
-                    list(data.values()),
-                )
-                conn.commit()
-            return True
-        except Exception:
-            return False
+    except Exception:
+        return False
 
 
-def db_upsert(table: str, data: dict) -> bool:
-    """Insert or update a row. Returns True on success."""
-    if _USE_SUPABASE and _supabase_client:
-        try:
-            _supabase_client.table(table).upsert(data).execute()
-            return True
-        except Exception:
-            return False
-    else:
-        return db_insert(table, data)
+def get_signals(limit: int = 200) -> list:
+    """Get recent signals."""
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM signals ORDER BY date_logged DESC LIMIT ?",
+                (limit,)
+            ).fetchall()
+            return [dict(r) for r in rows]
+    except Exception:
+        return []
 
 
-def db_select(table: str, filters: dict = None, order_by: str = None,
-              limit: int = None, columns: str = "*") -> list:
-    """Select rows. Returns list of dicts."""
-    if _USE_SUPABASE and _supabase_client:
-        try:
-            query = _supabase_client.table(table).select(columns)
-            if filters:
-                for k, v in filters.items():
-                    query = query.eq(k, v)
-            if order_by:
-                desc = order_by.startswith("-")
-                col = order_by.lstrip("-")
-                query = query.order(col, desc=desc)
-            if limit:
-                query = query.limit(limit)
-            result = query.execute()
-            return result.data if result.data else []
-        except Exception:
-            return []
-    else:
-        try:
-            where_clause = ""
-            values = []
-            if filters:
-                conditions = [f"{k} = ?" for k in filters.keys()]
-                where_clause = " WHERE " + " AND ".join(conditions)
-                values = list(filters.values())
-
-            sql = f"SELECT {columns} FROM {table}{where_clause}"
-            if order_by:
-                desc = order_by.startswith("-")
-                col = order_by.lstrip("-")
-                sql += f" ORDER BY {col} {'DESC' if desc else 'ASC'}"
-            if limit:
-                sql += f" LIMIT {limit}"
-
-            with sqlite3.connect(DB_FILE) as conn:
-                conn.row_factory = sqlite3.Row
-                rows = conn.execute(sql, values).fetchall()
-                return [dict(r) for r in rows]
-        except Exception:
-            return []
-
-
-def db_select_where(table: str, where_sql: str, values: list = None,
-                    order_by: str = None, limit: int = None) -> list:
-    """Select with raw WHERE clause (SQLite) or filter chain (Supabase).
-    For complex queries that need more than simple equality filters.
-    Falls back to SQLite-style query for both backends.
+def get_win_rates() -> dict:
     """
-    if _USE_SUPABASE and _supabase_client:
-        try:
-            # Use RPC or direct query for complex filters
-            query = _supabase_client.table(table).select("*")
-            if order_by:
-                desc = order_by.startswith("-")
-                col = order_by.lstrip("-")
-                query = query.order(col, desc=desc)
-            if limit:
-                query = query.limit(limit)
-            result = query.execute()
-            return result.data if result.data else []
-        except Exception:
-            return []
-    else:
-        try:
-            sql = f"SELECT * FROM {table}"
-            if where_sql:
-                sql += f" WHERE {where_sql}"
-            if order_by:
-                desc = order_by.startswith("-")
-                col = order_by.lstrip("-")
-                sql += f" ORDER BY {col} {'DESC' if desc else 'ASC'}"
-            if limit:
-                sql += f" LIMIT {limit}"
-            with sqlite3.connect(DB_FILE) as conn:
-                conn.row_factory = sqlite3.Row
-                rows = conn.execute(sql, values or []).fetchall()
-                return [dict(r) for r in rows]
-        except Exception:
-            return []
+    Compute actual win rates per decision type.
+    This is THE source of truth for the platform.
+    """
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT decision, accum_level,
+                    COUNT(*) as total,
+                    SUM(CASE WHEN outcome_10d = 'win' THEN 1 ELSE 0 END) as wins,
+                    COUNT(outcome_10d) as completed
+                FROM signals
+                WHERE outcome_10d IS NOT NULL
+                GROUP BY decision, accum_level
+            """).fetchall()
+
+            result = {}
+            for r in rows:
+                key = f"{r['decision']}_{r['accum_level']}"
+                completed = r["completed"]
+                wins = r["wins"]
+                result[key] = {
+                    "total": r["total"],
+                    "completed": completed,
+                    "wins": wins,
+                    "win_rate": round(wins / completed * 100, 1) if completed > 0 else 0,
+                }
+            return result
+    except Exception:
+        return {}
 
 
-def db_update(table: str, filters: dict, data: dict) -> bool:
-    """Update rows matching filters. Returns True on success."""
-    if _USE_SUPABASE and _supabase_client:
-        try:
-            query = _supabase_client.table(table).update(data)
-            for k, v in filters.items():
-                query = query.eq(k, v)
-            query.execute()
-            return True
-        except Exception:
-            return False
-    else:
-        try:
-            set_clause = ", ".join(f"{k} = ?" for k in data.keys())
-            where_clause = " AND ".join(f"{k} = ?" for k in filters.keys())
-            values = list(data.values()) + list(filters.values())
-            with sqlite3.connect(DB_FILE) as conn:
-                conn.execute(
-                    f"UPDATE {table} SET {set_clause} WHERE {where_clause}",
-                    values,
-                )
-                conn.commit()
-            return True
-        except Exception:
-            return False
+def get_total_performance() -> dict:
+    """Get overall platform performance summary."""
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("""
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN decision = 'enter' THEN 1 ELSE 0 END) as enter_count,
+                    SUM(CASE WHEN decision = 'enter' AND outcome_10d = 'win' THEN 1 ELSE 0 END) as enter_wins,
+                    SUM(CASE WHEN decision = 'enter' AND outcome_10d IS NOT NULL THEN 1 ELSE 0 END) as enter_completed,
+                    AVG(CASE WHEN decision = 'enter' THEN return_10d END) as avg_return
+                FROM signals
+            """).fetchone()
 
+            if row is None:
+                return {"total": 0, "enter_count": 0, "win_rate": 0, "avg_return": 0}
 
-def db_delete(table: str, filters: dict = None) -> bool:
-    """Delete rows (all if no filters). Returns True on success."""
-    if _USE_SUPABASE and _supabase_client:
-        try:
-            if filters:
-                query = _supabase_client.table(table).delete()
-                for k, v in filters.items():
-                    query = query.eq(k, v)
-                query.execute()
-            else:
-                # Delete all — Supabase needs at least one filter
-                _supabase_client.table(table).delete().neq("id", -999).execute()
-            return True
-        except Exception:
-            return False
-    else:
-        try:
-            with sqlite3.connect(DB_FILE) as conn:
-                if filters:
-                    where_clause = " AND ".join(f"{k} = ?" for k in filters.keys())
-                    conn.execute(f"DELETE FROM {table} WHERE {where_clause}",
-                                 list(filters.values()))
-                else:
-                    conn.execute(f"DELETE FROM {table}")
-                conn.commit()
-            return True
-        except Exception:
-            return False
+            completed = row["enter_completed"] or 0
+            wins = row["enter_wins"] or 0
 
-
-def db_count(table: str, filters: dict = None) -> int:
-    """Count rows in table."""
-    if _USE_SUPABASE and _supabase_client:
-        try:
-            query = _supabase_client.table(table).select("*", count="exact")
-            if filters:
-                for k, v in filters.items():
-                    query = query.eq(k, v)
-            result = query.execute()
-            return result.count if result.count is not None else 0
-        except Exception:
-            return 0
-    else:
-        try:
-            where_clause = ""
-            values = []
-            if filters:
-                conditions = [f"{k} = ?" for k in filters.keys()]
-                where_clause = " WHERE " + " AND ".join(conditions)
-                values = list(filters.values())
-            with sqlite3.connect(DB_FILE) as conn:
-                row = conn.execute(
-                    f"SELECT COUNT(*) FROM {table}{where_clause}", values
-                ).fetchone()
-                return row[0] if row else 0
-        except Exception:
-            return 0
+            return {
+                "total": row["total"] or 0,
+                "enter_count": row["enter_count"] or 0,
+                "enter_completed": completed,
+                "enter_wins": wins,
+                "win_rate": round(wins / completed * 100, 1) if completed > 0 else 0,
+                "avg_return": round(row["avg_return"] or 0, 2),
+            }
+    except Exception:
+        return {"total": 0, "enter_count": 0, "win_rate": 0, "avg_return": 0}

@@ -1,298 +1,686 @@
-SAUDI_NAMES = {
-    '1010.SR': 'الرياض', '1020.SR': 'الجزيرة', '1030.SR': 'الاستثمار',
-    '1050.SR': 'السعودي الفرنسي', '1060.SR': 'الأول', '1080.SR': 'العربي',
-    '1111.SR': 'تداول', '1120.SR': 'الراجحي', '1140.SR': 'البلاد',
-    '1150.SR': 'الإنماء', '1180.SR': 'الأهلي', '1182.SR': 'أملاك',
-    '1183.SR': 'سهل', '1833.SR': 'الموارد',
-    '1201.SR': 'تكوين', '1202.SR': 'مبكو', '1211.SR': 'معادن',
-    '1212.SR': 'أسترا الصناعية', '1213.SR': 'نسيج', '1214.SR': 'شاكر',
-    '1301.SR': 'أسلاك', '1302.SR': 'بوان', '1303.SR': 'الصناعات الكهربائية',
-    '1304.SR': 'اليمامة للحديد', '1320.SR': 'أنابيب السعودية',
-    '1321.SR': 'أنابيب الشرق', '1322.SR': 'أماك',
-    '2001.SR': 'كيمانول', '2010.SR': 'سابك', '2020.SR': 'المغذيات',
-    '2030.SR': 'المصافي', '2040.SR': 'الخزف السعودي',
-    '2050.SR': 'مجموعة صافولا', '2060.SR': 'التصنيع', '2070.SR': 'الدوائية',
-    '2080.SR': 'الغاز', '2081.SR': 'الخريف', '2082.SR': 'أكوا باور',
-    '2083.SR': 'مرافق', '2100.SR': 'وفرة', '2110.SR': 'الكابلات',
-    '2120.SR': 'المتطورة', '2130.SR': 'صدق', '2140.SR': 'أميانتيت',
-    '2150.SR': 'زجاج', '2170.SR': 'اللجين', '2180.SR': 'فيبكو',
-    '2190.SR': 'سيسكو', '2200.SR': 'أنابيب', '2210.SR': 'نماء',
-    '2220.SR': 'معدنية', '2222.SR': 'أرامكو', '2223.SR': 'لوبريف',
-    '2230.SR': 'الكيميائية', '2240.SR': 'الزامل',
-    '2250.SR': 'المجموعة السعودية', '2270.SR': 'سدافكو',
-    '2280.SR': 'المراعي', '2281.SR': 'تنمية', '2282.SR': 'المطاحن الأولى',
-    '2283.SR': 'المطاحن الحديثة', '2290.SR': 'ينساب',
-    '2300.SR': 'صناعة الورق', '2310.SR': 'سبكيم', '2330.SR': 'المتقدمة',
-    '2350.SR': 'كيان السعودية', '2360.SR': 'الفخارية',
-    '2380.SR': 'بترورابغ',
-    '3010.SR': 'أسمنت العربية', '3020.SR': 'أسمنت اليمامة',
-    '3030.SR': 'أسمنت السعودية', '3040.SR': 'أسمنت القصيم',
-    '3050.SR': 'أسمنت الجنوبية', '3060.SR': 'أسمنت ينبع',
-    '3080.SR': 'أسمنت الشرقية', '3090.SR': 'أسمنت تبوك',
-    '3091.SR': 'أسمنت الجوف', '3092.SR': 'أسمنت المدينة',
-    '3021.SR': 'أسمنت أم القرى', '3022.SR': 'أسمنت الرياض',
-    '4001.SR': 'أسواق العثيم', '4002.SR': 'المواساة', '4003.SR': 'إكسترا',
-    '4004.SR': 'دله الصحية', '4005.SR': 'رعاية', '4007.SR': 'الحمادي',
-    '4013.SR': 'سليمان الحبيب', '4014.SR': 'دار المعدات',
-    '4015.SR': 'جمجوم فارما', '4020.SR': 'العقارية', '4030.SR': 'البحري',
-    '4031.SR': 'مهارة', '4040.SR': 'سابتكو', '4050.SR': 'ساسكو',
-    '4061.SR': 'أنعام القابضة', '4071.SR': 'العربية',
-    '4081.SR': 'النايفات', '4090.SR': 'طيبة', '4100.SR': 'مكة',
-    '4110.SR': 'باتك', '4130.SR': 'درب السعودية', '4140.SR': 'الصادرات',
-    '4150.SR': 'التعمير', '4160.SR': 'ثمار', '4161.SR': 'بن داود',
-    '4162.SR': 'المنجم', '4163.SR': 'الدواء', '4164.SR': 'النهدي',
-    '4165.SR': 'الماجد للعود', '4170.SR': 'شمس',
-    '4180.SR': 'مجموعة فتيحي', '4190.SR': 'جرير',
-    '4191.SR': 'أبو معطي', '4192.SR': 'السيف غاليري', '4200.SR': 'الدريس',
-    '4210.SR': 'الأبحاث والإعلام', '4220.SR': 'إعمار',
-    '4230.SR': 'البحر الأحمر', '4240.SR': 'سينومي ريتيل',
-    '4250.SR': 'جبل عمر', '4260.SR': 'بدجت', '4261.SR': 'ذيب',
-    '4262.SR': 'لومي', '4280.SR': 'المملكة',
-    '4290.SR': 'الخليج للتدريب', '4300.SR': 'دار الأركان',
-    '4320.SR': 'الأندلس', '4321.SR': 'سينومي سنترز',
-    '4322.SR': 'ريتال',
-    '6004.SR': 'كاتريون', '6010.SR': 'نادك', '6012.SR': 'ريدان',
-    '6013.SR': 'التطويرية الغذائية', '6014.SR': 'الآمار',
-    '6015.SR': 'أمريكانا', '6020.SR': 'القصيم',
-    '6040.SR': 'تبوك الزراعية', '6050.SR': 'الأسماك',
-    '6060.SR': 'الشرقية للتنمية', '6070.SR': 'الجوف',
-    '6090.SR': 'جازادكو',
-    '7010.SR': 'STC', '7020.SR': 'موبايلي',
-    '7030.SR': 'زين السعودية', '7040.SR': 'قو للاتصالات',
-    '7200.SR': 'ام آي اس', '7202.SR': 'سلوشنز', '7203.SR': 'علم',
-    '7204.SR': 'توبي',
-    '8010.SR': 'التعاونية', '8012.SR': 'الجزيرة تكافل',
-    '8020.SR': 'ملاذ للتأمين', '8030.SR': 'ميدغلف',
-    '8040.SR': 'أليانز', '8050.SR': 'سلامة', '8060.SR': 'ولاء',
-    '8070.SR': 'الدرع العربي', '8100.SR': 'سايكو',
-    '8120.SR': 'اتحاد الخليج', '8150.SR': 'أسيج',
-    '8160.SR': 'التأمين العربية', '8200.SR': 'إعادة',
-    '8210.SR': 'بوبا', '8230.SR': 'تكافل الراجحي',
-    '8240.SR': 'تشب', '8250.SR': 'عناية',
-    '8260.SR': 'أمانة للتأمين',
-    '8280.SR': 'ليفا',
+"""
+MASA V2 — Market Stock Data
+Saudi Market (TASI) + US Market (S&P 500 Top Stocks)
+"""
+
+SAUDI_STOCKS = {
+    # ══════════════════════════════════════════════════════════
+    # المصارف والخدمات المالية (Banks & Financial Services)
+    # ══════════════════════════════════════════════════════════
+    "1010.SR": "الرياض",
+    "1020.SR": "الجزيرة",
+    "1030.SR": "الاستثمار",
+    "1050.SR": "السعودي الفرنسي",
+    "1060.SR": "الأول",
+    "1080.SR": "العربي",
+    "1111.SR": "تداول",
+    "1120.SR": "الراجحي",
+    "1140.SR": "البلاد",
+    "1150.SR": "الإنماء",
+    "1180.SR": "الأهلي",
+    "1182.SR": "أملاك",
+    "1183.SR": "سهل",
+    # ══════════════════════════════════════════════════════════
+    # المواد الأساسية (Materials & Mining)
+    # ══════════════════════════════════════════════════════════
+    "1201.SR": "تكوين",
+    "1202.SR": "مبكو",
+    "1210.SR": "بي سي آي",
+    "1211.SR": "معادن",
+    "1212.SR": "أسترا الصناعية",
+    "1213.SR": "نسيج",
+    "1214.SR": "شاكر",
+    "1301.SR": "أسلاك",
+    "1302.SR": "بوان",
+    "1303.SR": "الصناعات الكهربائية",
+    "1304.SR": "اليمامة للحديد",
+    "1320.SR": "أنابيب السعودية",
+    "1321.SR": "أنابيب الشرق",
+    "1322.SR": "أماك",
+    "1323.SR": "الكرتون المتحدة",
+    # ══════════════════════════════════════════════════════════
+    # الشركات القابضة والخدمات (Diversified Holdings & Services)
+    # ══════════════════════════════════════════════════════════
+    "1810.SR": "سيرا القابضة",
+    "1820.SR": "بان القابضة",
+    "1830.SR": "لجام للرياضة",
+    "1831.SR": "مهارة للموارد",
+    "1832.SR": "صدر",
+    "1833.SR": "الموارد",
+    "1834.SR": "حلول القوى",
+    "1835.SR": "تمكين",
+    # ══════════════════════════════════════════════════════════
+    # البتروكيماويات والطاقة (Petrochemicals & Energy)
+    # ══════════════════════════════════════════════════════════
+    "2001.SR": "كيمانول",
+    "2010.SR": "سابك",
+    "2020.SR": "المغذيات",
+    "2030.SR": "المصافي",
+    "2040.SR": "الخزف السعودي",
+    "2050.SR": "مجموعة صافولا",
+    "2060.SR": "التصنيع",
+    "2070.SR": "الدوائية",
+    "2080.SR": "الغاز",
+    "2081.SR": "الخريف",
+    "2082.SR": "أكوا باور",
+    "2083.SR": "مرافق",
+    "2084.SR": "مياهنا",
+    "2090.SR": "الجبس الوطنية",
+    "2100.SR": "وفرة",
+    "2110.SR": "الكابلات",
+    "2120.SR": "المتطورة",
+    "2130.SR": "صدق",
+    "2140.SR": "أميانتيت",
+    "2150.SR": "زجاج",
+    "2160.SR": "أميانتيت السعودية",
+    "2170.SR": "اللجين",
+    "2180.SR": "فيبكو",
+    "2190.SR": "سيسكو",
+    "2200.SR": "أنابيب",
+    "2210.SR": "نماء",
+    "2220.SR": "معدنية",
+    "2222.SR": "أرامكو",
+    "2223.SR": "لوبريف",
+    "2230.SR": "الكيميائية",
+    "2240.SR": "الزامل",
+    "2250.SR": "المجموعة السعودية",
+    "2270.SR": "سدافكو",
+    "2280.SR": "المراعي",
+    "2281.SR": "تنمية",
+    "2282.SR": "المطاحن الأولى",
+    "2283.SR": "المطاحن الحديثة",
+    "2284.SR": "المطاحن العربية",
+    "2285.SR": "مطاحن صافية",
+    "2286.SR": "المطاحن الرابعة",
+    "2287.SR": "رغوة",
+    "2288.SR": "نفوذ الغذائية",
+    "2290.SR": "ينساب",
+    "2300.SR": "صناعة الورق",
+    "2310.SR": "سبكيم",
+    "2320.SR": "البابطين",
+    "2330.SR": "المتقدمة",
+    "2340.SR": "العالمية",
+    "2350.SR": "كيان السعودية",
+    "2360.SR": "الفخارية",
+    "2370.SR": "مسك",
+    "2380.SR": "بترورابغ",
+    "2381.SR": "الحفر العربية",
+    "2382.SR": "أديس",
+    # ══════════════════════════════════════════════════════════
+    # الأسمنت (Cement)
+    # ══════════════════════════════════════════════════════════
+    "3002.SR": "أسمنت نجران",
+    "3003.SR": "أسمنت المدينة",
+    "3004.SR": "أسمنت الشمالية",
+    "3005.SR": "أسمنت أم القرى",
+    "3007.SR": "الواحة",
+    "3008.SR": "الكثيري",
+    "3010.SR": "أسمنت العربية",
+    "3020.SR": "أسمنت اليمامة",
+    "3030.SR": "أسمنت السعودية",
+    "3040.SR": "أسمنت القصيم",
+    "3050.SR": "أسمنت الجنوبية",
+    "3060.SR": "أسمنت ينبع",
+    "3080.SR": "أسمنت الشرقية",
+    "3090.SR": "أسمنت تبوك",
+    "3091.SR": "أسمنت الجوف",
+    "3092.SR": "أسمنت المدينة المنورة",
+    # ══════════════════════════════════════════════════════════
+    # التجزئة والرعاية الصحية (Retail & Healthcare)
+    # ══════════════════════════════════════════════════════════
+    "4001.SR": "أسواق العثيم",
+    "4002.SR": "المواساة",
+    "4003.SR": "إكسترا",
+    "4004.SR": "دله الصحية",
+    "4005.SR": "رعاية",
+    "4006.SR": "التسويق السعودية",
+    "4007.SR": "الحمادي",
+    "4008.SR": "ساكو",
+    "4009.SR": "الشرق الأوسط للرعاية",
+    "4011.SR": "لازوردي",
+    "4012.SR": "ثوب الأصيل",
+    "4013.SR": "سليمان الحبيب",
+    "4014.SR": "دار المعدات",
+    "4015.SR": "جمجوم فارما",
+    "4016.SR": "صناعة الأدوية",
+    "4017.SR": "فقيه الطبية",
+    "4018.SR": "الموسى الصحية",
+    "4019.SR": "المتخصصة الطبية",
+    "4020.SR": "العقارية",
+    "4021.SR": "المركز الكندي الطبي",
+    # ══════════════════════════════════════════════════════════
+    # النقل والخدمات اللوجستية (Transport & Logistics)
+    # ══════════════════════════════════════════════════════════
+    "4030.SR": "البحري",
+    "4031.SR": "مهارة",
+    "4040.SR": "سابتكو",
+    "4050.SR": "ساسكو",
+    "4051.SR": "بازعيم",
+    "4061.SR": "أنعام القابضة",
+    "4070.SR": "تهامة",
+    "4071.SR": "العربية",
+    "4072.SR": "إم بي سي",
+    # ══════════════════════════════════════════════════════════
+    # الخدمات المالية والاستثمار (Financial Services)
+    # ══════════════════════════════════════════════════════════
+    "4080.SR": "سيناد القابضة",
+    "4081.SR": "النايفات",
+    "4082.SR": "مرابحة مارينا",
+    "4083.SR": "المتحدة الدولية",
+    "4084.SR": "دراية المالية",
+    # ══════════════════════════════════════════════════════════
+    # السياحة والفنادق والتجزئة (Tourism, Hotels & Retail)
+    # ══════════════════════════════════════════════════════════
+    "4090.SR": "طيبة",
+    "4100.SR": "مكة",
+    "4110.SR": "باتك",
+    "4130.SR": "درب السعودية",
+    "4140.SR": "الصادرات",
+    "4141.SR": "العمران",
+    "4142.SR": "كابلات الرياض",
+    "4143.SR": "التيسير",
+    "4144.SR": "روم للتجارة",
+    "4145.SR": "العبيكان للزجاج",
+    "4146.SR": "خدمات الغاز العربية",
+    "4147.SR": "المتكاملة القابضة",
+    "4148.SR": "الوسائل الصناعية",
+    "4150.SR": "التعمير",
+    "4160.SR": "ثمار",
+    "4161.SR": "بن داود",
+    "4162.SR": "المنجم",
+    "4163.SR": "الدواء",
+    "4164.SR": "النهدي",
+    "4165.SR": "الماجد للعود",
+    "4170.SR": "شمس",
+    "4180.SR": "مجموعة فتيحي",
+    "4190.SR": "جرير",
+    "4191.SR": "أبو معطي",
+    "4192.SR": "السيف غاليري",
+    "4193.SR": "نايس ون",
+    "4194.SR": "بيت التسويق",
+    "4200.SR": "الدريس",
+    "4210.SR": "الأبحاث والإعلام",
+    "4220.SR": "إعمار",
+    "4230.SR": "البحر الأحمر",
+    "4240.SR": "سينومي ريتيل",
+    "4250.SR": "جبل عمر",
+    "4260.SR": "بدجت",
+    "4261.SR": "ذيب",
+    "4262.SR": "لومي",
+    "4263.SR": "سال للخدمات",
+    "4264.SR": "طيران ناس",
+    "4265.SR": "كرز للتجارة",
+    "4270.SR": "تغليف وتعبئة",
+    "4280.SR": "المملكة",
+    "4290.SR": "الخليج للتدريب",
+    "4291.SR": "التعلم الوطنية",
+    "4292.SR": "عطاء التعليمية",
+    # ══════════════════════════════════════════════════════════
+    # العقار وصناديق الريت (Real Estate & REITs)
+    # ══════════════════════════════════════════════════════════
+    "4300.SR": "دار الأركان",
+    "4310.SR": "اقتصادية المعرفة",
+    "4320.SR": "الأندلس",
+    "4321.SR": "سينومي سنترز",
+    "4322.SR": "ريتال",
+    "4323.SR": "سمو العقارية",
+    "4324.SR": "بنان العقارية",
+    "4325.SR": "أم القرى للتطوير",
+    "4326.SR": "دار المجد",
+    "4327.SR": "الرمز العقارية",
+    # ══════════════════════════════════════════════════════════
+    # المرافق العامة (Utilities)
+    # ══════════════════════════════════════════════════════════
+    "5110.SR": "الكهرباء",
+    # ══════════════════════════════════════════════════════════
+    # الزراعة والغذاء (Food & Agriculture)
+    # ══════════════════════════════════════════════════════════
+    "6001.SR": "حلواني إخوان",
+    "6002.SR": "هرفي",
+    "6004.SR": "كاتريون",
+    "6010.SR": "نادك",
+    "6012.SR": "ريدان",
+    "6013.SR": "التطويرية الغذائية",
+    "6014.SR": "الآمار",
+    "6015.SR": "أمريكانا",
+    "6016.SR": "شاورمر",
+    "6017.SR": "جاهز",
+    "6018.SR": "أندية رياضية",
+    "6019.SR": "المسار الشامل",
+    "6020.SR": "القصيم",
+    "6040.SR": "تبوك الزراعية",
+    "6050.SR": "الأسماك",
+    "6060.SR": "الشرقية للتنمية",
+    "6070.SR": "الجوف",
+    "6090.SR": "جازادكو",
+    # ══════════════════════════════════════════════════════════
+    # الاتصالات (Telecom)
+    # ══════════════════════════════════════════════════════════
+    "7010.SR": "STC",
+    "7020.SR": "موبايلي",
+    "7030.SR": "زين السعودية",
+    "7040.SR": "قو للاتصالات",
+    # ══════════════════════════════════════════════════════════
+    # التقنية (Technology)
+    # ══════════════════════════════════════════════════════════
+    "7200.SR": "ام آي اس",
+    "7201.SR": "بحر العرب",
+    "7202.SR": "سلوشنز",
+    "7203.SR": "علم",
+    "7204.SR": "توبي",
+    "7211.SR": "عزم",
+    # ══════════════════════════════════════════════════════════
+    # التأمين (Insurance)
+    # ══════════════════════════════════════════════════════════
+    "8010.SR": "التعاونية",
+    "8012.SR": "الجزيرة تكافل",
+    "8020.SR": "ملاذ للتأمين",
+    "8030.SR": "ميدغلف",
+    "8040.SR": "أليانز",
+    "8050.SR": "سلامة",
+    "8060.SR": "ولاء",
+    "8070.SR": "الدرع العربي",
+    "8100.SR": "سايكو",
+    "8120.SR": "اتحاد الخليج",
+    "8150.SR": "أسيج",
+    "8160.SR": "التأمين العربية",
+    "8170.SR": "الاتحاد للتأمين",
+    "8180.SR": "الصقر للتأمين",
+    "8190.SR": "المتحدة للتأمين",
+    "8200.SR": "إعادة",
+    "8210.SR": "بوبا",
+    "8230.SR": "تكافل الراجحي",
+    "8240.SR": "تشب",
+    "8250.SR": "عناية",
+    "8260.SR": "أمانة للتأمين",
+    "8280.SR": "ليفا",
+    "8300.SR": "الوطنية للتأمين",
+    "8310.SR": "أمانة للتأمين التعاوني",
+    "8311.SR": "عناية السعودية",
+    "8313.SR": "رسن",
 }
 
-US_NAMES = {
-    'AAPL': 'Apple', 'MSFT': 'Microsoft', 'NVDA': 'NVIDIA',
-    'GOOGL': 'Alphabet', 'AMZN': 'Amazon', 'META': 'Meta',
-    'TSLA': 'Tesla', 'SMCI': 'Super Micro', 'DELL': 'Dell Technologies',
-    'AMD': 'AMD', 'AVGO': 'Broadcom', 'TSM': 'TSMC', 'MU': 'Micron',
-    'ASML': 'ASML Holding', 'ARM': 'ARM Holdings',
-    'LRCX': 'Lam Research', 'AMAT': 'Applied Materials',
-    'INTC': 'Intel', 'QCOM': 'Qualcomm', 'TXN': 'Texas Instruments',
-    'KLAC': 'KLA Corp', 'MRVL': 'Marvell', 'NXPI': 'NXP Semi',
-    'CRM': 'Salesforce', 'ADBE': 'Adobe', 'ORCL': 'Oracle',
-    'NOW': 'ServiceNow', 'SNOW': 'Snowflake', 'PLTR': 'Palantir',
-    'DDOG': 'Datadog', 'MDB': 'MongoDB', 'TEAM': 'Atlassian',
-    'CDNS': 'Cadence Design', 'SNPS': 'Synopsys', 'SHOP': 'Shopify',
-    'UBER': 'Uber', 'NET': 'Cloudflare', 'CRWD': 'CrowdStrike',
-    'PANW': 'Palo Alto', 'FTNT': 'Fortinet', 'ZS': 'Zscaler',
-    'HUBS': 'HubSpot',
-    'WMT': 'Walmart', 'HD': 'Home Depot', 'COST': 'Costco',
-    'MCD': 'McDonalds', 'SBUX': 'Starbucks', 'NKE': 'Nike',
-    'LULU': 'Lululemon', 'LOW': "Lowe's", 'PG': 'Procter and Gamble',
-    'KO': 'Coca-Cola', 'PEP': 'PepsiCo', 'TGT': 'Target',
-    'CMG': 'Chipotle', 'TJX': 'TJX Companies',
-    'LLY': 'Eli Lilly', 'JNJ': 'Johnson and Johnson',
-    'ABBV': 'AbbVie', 'MRK': 'Merck', 'PFE': 'Pfizer',
-    'ISRG': 'Intuitive Surg', 'VRTX': 'Vertex Pharma',
-    'REGN': 'Regeneron', 'AMGN': 'Amgen', 'GILD': 'Gilead Sciences',
-    'TMO': 'Thermo Fisher', 'DHR': 'Danaher', 'ABT': 'Abbott',
-    'SYK': 'Stryker', 'ZTS': 'Zoetis',
-    'CAT': 'Caterpillar', 'BA': 'Boeing', 'GE': 'General Electric',
-    'XOM': 'Exxon Mobil', 'CVX': 'Chevron', 'SLB': 'Schlumberger',
-    'COP': 'ConocoPhillips', 'RIVN': 'Rivian', 'LCID': 'Lucid Motors',
-    'F': 'Ford', 'GM': 'General Motors', 'UNP': 'Union Pacific',
-    'UPS': 'UPS', 'FDX': 'FedEx', 'DE': 'Deere and Co',
-    'LMT': 'Lockheed Martin', 'RTX': 'RTX Corp',
-    'FSLR': 'First Solar', 'ENPH': 'Enphase Energy',
-    'NEE': 'NextEra Energy',
-    'NFLX': 'Netflix', 'VZ': 'Verizon', 'T': 'AT and T',
-    'TMUS': 'T-Mobile', 'SPOT': 'Spotify', 'BKNG': 'Booking',
-    'ABNB': 'Airbnb',
-    'SNAP': 'Snapchat', 'PYPL': 'PayPal', 'SQ': 'Block (Square)',
-    'COIN': 'Coinbase', 'MSTR': 'MicroStrategy',
-    'MARA': 'Marathon Digital', 'RIOT': 'Riot Platforms',
-    'CLSK': 'CleanSpark', 'HUT': 'Hut 8',
-    'SPUS': 'S and P Sharia ETF', 'HLAL': 'Wahed FTSE Sharia ETF',
-    'UMMA': 'Wahed Dow Jones Islamic ETF',
-    'SPSK': 'SP Funds Sukuk ETF', 'SMH': 'Semiconductor ETF',
-    'SOXX': 'iShares Semi ETF', 'XLK': 'Technology ETF',
-    'XLV': 'Health Care ETF', 'XLE': 'Energy ETF',
-    'XLI': 'Industrial ETF',
+
+# ══════════════════════════════════════════════════════════════
+# US Market — S&P 500 Top 200+ Stocks
+# ══════════════════════════════════════════════════════════════
+
+US_STOCKS = {
+    # ── Technology ──
+    "AAPL": "Apple",
+    "MSFT": "Microsoft",
+    "NVDA": "NVIDIA",
+    "GOOG": "Alphabet (Google)",
+    "GOOGL": "Alphabet Class A",
+    "META": "Meta (Facebook)",
+    "AVGO": "Broadcom",
+    "ORCL": "Oracle",
+    "CRM": "Salesforce",
+    "CSCO": "Cisco",
+    "ADBE": "Adobe",
+    "ACN": "Accenture",
+    "IBM": "IBM",
+    "INTC": "Intel",
+    "TXN": "Texas Instruments",
+    "QCOM": "Qualcomm",
+    "AMAT": "Applied Materials",
+    "NOW": "ServiceNow",
+    "INTU": "Intuit",
+    "AMD": "AMD",
+    "PANW": "Palo Alto Networks",
+    "MU": "Micron",
+    "LRCX": "Lam Research",
+    "ADI": "Analog Devices",
+    "KLAC": "KLA Corp",
+    "SNPS": "Synopsys",
+    "CDNS": "Cadence Design",
+    "CRWD": "CrowdStrike",
+    "MRVL": "Marvell Technology",
+    "FTNT": "Fortinet",
+    "MSI": "Motorola Solutions",
+    "NXPI": "NXP Semiconductors",
+    "ROP": "Roper Technologies",
+    "ADSK": "Autodesk",
+    "WDAY": "Workday",
+    "TEAM": "Atlassian",
+    "MCHP": "Microchip Technology",
+    "ON": "ON Semiconductor",
+    "HPE": "HP Enterprise",
+    "HPQ": "HP Inc",
+    "DELL": "Dell Technologies",
+    # ── Consumer / E-Commerce ──
+    "AMZN": "Amazon",
+    "TSLA": "Tesla",
+    "HD": "Home Depot",
+    "COST": "Costco",
+    "NKE": "Nike",
+    "MCD": "McDonald's",
+    "SBUX": "Starbucks",
+    "TGT": "Target",
+    "LOW": "Lowe's",
+    "TJX": "TJX Companies",
+    "BKNG": "Booking Holdings",
+    "MAR": "Marriott",
+    "CMG": "Chipotle",
+    "ORLY": "O'Reilly Auto",
+    "AZO": "AutoZone",
+    "ROST": "Ross Stores",
+    "DHI": "D.R. Horton",
+    "LEN": "Lennar",
+    "YUM": "Yum! Brands",
+    "DG": "Dollar General",
+    "DLTR": "Dollar Tree",
+    "EBAY": "eBay",
+    "ABNB": "Airbnb",
+    "DASH": "DoorDash",
+    "GM": "General Motors",
+    "F": "Ford Motor",
+    "RIVN": "Rivian",
+    # ── Fintech (non-bank) ──
+    "V": "Visa",
+    "MA": "Mastercard",
+    "PYPL": "PayPal",
+    "SQ": "Block (Square)",
+    "SPGI": "S&P Global",
+    "MCO": "Moody's",
+    "ICE": "Intercontinental Exchange",
+    "CME": "CME Group",
+    # ── Healthcare ──
+    "UNH": "UnitedHealth",
+    "JNJ": "Johnson & Johnson",
+    "LLY": "Eli Lilly",
+    "PFE": "Pfizer",
+    "ABBV": "AbbVie",
+    "MRK": "Merck",
+    "TMO": "Thermo Fisher",
+    "ABT": "Abbott Labs",
+    "DHR": "Danaher",
+    "AMGN": "Amgen",
+    "BMY": "Bristol-Myers",
+    "MDT": "Medtronic",
+    "ISRG": "Intuitive Surgical",
+    "GILD": "Gilead Sciences",
+    "VRTX": "Vertex Pharma",
+    "REGN": "Regeneron",
+    "SYK": "Stryker",
+    "ZTS": "Zoetis",
+    "BSX": "Boston Scientific",
+    "BDX": "Becton Dickinson",
+    "EW": "Edwards Lifesciences",
+    "CI": "Cigna",
+    "HCA": "HCA Healthcare",
+    "ELV": "Elevance Health",
+    "HUM": "Humana",
+    "DXCM": "DexCom",
+    "IDXX": "IDEXX Labs",
+    "A": "Agilent Technologies",
+    "BIIB": "Biogen",
+    "MRNA": "Moderna",
+    # ── Energy ──
+    "XOM": "ExxonMobil",
+    "CVX": "Chevron",
+    "COP": "ConocoPhillips",
+    "SLB": "Schlumberger",
+    "EOG": "EOG Resources",
+    "MPC": "Marathon Petroleum",
+    "PSX": "Phillips 66",
+    "VLO": "Valero Energy",
+    "PXD": "Pioneer Natural",
+    "OXY": "Occidental Petroleum",
+    "WMB": "Williams Companies",
+    "KMI": "Kinder Morgan",
+    "HAL": "Halliburton",
+    "DVN": "Devon Energy",
+    "BKR": "Baker Hughes",
+    # ── Industrials ──
+    "CAT": "Caterpillar",
+    "GE": "GE Aerospace",
+    # RTX (Raytheon) — defense/weapons ❌
+    "HON": "Honeywell",
+    "UNP": "Union Pacific",
+    # BA (Boeing) — defense ❌
+    # LMT (Lockheed Martin) — defense/weapons ❌
+    "DE": "Deere & Co",
+    "UPS": "United Parcel Service",
+    "MMM": "3M",
+    # GD (General Dynamics) — defense/weapons ❌
+    # NOC (Northrop Grumman) — defense/weapons ❌
+    "ITW": "Illinois Tool Works",
+    "EMR": "Emerson Electric",
+    "ETN": "Eaton Corp",
+    "FDX": "FedEx",
+    "CSX": "CSX Corp",
+    "NSC": "Norfolk Southern",
+    "WM": "Waste Management",
+    "JCI": "Johnson Controls",
+    "CARR": "Carrier Global",
+    "FAST": "Fastenal",
+    "IR": "Ingersoll Rand",
+    "PCAR": "PACCAR",
+    "CMI": "Cummins",
+    "ROK": "Rockwell Automation",
+    "UBER": "Uber Technologies",
+    # ── Consumer Staples ──
+    "PG": "Procter & Gamble",
+    "KO": "Coca-Cola",
+    "PEP": "PepsiCo",
+    "WMT": "Walmart",
+    # PM (Philip Morris) — tobacco ❌
+    # MO (Altria) — tobacco ❌
+    "CL": "Colgate-Palmolive",
+    "MDLZ": "Mondelez",
+    "GIS": "General Mills",
+    "KDP": "Keurig Dr Pepper",
+    "KHC": "Kraft Heinz",
+    "SYY": "Sysco",
+    "HSY": "Hershey",
+    # STZ (Constellation Brands) — alcohol ❌
+    "KR": "Kroger",
+    "ADM": "Archer-Daniels",
+    "EL": "Estée Lauder",
+    # ── Communications ──
+    "NFLX": "Netflix",
+    "DIS": "Walt Disney",
+    "CMCSA": "Comcast",
+    "T": "AT&T",
+    "VZ": "Verizon",
+    "TMUS": "T-Mobile",
+    "CHTR": "Charter Communications",
+    "EA": "Electronic Arts",
+    "TTWO": "Take-Two Interactive",
+    "WBD": "Warner Bros Discovery",
+    "SPOT": "Spotify",
+    # ── Utilities ──
+    "NEE": "NextEra Energy",
+    "DUK": "Duke Energy",
+    "SO": "Southern Co",
+    "D": "Dominion Energy",
+    "AEP": "American Electric Power",
+    "SRE": "Sempra",
+    "EXC": "Exelon",
+    "XEL": "Xcel Energy",
+    "WEC": "WEC Energy",
+    "ED": "Consolidated Edison",
+    # ── Real Estate ──
+    "AMT": "American Tower",
+    "PLD": "Prologis",
+    "CCI": "Crown Castle",
+    "EQIX": "Equinix",
+    "PSA": "Public Storage",
+    "SPG": "Simon Property",
+    "O": "Realty Income",
+    "WELL": "Welltower",
+    "DLR": "Digital Realty",
+    # ── Materials ──
+    "LIN": "Linde",
+    "APD": "Air Products",
+    "ECL": "Ecolab",
+    "SHW": "Sherwin-Williams",
+    "NEM": "Newmont",
+    "FCX": "Freeport-McMoRan",
+    "NUE": "Nucor",
+    "DOW": "Dow Inc",
+    "DD": "DuPont",
+    "PPG": "PPG Industries",
 }
 
-FX_NAMES = {
-    'EURUSD=X': 'EUR/USD', 'JPY=X': 'USD/JPY', 'GBPUSD=X': 'GBP/USD',
-    'CHF=X': 'USD/CHF', 'AUDUSD=X': 'AUD/USD', 'CAD=X': 'USD/CAD',
-    'NZDUSD=X': 'NZD/USD', 'EURGBP=X': 'EUR/GBP',
-    'EURJPY=X': 'EUR/JPY', 'GBPJPY=X': 'GBP/JPY',
+# Sector mapping for US stocks
+US_SECTORS = {
+    # Technology
+    **{t: "Technology" for t in [
+        "AAPL", "MSFT", "NVDA", "GOOG", "GOOGL", "META", "AVGO", "ORCL", "CRM",
+        "CSCO", "ADBE", "ACN", "IBM", "INTC", "TXN", "QCOM", "AMAT", "NOW",
+        "INTU", "AMD", "PANW", "MU", "LRCX", "ADI", "KLAC", "SNPS", "CDNS",
+        "CRWD", "MRVL", "FTNT", "MSI", "NXPI", "ROP", "ADSK", "WDAY", "TEAM",
+        "MCHP", "ON", "HPE", "HPQ", "DELL",
+    ]},
+    # Consumer
+    **{t: "Consumer" for t in [
+        "AMZN", "TSLA", "HD", "COST", "NKE", "MCD", "SBUX", "TGT", "LOW",
+        "TJX", "BKNG", "MAR", "CMG", "ORLY", "AZO", "ROST", "DHI", "LEN",
+        "YUM", "DG", "DLTR", "EBAY", "ABNB", "DASH", "GM", "F", "RIVN",
+    ]},
+    # Fintech
+    **{t: "Fintech" for t in [
+        "V", "MA", "PYPL", "SQ", "SPGI", "ICE", "CME", "MCO",
+    ]},
+    # Healthcare
+    **{t: "Healthcare" for t in [
+        "UNH", "JNJ", "LLY", "PFE", "ABBV", "MRK", "TMO", "ABT", "DHR",
+        "AMGN", "BMY", "MDT", "ISRG", "GILD", "VRTX", "REGN", "SYK", "ZTS",
+        "BSX", "BDX", "EW", "CI", "HCA", "ELV", "HUM", "DXCM", "IDXX", "A",
+        "BIIB", "MRNA",
+    ]},
+    # Energy
+    **{t: "Energy" for t in [
+        "XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "VLO", "PXD",
+        "OXY", "WMB", "KMI", "HAL", "DVN", "BKR",
+    ]},
+    # Industrials
+    **{t: "Industrials" for t in [
+        "CAT", "GE", "HON", "UNP", "DE", "UPS", "MMM",
+        "ITW", "EMR", "ETN", "FDX", "CSX", "NSC", "WM", "JCI",
+        "CARR", "FAST", "IR", "PCAR", "CMI", "ROK", "UBER",
+    ]},
+    # Consumer Staples
+    **{t: "Consumer Staples" for t in [
+        "PG", "KO", "PEP", "WMT", "CL", "MDLZ", "GIS", "KDP",
+        "KHC", "SYY", "HSY", "KR", "ADM", "EL",
+    ]},
+    # Communications
+    **{t: "Communications" for t in [
+        "NFLX", "DIS", "CMCSA", "T", "VZ", "TMUS", "CHTR", "EA", "TTWO",
+        "WBD", "SPOT",
+    ]},
+    # Utilities
+    **{t: "Utilities" for t in [
+        "NEE", "DUK", "SO", "D", "AEP", "SRE", "EXC", "XEL", "WEC", "ED",
+    ]},
+    # Real Estate
+    **{t: "Real Estate" for t in [
+        "AMT", "PLD", "CCI", "EQIX", "PSA", "SPG", "O", "WELL", "DLR",
+    ]},
+    # Materials
+    **{t: "Materials" for t in [
+        "LIN", "APD", "ECL", "SHW", "NEM", "FCX", "NUE", "DOW", "DD", "PPG",
+    ]},
 }
 
-CRYPTO_NAMES = {
-    'BTC-USD': 'Bitcoin', 'ETH-USD': 'Ethereum', 'SOL-USD': 'Solana',
-    'BNB-USD': 'BNB', 'XRP-USD': 'XRP', 'ADA-USD': 'Cardano',
-    'AVAX-USD': 'Avalanche', 'LINK-USD': 'Chainlink',
-    'DOGE-USD': 'Dogecoin', 'DOT-USD': 'Polkadot',
+
+# ══════════════════════════════════════════════════════════════
+# MARKET CONFIGS
+# ══════════════════════════════════════════════════════════════
+
+MARKETS = {
+    "🇸🇦 السوق السعودي (TASI)": {
+        "key": "saudi",
+        "stocks": SAUDI_STOCKS,
+        "label": "السوق السعودي",
+    },
+    "🇺🇸 السوق الأمريكي (S&P 500)": {
+        "key": "us",
+        "stocks": US_STOCKS,
+        "label": "السوق الأمريكي",
+    },
 }
 
-ALL_NAMES = {**SAUDI_NAMES, **US_NAMES, **FX_NAMES, **CRYPTO_NAMES}
+
+def get_all_tickers(market: str = "saudi") -> list:
+    """Get all tickers for a market."""
+    if market == "us":
+        return list(US_STOCKS.keys())
+    return list(SAUDI_STOCKS.keys())
 
 
 def get_stock_name(ticker: str) -> str:
-    if ticker in ALL_NAMES:
-        return ALL_NAMES[ticker]
-    return ticker.replace('.SR', '').replace('=X', '').replace('-USD', '')
+    """Get company name for a ticker (Saudi or US)."""
+    if ticker in SAUDI_STOCKS:
+        return SAUDI_STOCKS[ticker]
+    if ticker in US_STOCKS:
+        return US_STOCKS[ticker]
+    return ticker.replace(".SR", "")
 
 
-# ── Sector Constants ─────────────────────────────────────────
-SECTOR_BANKS = "بنوك"
-SECTOR_PETROCHEM = "بتروكيماويات"
-SECTOR_CEMENT = "أسمنت"
-SECTOR_REAL_ESTATE = "عقارات"
-SECTOR_TELECOM = "اتصالات"
-SECTOR_INDUSTRIAL = "صناعي"
-SECTOR_RETAIL = "تجزئة"
-SECTOR_HEALTHCARE = "رعاية صحية"
-SECTOR_INSURANCE = "تأمين"
-SECTOR_FOOD = "غذائي"
-SECTOR_ENERGY = "طاقة"
-SECTOR_IT = "تقنية"
-SECTOR_TRANSPORT = "نقل"
-SECTOR_DIVERSIFIED = "متنوع"
+def get_sector(ticker: str) -> str:
+    """Get sector for a ticker."""
+    # US stocks
+    if ticker in US_SECTORS:
+        return US_SECTORS[ticker]
 
-# ── Saudi Stock → Sector Mapping ─────────────────────────────
-SAUDI_SECTORS = {
-    # بنوك
-    '1010.SR': SECTOR_BANKS, '1020.SR': SECTOR_BANKS, '1030.SR': SECTOR_BANKS,
-    '1050.SR': SECTOR_BANKS, '1060.SR': SECTOR_BANKS, '1080.SR': SECTOR_BANKS,
-    '1111.SR': SECTOR_BANKS, '1120.SR': SECTOR_BANKS, '1140.SR': SECTOR_BANKS,
-    '1150.SR': SECTOR_BANKS, '1180.SR': SECTOR_BANKS, '1182.SR': SECTOR_BANKS,
-    '1183.SR': SECTOR_BANKS, '1833.SR': SECTOR_BANKS,
-    # صناعي
-    '1201.SR': SECTOR_INDUSTRIAL, '1202.SR': SECTOR_INDUSTRIAL,
-    '1211.SR': SECTOR_INDUSTRIAL, '1212.SR': SECTOR_INDUSTRIAL,
-    '1213.SR': SECTOR_INDUSTRIAL, '1214.SR': SECTOR_INDUSTRIAL,
-    '1301.SR': SECTOR_INDUSTRIAL, '1302.SR': SECTOR_INDUSTRIAL,
-    '1303.SR': SECTOR_INDUSTRIAL, '1304.SR': SECTOR_INDUSTRIAL,
-    '1320.SR': SECTOR_INDUSTRIAL, '1321.SR': SECTOR_INDUSTRIAL,
-    '1322.SR': SECTOR_INDUSTRIAL,
-    # بتروكيماويات
-    '2001.SR': SECTOR_PETROCHEM, '2010.SR': SECTOR_PETROCHEM,
-    '2020.SR': SECTOR_PETROCHEM, '2060.SR': SECTOR_PETROCHEM,
-    '2080.SR': SECTOR_PETROCHEM, '2081.SR': SECTOR_PETROCHEM,
-    '2170.SR': SECTOR_PETROCHEM, '2180.SR': SECTOR_PETROCHEM,
-    '2190.SR': SECTOR_PETROCHEM, '2210.SR': SECTOR_PETROCHEM,
-    '2220.SR': SECTOR_PETROCHEM, '2223.SR': SECTOR_PETROCHEM,
-    '2230.SR': SECTOR_PETROCHEM, '2290.SR': SECTOR_PETROCHEM,
-    '2310.SR': SECTOR_PETROCHEM, '2330.SR': SECTOR_PETROCHEM,
-    '2350.SR': SECTOR_PETROCHEM, '2380.SR': SECTOR_PETROCHEM,
-    # طاقة
-    '2030.SR': SECTOR_ENERGY, '2082.SR': SECTOR_ENERGY,
-    '2083.SR': SECTOR_ENERGY, '2222.SR': SECTOR_ENERGY,
-    # غذائي
-    '2050.SR': SECTOR_FOOD, '2270.SR': SECTOR_FOOD, '2280.SR': SECTOR_FOOD,
-    '2281.SR': SECTOR_FOOD, '2282.SR': SECTOR_FOOD, '2283.SR': SECTOR_FOOD,
-    '6004.SR': SECTOR_FOOD, '6010.SR': SECTOR_FOOD, '6012.SR': SECTOR_FOOD,
-    '6013.SR': SECTOR_FOOD, '6014.SR': SECTOR_FOOD, '6015.SR': SECTOR_FOOD,
-    '6020.SR': SECTOR_FOOD, '6040.SR': SECTOR_FOOD, '6050.SR': SECTOR_FOOD,
-    '6060.SR': SECTOR_FOOD, '6070.SR': SECTOR_FOOD, '6090.SR': SECTOR_FOOD,
-    # صناعي متنوع
-    '2040.SR': SECTOR_INDUSTRIAL, '2070.SR': SECTOR_HEALTHCARE,
-    '2100.SR': SECTOR_DIVERSIFIED, '2110.SR': SECTOR_INDUSTRIAL,
-    '2120.SR': SECTOR_DIVERSIFIED, '2130.SR': SECTOR_DIVERSIFIED,
-    '2140.SR': SECTOR_INDUSTRIAL, '2150.SR': SECTOR_INDUSTRIAL,
-    '2200.SR': SECTOR_INDUSTRIAL, '2240.SR': SECTOR_INDUSTRIAL,
-    '2250.SR': SECTOR_DIVERSIFIED, '2300.SR': SECTOR_INDUSTRIAL,
-    '2360.SR': SECTOR_INDUSTRIAL,
-    # أسمنت
-    '3010.SR': SECTOR_CEMENT, '3020.SR': SECTOR_CEMENT,
-    '3030.SR': SECTOR_CEMENT, '3040.SR': SECTOR_CEMENT,
-    '3050.SR': SECTOR_CEMENT, '3060.SR': SECTOR_CEMENT,
-    '3080.SR': SECTOR_CEMENT, '3090.SR': SECTOR_CEMENT,
-    '3091.SR': SECTOR_CEMENT, '3092.SR': SECTOR_CEMENT,
-    '3021.SR': SECTOR_CEMENT, '3022.SR': SECTOR_CEMENT,
-    # تجزئة
-    '4001.SR': SECTOR_RETAIL, '4003.SR': SECTOR_RETAIL,
-    '4061.SR': SECTOR_RETAIL, '4160.SR': SECTOR_RETAIL,
-    '4161.SR': SECTOR_RETAIL, '4162.SR': SECTOR_RETAIL,
-    '4163.SR': SECTOR_RETAIL,
-    '4165.SR': SECTOR_RETAIL, '4170.SR': SECTOR_RETAIL,
-    '4180.SR': SECTOR_RETAIL, '4190.SR': SECTOR_RETAIL,
-    '4191.SR': SECTOR_RETAIL, '4192.SR': SECTOR_RETAIL,
-    '4200.SR': SECTOR_RETAIL, '4240.SR': SECTOR_RETAIL,
-    # رعاية صحية
-    '4002.SR': SECTOR_HEALTHCARE, '4004.SR': SECTOR_HEALTHCARE,
-    '4005.SR': SECTOR_HEALTHCARE, '4007.SR': SECTOR_HEALTHCARE,
-    '4013.SR': SECTOR_HEALTHCARE, '4014.SR': SECTOR_HEALTHCARE,
-    '4015.SR': SECTOR_HEALTHCARE, '4164.SR': SECTOR_HEALTHCARE,
-    # عقارات
-    '4020.SR': SECTOR_REAL_ESTATE, '4090.SR': SECTOR_REAL_ESTATE,
-    '4100.SR': SECTOR_REAL_ESTATE, '4220.SR': SECTOR_REAL_ESTATE,
-    '4230.SR': SECTOR_REAL_ESTATE, '4250.SR': SECTOR_REAL_ESTATE,
-    '4300.SR': SECTOR_REAL_ESTATE, '4320.SR': SECTOR_REAL_ESTATE,
-    '4321.SR': SECTOR_REAL_ESTATE, '4322.SR': SECTOR_REAL_ESTATE,
-    # نقل وخدمات
-    '4030.SR': SECTOR_TRANSPORT, '4031.SR': SECTOR_DIVERSIFIED,
-    '4040.SR': SECTOR_TRANSPORT, '4050.SR': SECTOR_ENERGY,
-    '4071.SR': SECTOR_DIVERSIFIED, '4081.SR': SECTOR_BANKS,
-    '4110.SR': SECTOR_DIVERSIFIED, '4130.SR': SECTOR_DIVERSIFIED,
-    '4140.SR': SECTOR_DIVERSIFIED, '4150.SR': SECTOR_REAL_ESTATE,
-    '4210.SR': SECTOR_DIVERSIFIED, '4260.SR': SECTOR_TRANSPORT,
-    '4261.SR': SECTOR_TRANSPORT, '4262.SR': SECTOR_DIVERSIFIED,
-    '4280.SR': SECTOR_DIVERSIFIED, '4290.SR': SECTOR_DIVERSIFIED,
-    # اتصالات وتقنية
-    '7010.SR': SECTOR_TELECOM, '7020.SR': SECTOR_TELECOM,
-    '7030.SR': SECTOR_TELECOM, '7040.SR': SECTOR_TELECOM,
-    '7200.SR': SECTOR_IT, '7202.SR': SECTOR_IT,
-    '7203.SR': SECTOR_IT, '7204.SR': SECTOR_IT,
-    # تأمين
-    '8010.SR': SECTOR_INSURANCE, '8012.SR': SECTOR_INSURANCE,
-    '8020.SR': SECTOR_INSURANCE, '8030.SR': SECTOR_INSURANCE,
-    '8040.SR': SECTOR_INSURANCE, '8050.SR': SECTOR_INSURANCE,
-    '8060.SR': SECTOR_INSURANCE, '8070.SR': SECTOR_INSURANCE,
-    '8100.SR': SECTOR_INSURANCE, '8120.SR': SECTOR_INSURANCE,
-    '8150.SR': SECTOR_INSURANCE, '8160.SR': SECTOR_INSURANCE,
-    '8200.SR': SECTOR_INSURANCE, '8210.SR': SECTOR_INSURANCE,
-    '8230.SR': SECTOR_INSURANCE, '8240.SR': SECTOR_INSURANCE,
-    '8250.SR': SECTOR_INSURANCE, '8260.SR': SECTOR_INSURANCE,
-    '8280.SR': SECTOR_INSURANCE,
-}
+    # Saudi stocks — number-based sector mapping
+    # Specific tickers override first, then ranges (most specific → broadest)
+    num = ticker.replace(".SR", "")
+    try:
+        n = int(num)
+    except ValueError:
+        return "أخرى"
 
+    # ── Specific overrides ──
+    if n == 2222:
+        return "الطاقة"
 
-def get_stock_sector(ticker: str) -> str:
-    """Return sector name for Saudi stocks, empty string for non-Saudi."""
-    return SAUDI_SECTORS.get(ticker, "")
-
-
-# ── Sector-Keyword Boost Map ─────────────────────────────────
-# keyword_fragment → {sector: multiplier}
-SECTOR_KEYWORD_BOOST = {
-    "إيقاف الإنتاج": {SECTOR_INDUSTRIAL: 1.5, SECTOR_PETROCHEM: 1.5, SECTOR_CEMENT: 1.3},
-    "stop production": {SECTOR_INDUSTRIAL: 1.5, SECTOR_PETROCHEM: 1.5, SECTOR_CEMENT: 1.3},
-    "تعثر في السداد": {SECTOR_BANKS: 1.5},
-    "default": {SECTOR_BANKS: 1.5},
-    "تعثر القروض": {SECTOR_BANKS: 1.5},
-    "loan default": {SECTOR_BANKS: 1.5},
-    "مخصصات ائتمانية": {SECTOR_BANKS: 1.4},
-    "credit provisions": {SECTOR_BANKS: 1.4},
-    "تطوير أراضي": {SECTOR_REAL_ESTATE: 1.5},
-    "land development": {SECTOR_REAL_ESTATE: 1.5},
-    "مشروع سكني": {SECTOR_REAL_ESTATE: 1.4},
-    "residential project": {SECTOR_REAL_ESTATE: 1.4},
-    "رؤية 2030": {SECTOR_INDUSTRIAL: 1.3, SECTOR_REAL_ESTATE: 1.3, SECTOR_IT: 1.3},
-    "vision 2030": {SECTOR_INDUSTRIAL: 1.3, SECTOR_REAL_ESTATE: 1.3, SECTOR_IT: 1.3},
-    "أسعار النفط": {SECTOR_ENERGY: 1.5, SECTOR_PETROCHEM: 1.4},
-    "oil prices": {SECTOR_ENERGY: 1.5, SECTOR_PETROCHEM: 1.4},
-    "أقساط التأمين": {SECTOR_INSURANCE: 1.4},
-    "insurance premiums": {SECTOR_INSURANCE: 1.4},
-    "ترخيص دوائي": {SECTOR_HEALTHCARE: 1.5},
-    "drug approval": {SECTOR_HEALTHCARE: 1.5},
-    "توسع فروع": {SECTOR_RETAIL: 1.4},
-    "store expansion": {SECTOR_RETAIL: 1.4},
-    "طاقة إنتاجية": {SECTOR_CEMENT: 1.4, SECTOR_PETROCHEM: 1.3, SECTOR_INDUSTRIAL: 1.3},
-    "production capacity": {SECTOR_CEMENT: 1.4, SECTOR_PETROCHEM: 1.3, SECTOR_INDUSTRIAL: 1.3},
-    "بنية تحتية رقمية": {SECTOR_IT: 1.5, SECTOR_TELECOM: 1.4},
-    "digital infrastructure": {SECTOR_IT: 1.5, SECTOR_TELECOM: 1.4},
-}
+    # ── Number ranges (specific first) ──
+    if 1000 <= n <= 1199:
+        return "المصارف"
+    elif 1200 <= n <= 1399:
+        return "المواد"
+    elif 1800 <= n <= 1899:
+        return "القابضة والخدمات"
+    elif 2000 <= n <= 2099:
+        return "البتروكيماويات"
+    elif 2380 <= n <= 2399:
+        return "الطاقة"
+    elif 2100 <= n <= 2379:
+        return "الصناعة"
+    elif 3000 <= n <= 3099:
+        return "الأسمنت"
+    elif 4000 <= n <= 4021:
+        return "التجزئة والصحة"
+    elif 4030 <= n <= 4059:
+        return "النقل والخدمات"
+    elif 4060 <= n <= 4079:
+        return "الإعلام والترفيه"
+    elif 4080 <= n <= 4089:
+        return "الخدمات المالية"
+    elif 4140 <= n <= 4149:
+        return "السلع الرأسمالية"
+    elif 4090 <= n <= 4139:
+        return "التجزئة"
+    elif 4150 <= n <= 4299:
+        return "التجزئة"
+    elif 4300 <= n <= 4329:
+        return "العقار"
+    elif 4330 <= n <= 4349:
+        return "صناديق الريت"
+    elif 5000 <= n <= 5999:
+        return "المرافق"
+    elif 6000 <= n <= 6999:
+        return "الزراعة والغذاء"
+    elif 7000 <= n <= 7099:
+        return "الاتصالات"
+    elif 7200 <= n <= 7299:
+        return "التقنية"
+    elif 8000 <= n <= 8999:
+        return "التأمين"
+    else:
+        return "أخرى"

@@ -1,0 +1,573 @@
+"""
+MASA V2 — Wyckoff Order Flow Engine
+Detects accumulation/distribution using the REAL question:
+"Who is initiating — the buyer or the seller?"
+
+Built on:
+1. Cumulative Delta Volume (CDV) — the #1 indicator
+2. Absorption (Effort vs Result) — smart money footprint
+3. Aggressive Order Flow — who is attacking
+4. Wyckoff Phases — the complete framework
+
+No more indirect proxies. This goes straight to the source.
+"""
+
+import pandas as pd
+import numpy as np
+from core.indicators import (
+    compute_cdv, compute_cdv_slope, compute_rolling_delta,
+    compute_delta_volume, compute_absorption, compute_absorption_bias,
+    compute_aggressive_ratio, compute_divergence,
+    compute_rsi, compute_volume_ratio, compute_range_contraction,
+    compute_zero_reflection, compute_zr_status, compute_ma, compute_atr,
+)
+
+
+# ── Wyckoff Phases ──────────────────────────────────────────
+
+PHASES = {
+    "accumulation": {
+        "label": "🟢 تدفق شرائي + امتصاص",
+        "description": "CDV صاعد + المشتري مهاجم + امتصاص عرض عند الدعم",
+        "color": "#00E676",
+    },
+    "markup": {
+        "label": "🚀 تدفق صاعد مؤكد",
+        "description": "CDV يؤكد الترند — المشتري مسيطر",
+        "color": "#4FC3F7",
+    },
+    "distribution": {
+        "label": "🔴 تدفق بيعي + تصريف",
+        "description": "CDV هابط + البائع مهاجم + امتصاص طلب عند المقاومة",
+        "color": "#FF5252",
+    },
+    "markdown": {
+        "label": "📉 تدفق هابط مؤكد",
+        "description": "CDV يؤكد الهبوط — البائع مسيطر",
+        "color": "#FF8A80",
+    },
+    "spring": {
+        "label": "🎯 سبرنق — كسر كاذب + تدفق يرتد",
+        "description": "كسر كاذب للقاع + CDV يرتد + امتصاص شرائي — أقوى إشارة",
+        "color": "#00E676",
+    },
+    "upthrust": {
+        "label": "⚠️ أبثرست — كسر كاذب + تدفق يضعف",
+        "description": "كسر كاذب للقمة + CDV يهبط + امتصاص بيعي",
+        "color": "#FF9800",
+    },
+    "transition": {
+        "label": "🔄 تحول في التدفق",
+        "description": "CDV يتغير اتجاهه — مراقبة المهاجم",
+        "color": "#FFD700",
+    },
+    "neutral": {
+        "label": "⚪ تدفق متوازن",
+        "description": "لا سيطرة واضحة — CDV مسطح + لا مهاجم",
+        "color": "#808080",
+    },
+}
+
+
+# ── Location Assessment ──────────────────────────────────────
+
+LOCATIONS = {
+    "bottom": {
+        "label": "🎯 قاع القناة",
+        "description": "أفضل موقع — إذا كان الأوردر فلو إيجابي = تجميع حقيقي",
+        "color": "#00E676",
+        "rank": 1,
+    },
+    "support": {
+        "label": "💎 منطقة دعم",
+        "description": "قريب من MA200 أو دعم رئيسي",
+        "color": "#4CAF50",
+        "rank": 2,
+    },
+    "middle": {
+        "label": "⚪ منتصف القناة",
+        "description": "بين الدعم والمقاومة",
+        "color": "#FFD700",
+        "rank": 3,
+    },
+    "resistance": {
+        "label": "⚠️ منطقة مقاومة",
+        "description": "قريب من سقف القناة — مراقبة الأوردر فلو حرجة",
+        "color": "#FF9800",
+        "rank": 4,
+    },
+    "above": {
+        "label": "🌌 فوق القناة",
+        "description": "كسر المقاومة — يحتاج تأكيد من الأوردر فلو",
+        "color": "#2196F3",
+        "rank": 2,
+    },
+}
+
+
+def detect_orderflow(
+    high: pd.Series,
+    low: pd.Series,
+    close: pd.Series,
+    open_: pd.Series,
+    volume: pd.Series,
+) -> dict:
+    """
+    Main Order Flow + Wyckoff detection engine.
+
+    Returns dict with:
+        phase:              str (accumulation/markup/distribution/markdown/spring/upthrust/transition/neutral)
+        phase_info:         dict (label, description, color)
+        evidence:           list of dicts
+        flow_bias:          float (-100 to +100) — net order flow
+        cdv_trend:          str (rising/falling/flat)
+        absorption_score:   float (0-100) — how much absorption
+        absorption_bias:    float (-1 to +1) — bullish vs bearish absorption
+        aggressor:          str (buyers/sellers/balanced)
+        aggressive_ratio:   float (-1 to +1)
+        divergence:         float (-100 to +100) — price-CDV divergence
+        rsi:                float
+        volume_ratio:       float
+        days:               int — consecutive days of positive/negative flow
+        location:           str
+        location_info:      dict
+        zr_high:            float
+        zr_low:             float
+        # Chart data
+        delta_series:       list — for CDV chart
+        cdv_series:         list — for CDV chart
+        absorption_series:  list — for absorption chart
+    """
+    n = len(close)
+    if n < 50:
+        return _empty_result()
+
+    # ── Compute Order Flow indicators ─────────────────────
+    delta = compute_delta_volume(high, low, close, volume)
+    cdv = compute_cdv(high, low, close, volume)
+    cdv_slope = compute_cdv_slope(high, low, close, volume, 10)
+    rolling_delta = compute_rolling_delta(high, low, close, volume, 20)
+    absorption = compute_absorption(high, low, close, volume, 20)
+    abs_bias = compute_absorption_bias(high, low, close, open_, volume, 20)
+    agg_ratio = compute_aggressive_ratio(high, low, close, open_, volume, 20)
+    divergence = compute_divergence(close, cdv, 20)
+
+    # Supporting
+    rsi = compute_rsi(close, 14)
+    vol_ratio = compute_volume_ratio(volume, 20)
+    contraction = compute_range_contraction(high, low, 20)
+    ma50 = compute_ma(close, 50)
+    ma200 = compute_ma(close, min(200, n - 1)) if n >= 50 else ma50
+
+    # Current values
+    last_delta = float(delta.iloc[-1])
+    last_cdv_slope = float(cdv_slope.iloc[-1])
+    last_rolling_delta = float(rolling_delta.iloc[-1])
+    last_absorption = float(absorption.iloc[-1])
+    last_abs_bias = float(abs_bias.iloc[-1])
+    last_agg_ratio = float(agg_ratio.iloc[-1])
+    last_divergence = float(divergence.iloc[-1])
+    last_rsi = float(rsi.iloc[-1])
+    last_vol_ratio = float(vol_ratio.iloc[-1])
+    last_contraction = float(contraction.iloc[-1])
+    last_close = float(close.iloc[-1])
+    last_ma50 = float(ma50.iloc[-1]) if pd.notna(ma50.iloc[-1]) else last_close
+    last_ma200 = float(ma200.iloc[-1]) if pd.notna(ma200.iloc[-1]) else last_close
+
+    # ── CDV Trend ─────────────────────────────────────────
+    cdv_5d = float(cdv.iloc[-1]) - float(cdv.iloc[-6]) if n >= 6 else 0
+    cdv_10d = float(cdv.iloc[-1]) - float(cdv.iloc[-11]) if n >= 11 else 0
+
+    if cdv_5d > 0 and cdv_10d > 0:
+        cdv_trend = "rising"
+    elif cdv_5d < 0 and cdv_10d < 0:
+        cdv_trend = "falling"
+    else:
+        cdv_trend = "flat"
+
+    # ── Aggressor Detection ───────────────────────────────
+    if last_agg_ratio > 0.25:
+        aggressor = "buyers"
+    elif last_agg_ratio < -0.25:
+        aggressor = "sellers"
+    else:
+        aggressor = "balanced"
+
+    # ── Flow Bias (composite score -100 to +100) ─────────
+    # Weighted combination of all order flow signals
+    flow_components = [
+        (last_agg_ratio * 35),       # Aggressive ratio: 35% weight
+        (last_abs_bias * 25),         # Absorption bias: 25% weight
+        (last_divergence * 0.2),      # Divergence: 20% weight
+        (1 if cdv_trend == "rising" else -1 if cdv_trend == "falling" else 0) * 20,
+    ]
+    flow_bias = sum(flow_components)
+    flow_bias = max(-100, min(100, flow_bias))
+
+    # ── Consecutive flow days ─────────────────────────────
+    days = _count_flow_days(rolling_delta)
+
+    # ── Location ──────────────────────────────────────────
+    zr_high, zr_low = compute_zero_reflection(high, low, bars=400, confirm_len=25)
+    location = _classify_location(last_close, zr_high, zr_low, last_ma200, last_ma50)
+    zr_stat = compute_zr_status(close, zr_high, zr_low)
+
+    # ── Build Evidence ────────────────────────────────────
+    evidence = []
+
+    # Evidence 1: Cumulative Delta Volume trend
+    if cdv_trend == "rising":
+        evidence.append({
+            "factor": "📈 CDV صاعد",
+            "type": "positive",
+            "meaning": "المشترون يسيطرون — تدفق أوامر صافي شرائي",
+            "weight": 3,
+        })
+    elif cdv_trend == "falling":
+        evidence.append({
+            "factor": "📉 CDV هابط",
+            "type": "negative",
+            "meaning": "البائعون يسيطرون — تدفق أوامر صافي بيعي",
+            "weight": 3,
+        })
+
+    # Evidence 2: Aggressive ratio
+    if last_agg_ratio > 0.3:
+        evidence.append({
+            "factor": f"🔥 مشتري عدواني ({last_agg_ratio:+.2f})",
+            "type": "positive",
+            "meaning": "المشترون يهاجمون — يرفعون السعر بعنف",
+            "weight": 3,
+        })
+    elif last_agg_ratio > 0.1:
+        evidence.append({
+            "factor": f"🟢 ميل شرائي ({last_agg_ratio:+.2f})",
+            "type": "positive",
+            "meaning": "المشترون أكثر عدوانية من البائعين",
+            "weight": 2,
+        })
+    elif last_agg_ratio < -0.3:
+        evidence.append({
+            "factor": f"🔥 بائع عدواني ({last_agg_ratio:+.2f})",
+            "type": "negative",
+            "meaning": "البائعون يهاجمون — يضغطون السعر للأسفل",
+            "weight": 3,
+        })
+    elif last_agg_ratio < -0.1:
+        evidence.append({
+            "factor": f"🔴 ميل بيعي ({last_agg_ratio:+.2f})",
+            "type": "negative",
+            "meaning": "البائعون أكثر عدوانية من المشترين",
+            "weight": 2,
+        })
+
+    # Evidence 3: Absorption
+    if last_absorption > 70 and last_abs_bias > 0.3:
+        evidence.append({
+            "factor": f"🛡️ امتصاص شرائي ({last_absorption:.0f}/100)",
+            "type": "positive",
+            "meaning": "حجم كبير + حركة صغيرة = سمارت مني يمتص العرض",
+            "weight": 3,
+        })
+    elif last_absorption > 70 and last_abs_bias < -0.3:
+        evidence.append({
+            "factor": f"⚡ امتصاص بيعي ({last_absorption:.0f}/100)",
+            "type": "negative",
+            "meaning": "حجم كبير + حركة صغيرة = سمارت مني يمتص الطلب",
+            "weight": 3,
+        })
+    elif last_absorption > 60:
+        evidence.append({
+            "factor": f"👁️ امتصاص نشط ({last_absorption:.0f}/100)",
+            "type": "neutral",
+            "meaning": "حجم مرتفع نسبياً — مراقبة الاتجاه",
+            "weight": 1,
+        })
+
+    # Evidence 4: Divergence (THE most powerful signal)
+    if last_divergence > 30:
+        evidence.append({
+            "factor": f"⭐ دايفرجنس شرائي ({last_divergence:+.0f})",
+            "type": "positive",
+            "meaning": "السعر يهبط لكن التدفق يصعد — تجميع خفي",
+            "weight": 4,
+        })
+    elif last_divergence > 15:
+        evidence.append({
+            "factor": f"↗️ دايفرجنس إيجابي ({last_divergence:+.0f})",
+            "type": "positive",
+            "meaning": "التدفق أقوى من حركة السعر",
+            "weight": 2,
+        })
+    elif last_divergence < -30:
+        evidence.append({
+            "factor": f"⭐ دايفرجنس بيعي ({last_divergence:+.0f})",
+            "type": "negative",
+            "meaning": "السعر يصعد لكن التدفق يهبط — تصريف خفي",
+            "weight": 4,
+        })
+    elif last_divergence < -15:
+        evidence.append({
+            "factor": f"↘️ دايفرجنس سلبي ({last_divergence:+.0f})",
+            "type": "negative",
+            "meaning": "التدفق أضعف من حركة السعر",
+            "weight": 2,
+        })
+
+    # Evidence 5: Rolling delta duration
+    if days >= 15:
+        evidence.append({
+            "factor": f"💪 تدفق شرائي مستمر {days} يوم",
+            "type": "positive",
+            "meaning": "سيطرة شرائية طويلة — تجميع منظم",
+            "weight": 2,
+        })
+    elif days >= 7:
+        evidence.append({
+            "factor": f"🟢 تدفق شرائي {days} أيام",
+            "type": "positive",
+            "meaning": "سيطرة شرائية متواصلة",
+            "weight": 1,
+        })
+    elif days <= -15:
+        evidence.append({
+            "factor": f"📉 تدفق بيعي مستمر {abs(days)} يوم",
+            "type": "negative",
+            "meaning": "سيطرة بيعية طويلة — تصريف",
+            "weight": 2,
+        })
+    elif days <= -7:
+        evidence.append({
+            "factor": f"🔴 تدفق بيعي {abs(days)} أيام",
+            "type": "negative",
+            "meaning": "سيطرة بيعية متواصلة",
+            "weight": 1,
+        })
+
+    # Evidence 6: Volume + Contraction
+    if last_vol_ratio >= 1.5:
+        evidence.append({
+            "factor": f"📊 حجم مرتفع ({last_vol_ratio:.1f}x)",
+            "type": "neutral",
+            "meaning": "نشاط غير عادي — تحقق من الاتجاه",
+            "weight": 1,
+        })
+
+    if last_contraction >= 75:
+        evidence.append({
+            "factor": f"🔋 ضغط سعري ({last_contraction:.0f}/100)",
+            "type": "neutral",
+            "meaning": "السعر مضغوط — انفجار قادم",
+            "weight": 1,
+        })
+
+    # ── Determine Wyckoff Phase ───────────────────────────
+    phase = _determine_phase(
+        flow_bias=flow_bias,
+        cdv_trend=cdv_trend,
+        aggressor=aggressor,
+        last_absorption=last_absorption,
+        last_abs_bias=last_abs_bias,
+        last_divergence=last_divergence,
+        last_close=last_close,
+        last_ma50=last_ma50,
+        last_ma200=last_ma200,
+        location=location,
+        last_rsi=last_rsi,
+        last_contraction=last_contraction,
+        evidence=evidence,
+    )
+
+    # ── Chart data (last 90 days) ─────────────────────────
+    chart_days = 90
+    delta_list = [round(float(v), 2) for v in delta.iloc[-chart_days:]]
+    cdv_list = [round(float(v), 2) for v in cdv.iloc[-chart_days:]]
+    abs_list = [round(float(v), 1) for v in absorption.iloc[-chart_days:]]
+
+    return {
+        "phase": phase,
+        "phase_info": PHASES[phase],
+        "evidence": evidence,
+        "flow_bias": round(flow_bias, 1),
+        "cdv_trend": cdv_trend,
+        "absorption_score": round(last_absorption, 1),
+        "absorption_bias": round(last_abs_bias, 3),
+        "aggressor": aggressor,
+        "aggressive_ratio": round(last_agg_ratio, 3),
+        "divergence": round(last_divergence, 1),
+        "rsi": round(last_rsi, 1),
+        "volume_ratio": round(last_vol_ratio, 2),
+        "contraction": round(last_contraction, 1),
+        "days": days,
+        "ma50": round(last_ma50, 2),
+        "ma200": round(last_ma200, 2),
+        "location": location,
+        "location_info": LOCATIONS[location],
+        "zr_high": round(zr_high, 2) if pd.notna(zr_high) else None,
+        "zr_low": round(zr_low, 2) if pd.notna(zr_low) else None,
+        "zr_status": zr_stat["status"],
+        "zr_status_label": zr_stat["label"],
+        "zr_status_color": zr_stat["color"],
+        # Chart series
+        "delta_series": delta_list,
+        "cdv_series": cdv_list,
+        "absorption_series": abs_list,
+    }
+
+
+def _determine_phase(
+    flow_bias, cdv_trend, aggressor, last_absorption, last_abs_bias,
+    last_divergence, last_close, last_ma50, last_ma200,
+    location, last_rsi, last_contraction, evidence,
+) -> str:
+    """
+    Determine the Wyckoff phase from Order Flow evidence.
+
+    Priority logic:
+    1. Spring / Upthrust (highest priority — specific patterns)
+    2. Accumulation / Distribution (confirmed phase)
+    3. Markup / Markdown (trending)
+    4. Transition / Neutral (unclear)
+    """
+    positive_weight = sum(e["weight"] for e in evidence if e["type"] == "positive")
+    negative_weight = sum(e["weight"] for e in evidence if e["type"] == "negative")
+
+    is_above_ma200 = last_close > last_ma200
+    is_above_ma50 = last_close > last_ma50
+
+    # ── Spring Detection ──────────────────────────────────
+    # Price near bottom/support + strong bullish divergence + absorption
+    if (location in ("bottom", "support")
+            and last_divergence > 20
+            and last_abs_bias > 0.2
+            and cdv_trend == "rising"):
+        return "spring"
+
+    # ── Upthrust Detection ────────────────────────────────
+    # Price near resistance/above + bearish divergence + absorption
+    if (location in ("resistance", "above")
+            and last_divergence < -20
+            and last_abs_bias < -0.2
+            and cdv_trend == "falling"):
+        return "upthrust"
+
+    # ── Accumulation ──────────────────────────────────────
+    # Strong positive flow + buyer aggression + location makes sense
+    if (flow_bias > 25
+            and positive_weight >= 6
+            and aggressor in ("buyers", "balanced")
+            and location not in ("resistance",)):
+        return "accumulation"
+
+    # Moderate positive + strong divergence (hidden accumulation)
+    if (flow_bias > 10
+            and last_divergence > 25
+            and location in ("bottom", "support", "middle")):
+        return "accumulation"
+
+    # ── Distribution ──────────────────────────────────────
+    # Strong negative flow + seller aggression
+    if (flow_bias < -25
+            and negative_weight >= 6
+            and aggressor in ("sellers", "balanced")):
+        return "distribution"
+
+    # Moderate negative + bearish divergence (hidden distribution)
+    if (flow_bias < -10
+            and last_divergence < -25
+            and location in ("resistance", "above", "middle")):
+        return "distribution"
+
+    # ── Markup (trending up) ──────────────────────────────
+    if (is_above_ma50 and is_above_ma200
+            and cdv_trend == "rising"
+            and flow_bias > 10):
+        return "markup"
+
+    # ── Markdown (trending down) ──────────────────────────
+    if (not is_above_ma50 and not is_above_ma200
+            and cdv_trend == "falling"
+            and flow_bias < -10):
+        return "markdown"
+
+    # ── Transition ────────────────────────────────────────
+    if abs(flow_bias) > 15 or abs(positive_weight - negative_weight) >= 3:
+        return "transition"
+
+    # ── Neutral ───────────────────────────────────────────
+    return "neutral"
+
+
+def _count_flow_days(rolling_delta: pd.Series) -> int:
+    """
+    Count consecutive days of positive/negative rolling delta.
+    Positive return = consecutive buying days
+    Negative return = consecutive selling days
+    """
+    count = 0
+    for val in reversed(rolling_delta.values):
+        if pd.isna(val):
+            break
+        if count == 0:
+            # First bar sets direction
+            if val > 0:
+                direction = 1
+            elif val < 0:
+                direction = -1
+            else:
+                return 0
+            count = direction
+        else:
+            if (direction == 1 and val > 0) or (direction == -1 and val < 0):
+                count += direction
+            else:
+                break
+    return count
+
+
+def _classify_location(close, zr_high, zr_low, ma200, ma50) -> str:
+    """Classify where the stock is relative to its historical channel."""
+    if pd.notna(zr_high) and close > zr_high:
+        return "above"
+
+    if pd.notna(zr_low) and close <= zr_low * 1.05:
+        return "bottom"
+
+    if pd.notna(ma200) and close <= ma200 * 1.03:
+        return "support"
+
+    if pd.notna(zr_high) and zr_high > 0:
+        dist_to_top = (zr_high - close) / zr_high
+        if dist_to_top <= 0.05:
+            return "resistance"
+
+    return "middle"
+
+
+def _empty_result() -> dict:
+    """Return empty result when data is insufficient."""
+    return {
+        "phase": "neutral",
+        "phase_info": PHASES["neutral"],
+        "evidence": [{"factor": "بيانات غير كافية", "type": "neutral",
+                       "meaning": "يحتاج 50 شمعة على الأقل", "weight": 0}],
+        "flow_bias": 0,
+        "cdv_trend": "flat",
+        "absorption_score": 0,
+        "absorption_bias": 0,
+        "aggressor": "balanced",
+        "aggressive_ratio": 0,
+        "divergence": 0,
+        "rsi": 50,
+        "volume_ratio": 1.0,
+        "contraction": 50,
+        "days": 0,
+        "ma50": 0, "ma200": 0,
+        "location": "middle",
+        "location_info": LOCATIONS["middle"],
+        "zr_high": None, "zr_low": None,
+        "zr_status": "normal", "zr_status_label": "", "zr_status_color": "#808080",
+        "delta_series": [],
+        "cdv_series": [],
+        "absorption_series": [],
+    }

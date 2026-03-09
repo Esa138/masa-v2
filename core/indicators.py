@@ -1,588 +1,434 @@
+"""
+MASA V2 — Order Flow Indicators
+Built on one principle: Who is initiating — the buyer or the seller?
+
+Core Indicators:
+- Delta Volume: Buy pressure vs sell pressure per bar
+- Cumulative Delta Volume (CDV): The single most powerful indicator
+- Absorption: Effort vs Result — smart money absorbing supply/demand
+- Aggressive Ratio: Who is attacking — buyers or sellers
+
+Supporting:
+- RSI, ATR, VWAP, Zero Reflection, Volume Ratio, MA
+"""
+
 import pandas as pd
 import numpy as np
-from core.utils import safe_div
 
 
-def calculate_zero_reflection(
-    high_col: pd.Series,
-    low_col: pd.Series,
-    bars: int = 400,
-    confirm_len: int = 25
-) -> tuple[pd.Series, pd.Series]:
-    try:
-        n = len(high_col)
-        ph_val = np.full(n, np.nan)
-        pl_val = np.full(n, np.nan)
+# ══════════════════════════════════════════════════════════════
+# ORDER FLOW — THE CORE
+# ══════════════════════════════════════════════════════════════
 
-        window_size = int(2 * confirm_len + 1)
-        if n > window_size:
-            roll_max = high_col.rolling(window=window_size, min_periods=1, center=True).max().values
-            roll_min = low_col.rolling(window=window_size, min_periods=1, center=True).min().values
+def compute_delta_volume(high: pd.Series, low: pd.Series,
+                         close: pd.Series, volume: pd.Series) -> pd.Series:
+    """
+    Delta Volume — approximation of buy vs sell volume per bar.
 
-            shifted_high = high_col.shift(int(confirm_len)).values
-            shifted_low = low_col.shift(int(confirm_len)).values
+    Logic:
+        Where Close falls within the bar's range tells us who won.
+        Close near High = buyers dominated = positive delta
+        Close near Low = sellers dominated = negative delta
 
-            with np.errstate(invalid='ignore'):
-                is_ph = (shifted_high == roll_max) & ~np.isnan(shifted_high)
-                is_pl = (shifted_low == roll_min) & ~np.isnan(shifted_low)
+    Formula:
+        delta = Volume × ((Close - Low) - (High - Close)) / (High - Low)
+        Simplified: Volume × (2*Close - High - Low) / (High - Low)
 
-            ph_val[is_ph] = shifted_high[is_ph]
-            pl_val[is_pl] = shifted_low[is_pl]
+    This is the most direct measure available from OHLCV data.
+    """
+    hl_range = high - low
+    hl_range = hl_range.replace(0, np.nan)
 
-        ph_series = pd.Series(ph_val, index=high_col.index)
-        pl_series = pd.Series(pl_val, index=low_col.index)
+    # Position of close within the bar: -1 (at low) to +1 (at high)
+    position = (2 * close - high - low) / hl_range
 
-        ph_filled = ph_series.ffill()
-        pl_filled = pl_series.ffill()
+    delta = position * volume
+    return delta.fillna(0)
 
-        ceiling = ph_filled.rolling(window=int(bars), min_periods=1).max()
-        floor_s = pl_filled.rolling(window=int(bars), min_periods=1).min()
 
-        fallback_ceiling = high_col.rolling(window=int(bars), min_periods=1).max()
-        fallback_floor = low_col.rolling(window=int(bars), min_periods=1).min()
+def compute_cdv(high: pd.Series, low: pd.Series,
+                close: pd.Series, volume: pd.Series) -> pd.Series:
+    """
+    Cumulative Delta Volume — running sum of delta.
 
-        ceiling = ceiling.where(ceiling.notna() & (ceiling > 0), fallback_ceiling)
-        floor_s = floor_s.where(floor_s.notna() & (floor_s > 0), fallback_floor)
+    THE single most powerful indicator.
+    Rising CDV = buyers accumulating — they are the aggressor
+    Falling CDV = sellers distributing — they are the aggressor
 
-        return ceiling, floor_s
+    Key divergences:
+    - Price down + CDV up = ABSORPTION (smart money buying the dip)
+    - Price up + CDV down = DISTRIBUTION (smart money selling into strength)
+    """
+    delta = compute_delta_volume(high, low, close, volume)
+    return delta.cumsum()
 
-    except Exception:
-        fallback_ceiling = high_col.rolling(window=int(bars), min_periods=1).max()
-        fallback_floor = low_col.rolling(window=int(bars), min_periods=1).min()
-        return fallback_ceiling, fallback_floor
 
+def compute_cdv_slope(high: pd.Series, low: pd.Series,
+                      close: pd.Series, volume: pd.Series,
+                      period: int = 10) -> pd.Series:
+    """CDV trend direction over N bars. Positive = net buying."""
+    cdv = compute_cdv(high, low, close, volume)
+    slope = cdv.diff(period) / period
+    return slope.fillna(0)
+
+
+def compute_rolling_delta(high: pd.Series, low: pd.Series,
+                          close: pd.Series, volume: pd.Series,
+                          period: int = 20) -> pd.Series:
+    """
+    Rolling Delta Sum — sum of delta over last N bars.
+    More responsive than CDV for detecting recent shifts.
+    Positive = recent net buying, Negative = recent net selling.
+    """
+    delta = compute_delta_volume(high, low, close, volume)
+    return delta.rolling(period).sum().fillna(0)
+
+
+def compute_absorption(high: pd.Series, low: pd.Series,
+                       close: pd.Series, volume: pd.Series,
+                       period: int = 20) -> pd.Series:
+    """
+    Absorption Detection — Effort vs Result (Wyckoff).
+
+    Principle: When there is high EFFORT (volume) but low RESULT (price movement),
+    someone is absorbing the other side's orders.
+
+    High absorption at support = smart money absorbing selling (bullish)
+    High absorption at resistance = smart money absorbing buying (bearish)
+
+    Returns: absorption score per bar (0-100)
+        High score = lots of effort, little result = absorption happening
+    """
+    # Effort: volume relative to average
+    avg_vol = volume.rolling(period).mean()
+    effort = (volume / avg_vol.replace(0, np.nan)).fillna(1)
+
+    # Result: price spread relative to ATR
+    spread = (high - low).abs()
+    avg_spread = spread.rolling(period).mean()
+    result = (spread / avg_spread.replace(0, np.nan)).fillna(1)
+
+    # Absorption = high effort / low result
+    # When effort >> result, absorption is happening
+    raw = (effort / result.replace(0, np.nan)).fillna(1)
+
+    # Normalize to 0-100 using rolling percentile
+    min_val = raw.rolling(period * 5, min_periods=period).min()
+    max_val = raw.rolling(period * 5, min_periods=period).max()
+    rng = (max_val - min_val).replace(0, np.nan)
+    normalized = ((raw - min_val) / rng * 100).fillna(50)
+
+    return normalized.clip(0, 100)
+
+
+def compute_absorption_bias(high: pd.Series, low: pd.Series,
+                            close: pd.Series, open_: pd.Series,
+                            volume: pd.Series, period: int = 20) -> pd.Series:
+    """
+    Absorption Bias — is absorption bullish or bearish?
+
+    When absorption is happening (high volume, small spread):
+    - If close > open on those bars = bullish absorption (buying the dip)
+    - If close < open on those bars = bearish absorption (selling into strength)
+
+    Returns: rolling ratio (-1 to +1)
+        Positive = bullish absorption dominates
+        Negative = bearish absorption dominates
+    """
+    spread = high - low
+    avg_spread = spread.rolling(period).mean()
+    avg_vol = volume.rolling(period).mean()
+
+    # Identify absorption bars: high volume + narrow spread
+    vol_ratio = volume / avg_vol.replace(0, np.nan)
+    spread_ratio = spread / avg_spread.replace(0, np.nan)
+
+    is_absorption = (vol_ratio > 1.3) & (spread_ratio < 0.8)
+
+    # Direction of absorption bars
+    direction = np.where(close > open_, 1.0, np.where(close < open_, -1.0, 0.0))
+    direction = pd.Series(direction, index=close.index)
+
+    # Weighted by volume on absorption bars only
+    weighted = np.where(is_absorption, direction * vol_ratio, 0.0)
+    weighted = pd.Series(weighted, index=close.index)
+
+    # Rolling sum
+    bullish = weighted.clip(lower=0).rolling(period).sum()
+    bearish = weighted.clip(upper=0).abs().rolling(period).sum()
+    total = (bullish + bearish).replace(0, np.nan)
+    bias = ((bullish - bearish) / total).fillna(0)
+
+    return bias
+
+
+def compute_aggressive_ratio(high: pd.Series, low: pd.Series,
+                             close: pd.Series, open_: pd.Series,
+                             volume: pd.Series, period: int = 20) -> pd.Series:
+    """
+    Aggressive Order Ratio — who is initiating?
+
+    Aggressive buyer bar: Close > Open AND Close in upper 30% of range AND above-avg volume
+    Aggressive seller bar: Close < Open AND Close in lower 30% of range AND above-avg volume
+
+    Returns: ratio (-1 to +1)
+        > 0.3 = buyers are the aggressor
+        < -0.3 = sellers are the aggressor
+        Near 0 = balanced
+    """
+    avg_vol = volume.rolling(period).mean()
+    above_avg = volume > avg_vol * 0.8  # At least 80% of average
+
+    hl_range = (high - low).replace(0, np.nan)
+    close_position = (close - low) / hl_range  # 0 = at low, 1 = at high
+
+    # Aggressive buyers: green bar + close in upper 30% + decent volume
+    agg_buy = (close > open_) & (close_position > 0.7) & above_avg
+    # Aggressive sellers: red bar + close in lower 30% + decent volume
+    agg_sell = (close < open_) & (close_position < 0.3) & above_avg
+
+    buy_vol = (volume * agg_buy.astype(float)).rolling(period).sum()
+    sell_vol = (volume * agg_sell.astype(float)).rolling(period).sum()
+    total = (buy_vol + sell_vol).replace(0, np.nan)
+
+    ratio = ((buy_vol - sell_vol) / total).fillna(0)
+    return ratio
+
+
+def compute_divergence(close: pd.Series, cdv: pd.Series,
+                       period: int = 20) -> pd.Series:
+    """
+    Price-CDV Divergence — the most powerful signal.
+
+    - Price falling + CDV rising = BULLISH divergence (accumulation)
+    - Price rising + CDV falling = BEARISH divergence (distribution)
+
+    Returns: divergence score (-100 to +100)
+        Positive = bullish divergence (accumulation signal)
+        Negative = bearish divergence (distribution signal)
+    """
+    # Normalize price and CDV changes to comparable scales
+    price_change = close.pct_change(period).fillna(0)
+    cdv_change = cdv.diff(period)
+    cdv_std = cdv_change.rolling(period * 3, min_periods=period).std()
+    cdv_norm = (cdv_change / cdv_std.replace(0, np.nan)).fillna(0)
+
+    # Price normalized
+    price_std = price_change.rolling(period * 3, min_periods=period).std()
+    price_norm = (price_change / price_std.replace(0, np.nan)).fillna(0)
+
+    # Divergence = CDV direction minus price direction
+    # Positive: CDV up while price down = bullish
+    # Negative: CDV down while price up = bearish
+    divergence = (cdv_norm - price_norm) * 25  # Scale to roughly -100 to +100
+    return divergence.clip(-100, 100)
+
+
+# ══════════════════════════════════════════════════════════════
+# SUPPORTING INDICATORS
+# ══════════════════════════════════════════════════════════════
 
 def compute_rsi(close: pd.Series, period: int = 14) -> pd.Series:
-    diff = close.diff()
-    up = diff.clip(lower=0)
-    down = (-diff).clip(lower=0)
-    ema_up = up.ewm(com=period - 1, adjust=False).mean()
-    ema_down = down.ewm(com=period - 1, adjust=False).mean()
-    ema_down_safe = ema_down.replace(0, np.nan)
-    rs = ema_up / ema_down_safe
+    """Relative Strength Index — overbought/oversold."""
+    delta = close.diff()
+    gain = delta.clip(lower=0)
+    loss = (-delta).clip(lower=0)
+    avg_gain = gain.ewm(span=period, adjust=False).mean()
+    avg_loss = loss.ewm(span=period, adjust=False).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
     rsi = 100 - (100 / (1 + rs))
     return rsi.fillna(50)
 
 
-def compute_atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
-    tr1 = high - low
-    tr2 = (high - close.shift(1)).abs()
-    tr3 = (low - close.shift(1)).abs()
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    return tr.rolling(period).mean()
+def compute_atr(high: pd.Series, low: pd.Series, close: pd.Series,
+                period: int = 14) -> pd.Series:
+    """Average True Range — volatility measure for stop-loss sizing."""
+    prev_close = close.shift(1)
+    tr = pd.concat([
+        high - low,
+        (high - prev_close).abs(),
+        (low - prev_close).abs(),
+    ], axis=1).max(axis=1)
+    atr = tr.rolling(period).mean()
+    return atr
 
 
-def compute_vwap(high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, window: int = 20) -> pd.Series:
-    if volume.sum() == 0:
-        return close.rolling(window).mean()
+def compute_vwap(high: pd.Series, low: pd.Series, close: pd.Series,
+                 volume: pd.Series, period: int = 20) -> pd.Series:
+    """Volume Weighted Average Price — average cost basis."""
     typical_price = (high + low + close) / 3
-    vol_sum = volume.rolling(window).sum().replace(0, np.nan)
-    return (typical_price * volume).rolling(window).sum() / vol_sum
+    vwap = (typical_price * volume).rolling(period).sum() / volume.rolling(period).sum()
+    return vwap
 
 
-def compute_direction_counter(close: pd.Series) -> list[int]:
-    diff = close.diff()
-    direction = np.where(diff > 0, 1, np.where(diff < 0, -1, 0))
-    counters = []
-    curr = 0
-    for d in direction:
-        if d == 1:
-            curr = curr + 1 if curr > 0 else 1
-        elif d == -1:
-            curr = curr - 1 if curr < 0 else -1
-        else:
-            curr = 0
-        counters.append(curr)
-    return counters
-
-
-def calc_momentum_score(
-    pct_1d: float, pct_5d: float, pct_10d: float, vol_ratio: float
-) -> int:
-    def get_points(val, weights):
-        if pd.isna(val) or val == 0:
-            return weights[3]
-        abs_val = abs(val)
-        if val > 0:
-            if abs_val >= 1.0:
-                return weights[0]
-            elif abs_val >= 0.1:
-                return weights[1]
-            return weights[2]
-        else:
-            if abs_val >= 1.0:
-                return weights[6]
-            elif abs_val >= 0.1:
-                return weights[5]
-            return weights[4]
-
-    s5 = get_points(pct_5d, [40, 35, 28, 20, 12, 6, 0])
-    s10 = get_points(pct_10d, [25, 22, 18, 12, 8, 4, 0])
-    s1 = get_points(pct_1d, [15, 13, 10, 7, 4, 2, 0])
-
-    if pd.isna(pct_1d) or pct_1d == 0:
-        svol = 10
-    elif pct_1d > 0:
-        svol = 20 if vol_ratio > 1.0 else 16
-    else:
-        svol = 6 if vol_ratio <= 1.0 else 0
-
-    return int(min(100, max(0, s5 + s10 + s1 + svol)))
-
-
-# ── RSI Divergence Detection ─────────────────────────────────
-def detect_rsi_divergence(
-    close: pd.Series, rsi: pd.Series, lookback: int = 10
-) -> dict:
+def compute_zero_reflection(high: pd.Series, low: pd.Series,
+                            bars: int = 400,
+                            confirm_len: int = 25) -> tuple:
     """
-    Detect RSI divergence (bearish or bullish).
-    - Bearish: price makes higher high but RSI makes lower high
-    - Bullish: price makes lower low but RSI makes higher low
-    Returns: {type, strength(0-1), description_ar}
+    خوارزمية التجميد الهيكلي (زيرو انعكاس)
+    Exact 1:1 translation of Pine Script f_get_structural_zr(bars, confirm_len)
+
+    Pine Script:
+        float ph = ta.pivothigh(high, confirm_len, confirm_len)
+        float pl = ta.pivotlow(low, confirm_len, confirm_len)
+        float ph_val = na(ph) ? 0.0 : ph
+        float pl_val = na(pl) ? 10e10 : pl
+        float ceiling = ta.highest(ph_val, bars)
+        float floor   = ta.lowest(pl_val, bars)
+        if ceiling == 0.0 or na(ceiling)
+            ceiling := ta.highest(high, bars)[1]
+        if floor == 10e10 or na(floor)
+            floor := ta.lowest(low, bars)[1]
+
+    Returns: (ceiling, floor)
     """
-    result = {"type": "none", "strength": 0.0, "description_ar": ""}
+    n = len(high)
+    if n < confirm_len * 2 + 10:
+        return np.nan, np.nan
 
-    try:
-        if len(close) < lookback + 2 or len(rsi) < lookback + 2:
-            return result
+    h_vals = high.values
+    l_vals = low.values
 
-        c = close.values
-        r = rsi.values
+    # ── Step 1: Build ph_val / pl_val series (like Pine bar-by-bar) ──
+    # ta.pivothigh on bar i confirms a pivot at bar (i - confirm_len)
+    # ph_val[i] = pivot value if confirmed on this bar, else 0.0
+    # pl_val[i] = pivot value if confirmed on this bar, else 10e10
+    ph_val = np.zeros(n, dtype=np.float64)
+    pl_val = np.full(n, 1e11, dtype=np.float64)
 
-        # Current vs lookback-ago
-        curr_price = c[-1]
-        prev_price = np.nanmax(c[-(lookback + 1):-1])  # highest in lookback
-        curr_rsi = r[-1]
-        prev_rsi_at_peak = r[-(lookback + 1):-1]
+    for i in range(confirm_len, n - confirm_len):
+        # Check if bar i is a pivot high
+        window_h = h_vals[i - confirm_len: i + confirm_len + 1]
+        if h_vals[i] >= np.nanmax(window_h):
+            # Pivot at bar i, confirmed at bar i + confirm_len
+            cb = i + confirm_len
+            if cb < n:
+                ph_val[cb] = float(h_vals[i])
 
-        # Find the index of the price peak in lookback window
-        peak_idx = np.nanargmax(c[-(lookback + 1):-1])
-        prev_rsi_peak = prev_rsi_at_peak[peak_idx] if not np.isnan(prev_rsi_at_peak[peak_idx]) else 50
+        # Check if bar i is a pivot low
+        window_l = l_vals[i - confirm_len: i + confirm_len + 1]
+        if l_vals[i] <= np.nanmin(window_l):
+            cb = i + confirm_len
+            if cb < n:
+                pl_val[cb] = float(l_vals[i])
 
-        # Bearish divergence: price higher high + RSI lower high
-        if curr_price > prev_price and curr_rsi < prev_rsi_peak:
-            rsi_drop = (prev_rsi_peak - curr_rsi) / max(prev_rsi_peak, 1)
-            strength = min(1.0, max(0.0, rsi_drop * 2))
-            if strength >= 0.15:
-                result = {
-                    "type": "bearish",
-                    "strength": round(strength, 2),
-                    "description_ar": f"📉 تباين RSI هبوطي: السعر يصنع قمة جديدة لكن RSI يتراجع (قوة {strength:.0%})"
-                }
-                return result
+    # ── Step 2: ta.highest(ph_val, bars) / ta.lowest(pl_val, bars) ──
+    # On the last bar, look back `bars` bars
+    end = n
+    start = max(0, end - bars)
 
-        # Bullish divergence: price lower low + RSI higher low
-        prev_low = np.nanmin(c[-(lookback + 1):-1])
-        trough_idx = np.nanargmin(c[-(lookback + 1):-1])
-        prev_rsi_trough = prev_rsi_at_peak[trough_idx] if not np.isnan(prev_rsi_at_peak[trough_idx]) else 50
+    ceiling = float(np.max(ph_val[start:end]))
+    floor = float(np.min(pl_val[start:end]))
 
-        if curr_price < prev_low and curr_rsi > prev_rsi_trough:
-            rsi_rise = (curr_rsi - prev_rsi_trough) / max(100 - prev_rsi_trough, 1)
-            strength = min(1.0, max(0.0, rsi_rise * 2))
-            if strength >= 0.15:
-                result = {
-                    "type": "bullish",
-                    "strength": round(strength, 2),
-                    "description_ar": f"📈 تباين RSI صعودي: السعر يصنع قاع جديد لكن RSI يرتفع (قوة {strength:.0%})"
-                }
+    # ── Step 3: صمام الأمان (Safety fallback) ──
+    # if ceiling == 0.0 → no pivot highs found → use ta.highest(high, bars)[1]
+    if ceiling == 0.0 or np.isnan(ceiling):
+        ceiling = float(np.nanmax(h_vals[max(0, start): end - 1]))
 
-    except Exception:
-        pass
+    # if floor == 10e10 → no pivot lows found → use ta.lowest(low, bars)[1]
+    if floor >= 1e11 or np.isnan(floor):
+        floor = float(np.nanmin(l_vals[max(0, start): end - 1]))
 
-    return result
+    return ceiling, floor
 
 
-# ── Volume-Price Divergence Detection ─────────────────────────
-def detect_volume_price_divergence(
-    close: pd.Series, volume: pd.Series, bars: int = 3
-) -> dict:
+def compute_zr_status(close: pd.Series, zr_high: float, zr_low: float,
+                      days_for_bluesky: int = 5) -> dict:
     """
-    Detect volume-price divergence.
-    - Bearish: price rises N bars but volume decreasing = fake breakout
-    - Bullish: price falls N bars but volume decreasing = selling exhaustion
-    Returns: {type, description_ar}
+    Determine stock's relationship to Zero Reflection levels.
+
+    Returns dict with:
+        status: str — "zr_floor" | "zr_breakout" | "zr_bluesky" | "normal"
+        label: str — Arabic display label
+        color: str — hex color
     """
-    result = {"type": "none", "description_ar": ""}
+    if pd.isna(zr_high) or pd.isna(zr_low) or zr_high == 0 or zr_low == 0:
+        return {"status": "normal", "label": "", "color": "#808080"}
 
-    try:
-        if len(close) < bars + 1 or len(volume) < bars + 1:
-            return result
+    last_close = float(close.iloc[-1])
 
-        c = close.values
-        v = volume.values
+    # ── قاع زيرو انعكاس — at or near the ZR floor ──
+    if last_close <= zr_low * 1.03:
+        return {
+            "status": "zr_floor",
+            "label": "🔻 قاع زيرو انعكاس",
+            "color": "#FF9800",
+        }
 
-        # Check last N bars
-        price_changes = [c[-(i)] - c[-(i + 1)] for i in range(1, bars + 1)]
-        vol_changes = [v[-(i)] - v[-(i + 1)] for i in range(1, bars + 1)]
-
-        price_rising = all(pc > 0 for pc in price_changes)
-        price_falling = all(pc < 0 for pc in price_changes)
-        vol_decreasing = all(vc < 0 for vc in vol_changes)
-        vol_increasing = all(vc > 0 for vc in vol_changes)
-
-        # Bearish: price up + volume down
-        if price_rising and vol_decreasing:
-            result = {
-                "type": "bearish",
-                "description_ar": f"📉 تباين حجم هبوطي: السعر يصعد {bars} شموع لكن الحجم يتناقص (اختراق وهمي محتمل)"
-            }
-        # Bullish: price down + volume down
-        elif price_falling and vol_decreasing:
-            result = {
-                "type": "bullish",
-                "description_ar": f"📈 تباين حجم صعودي: السعر يهبط {bars} شموع لكن الحجم يتناقص (استنفاد بيعي)"
-            }
-        # Extra: price up + volume surging = healthy breakout (confirmation)
-        elif price_rising and vol_increasing:
-            result = {
-                "type": "confirmed",
-                "description_ar": f"✅ تأكيد حجم: السعر يصعد مع تزايد الحجم ({bars} شموع متوافقة)"
-            }
-
-    except Exception:
-        pass
-
-    return result
-
-
-# ── ATR Regime Detection ──────────────────────────────────────
-def compute_atr_regime(
-    atr: pd.Series, close: pd.Series, ma50: pd.Series
-) -> dict:
-    """
-    Classify ATR regime: expanding (volatile), contracting (squeeze), normal.
-    Returns: {regime, atr_ratio, score_modifier, description_ar}
-    """
-    result = {
-        "regime": "normal",
-        "atr_ratio": 1.0,
-        "score_modifier": 0,
-        "description_ar": ""
-    }
-
-    try:
-        if len(atr) < 20 or len(close) < 2:
-            return result
-
-        last_atr = atr.values[-1]
-        avg_atr = np.nanmean(atr.values[-20:])
-
-        if pd.isna(last_atr) or pd.isna(avg_atr) or avg_atr <= 0:
-            return result
-
-        ratio = last_atr / avg_atr
-        result["atr_ratio"] = round(ratio, 2)
-
-        last_close = close.values[-1]
-        last_ma50 = ma50.values[-1] if len(ma50) > 0 else last_close
-        is_uptrend = last_close > last_ma50 if pd.notna(last_ma50) else True
-
-        if ratio > 1.3:
-            if is_uptrend:
-                result.update({
-                    "regime": "expanding_bull",
-                    "score_modifier": 5,
-                    "description_ar": f"🔥 تذبذب متوسع صاعد (ATR ×{ratio:.1f}) — زخم قوي مع ترند"
-                })
+    # ── Above ZR ceiling — check breakout vs blue sky ──
+    if last_close > zr_high:
+        # Count consecutive days above ZR ceiling
+        days_above = 0
+        for val in reversed(close.values):
+            if float(val) > zr_high:
+                days_above += 1
             else:
-                result.update({
-                    "regime": "expanding_bear",
-                    "score_modifier": -5,
-                    "description_ar": f"⚠️ تذبذب متوسع هابط (ATR ×{ratio:.1f}) — ذعر بيعي"
-                })
-        elif ratio < 0.7:
-            result.update({
-                "regime": "contracting",
-                "score_modifier": 3,
-                "description_ar": f"🔋 ضغط تذبذبي (ATR ×{ratio:.1f}) — انفجار سعري قادم"
-            })
+                break
+
+        if days_above >= days_for_bluesky:
+            # سماء زرقا — stabilized above ceiling
+            return {
+                "status": "zr_bluesky",
+                "label": "🔵 سماء زرقا",
+                "color": "#2196F3",
+            }
         else:
-            result.update({
-                "regime": "normal",
-                "score_modifier": 0,
-                "description_ar": ""
-            })
+            # اختراق زيرو انعكاس — just broke out
+            return {
+                "status": "zr_breakout",
+                "label": "🚀 اختراق زيرو انعكاس",
+                "color": "#00E676",
+            }
 
-    except Exception:
-        pass
-
-    return result
-
-
-# ══════════════════════════════════════════════════════════════
-# 🏗️ Institutional Accumulation Detection System
-# ══════════════════════════════════════════════════════════════
-
-# ── Accumulation Phase Configuration ─────────────────────────
-ACCUM_PHASES = {
-    "neutral":       {"label": "محايد ⚪",                "color": "#808080", "priority": 0},
-    "early":         {"label": "بداية تجميع 🟡",         "color": "#FFD700", "priority": 1},
-    "mid":           {"label": "وسط التجميع 🟣",          "color": "#CE93D8", "priority": 2},
-    "strong":        {"label": "تجميع قوي 🔵",           "color": "#2196F3", "priority": 3},
-    "late":          {"label": "نهاية تجميع 🟢",         "color": "#00E676", "priority": 4},
-    "distribute":    {"label": "تصريف 🔴",               "color": "#FF5252", "priority": 5},
-    # ── Lifecycle phases (post-breakout) ──
-    "breakout":      {"label": "انطلاق 🚀",              "color": "#FF9800", "priority": 6},
-    "pullback_buy":  {"label": "ارتداد صحي — فرصة 🟢",   "color": "#4CAF50", "priority": 7},
-    "pullback_wait": {"label": "ارتداد — انتظر 🟡",      "color": "#FFC107", "priority": 8},
-    "exhausted":     {"label": "استنفاد الحركة 🔴",       "color": "#E91E63", "priority": 9},
-}
+    # ── Normal range — between floor and ceiling ──
+    return {"status": "normal", "label": "", "color": "#808080"}
 
 
-def compute_obv(close: pd.Series, volume: pd.Series) -> pd.Series:
-    """
-    On Balance Volume — cumulative volume direction tracker.
-    Rising OBV = accumulation / institutional buying.
-    Falling OBV = distribution / selling.
-    """
-    direction = np.where(close.diff() > 0, 1, np.where(close.diff() < 0, -1, 0))
-    obv = (volume * direction).cumsum()
-    return obv
-
-
-def compute_cmf(
-    high: pd.Series, low: pd.Series, close: pd.Series,
-    volume: pd.Series, period: int = 20
-) -> pd.Series:
-    """
-    Chaikin Money Flow — buying/selling pressure indicator.
-    Range: -1 to +1.  Positive = buying pressure, Negative = selling.
-    Formula: SUM(MFV, period) / SUM(Volume, period)
-    where MFV = ((close-low) - (high-close)) / (high-low) * volume
-    """
-    hl_range = high - low
-    hl_range = hl_range.replace(0, np.nan)  # avoid division by zero
-    mf_multiplier = ((close - low) - (high - close)) / hl_range
-    mf_volume = mf_multiplier * volume
-    cmf = mf_volume.rolling(period, min_periods=1).sum() / \
-          volume.rolling(period, min_periods=1).sum().replace(0, np.nan)
-    return cmf.fillna(0)
-
-
-def compute_linear_slope(series: pd.Series, window: int = 20) -> pd.Series:
-    """
-    Rolling linear regression slope — measures trend direction.
-    Positive = uptrend, Negative = downtrend, ~0 = flat/sideways.
-    Normalized by the mean of the window for comparability.
-    """
-    def _slope(arr):
-        arr = arr[~np.isnan(arr)]
-        n = len(arr)
-        if n < 3:
-            return 0.0
-        x = np.arange(n)
-        mean_x = x.mean()
-        mean_y = arr.mean()
-        denom = ((x - mean_x) ** 2).sum()
-        if denom == 0:
-            return 0.0
-        slope = ((x - mean_x) * (arr - mean_y)).sum() / denom
-        # Normalize: slope per bar as % of mean value
-        if abs(mean_y) > 0:
-            slope = slope / abs(mean_y)
-        return slope
-
-    return series.rolling(window, min_periods=5).apply(_slope, raw=True).fillna(0)
-
-
-def compute_range_contraction(
-    high: pd.Series, low: pd.Series, window: int = 20
-) -> pd.Series:
-    """
-    Range contraction ratio — detects price squeeze.
-    Current range / average range over window.
-    < 0.6 = tight squeeze (accumulation signal).
-    > 1.3 = expansion (breakout or distribution).
-    """
-    daily_range = high - low
-    avg_range = daily_range.rolling(window, min_periods=5).mean()
-    avg_range = avg_range.replace(0, np.nan)
-    # Use last 5 bars range vs full window average
-    recent_range = daily_range.rolling(5, min_periods=1).mean()
-    ratio = recent_range / avg_range
+def compute_volume_ratio(volume: pd.Series, period: int = 20) -> pd.Series:
+    """Current volume vs average — how active is trading."""
+    avg = volume.rolling(period).mean()
+    ratio = volume / avg.replace(0, np.nan)
     return ratio.fillna(1.0)
 
 
-def compute_accumulation_score(
-    cmf: pd.Series, obv_slope: pd.Series, rsi: pd.Series,
-    vol_ratio: pd.Series, range_ratio: pd.Series,
-    price_slope: pd.Series
-) -> pd.Series:
+def compute_ma(close: pd.Series, period: int) -> pd.Series:
+    """Simple moving average."""
+    return close.rolling(period).mean()
+
+
+def compute_range_contraction(high: pd.Series, low: pd.Series,
+                              period: int = 20) -> pd.Series:
     """
-    Composite accumulation score 0-100.
-    Detects institutional accumulation via 6 weighted factors:
-      CMF (25) + OBV Slope (25) + RSI Zone (15) + Range (15) + Volume (10) + Price (10)
-    Higher = stronger accumulation evidence.
+    Bollinger bandwidth squeeze — measures volatility compression.
+    Low values = price is coiling, potential breakout ahead.
     """
-    score = pd.Series(0.0, index=cmf.index)
-
-    # ── Factor 1: CMF (25 points) ─────────────────────────────
-    # Positive CMF = buying pressure. Range clamp [-0.3, +0.3]
-    cmf_clamped = cmf.clip(-0.3, 0.3)
-    # Map [-0.3, +0.3] → [0, 25]
-    cmf_pts = ((cmf_clamped + 0.3) / 0.6) * 25
-    score += cmf_pts
-
-    # ── Factor 2: OBV Slope (25 points) ───────────────────────
-    # Rising OBV = accumulation. Clamp [-0.05, +0.05]
-    obv_clamped = obv_slope.clip(-0.05, 0.05)
-    obv_pts = ((obv_clamped + 0.05) / 0.10) * 25
-    score += obv_pts
-
-    # ── Factor 3: RSI Zone (15 points) ────────────────────────
-    # Sweet spot: RSI 30-50 (accumulation zone) = max points
-    # RSI < 30 or > 70 = low points
-    rsi_pts = pd.Series(7.5, index=rsi.index)  # default mid
-    rsi_pts = rsi_pts.where(~((rsi >= 30) & (rsi <= 50)), 15.0)   # optimal
-    rsi_pts = rsi_pts.where(~((rsi > 50) & (rsi <= 60)), 10.0)    # decent
-    rsi_pts = rsi_pts.where(~((rsi > 60) & (rsi <= 70)), 5.0)     # elevated
-    rsi_pts = rsi_pts.where(~(rsi > 70), 2.0)                      # overbought
-    rsi_pts = rsi_pts.where(~(rsi < 30), 8.0)                      # oversold (possible)
-    score += rsi_pts
-
-    # ── Factor 4: Range Contraction (15 points) ───────────────
-    # Tight range (< 0.6) = squeeze = accumulation. Expansion = less likely
-    range_pts = pd.Series(7.5, index=range_ratio.index)
-    range_pts = range_pts.where(~(range_ratio < 0.5), 15.0)       # extreme squeeze
-    range_pts = range_pts.where(~((range_ratio >= 0.5) & (range_ratio < 0.7)), 12.0)
-    range_pts = range_pts.where(~((range_ratio >= 0.7) & (range_ratio < 0.9)), 8.0)
-    range_pts = range_pts.where(~((range_ratio >= 0.9) & (range_ratio < 1.1)), 5.0)
-    range_pts = range_pts.where(~(range_ratio >= 1.1), 2.0)       # expanding
-    score += range_pts
-
-    # ── Factor 5: Volume Dryup (10 points) ────────────────────
-    # Low volume during sideways = accumulation (institutions buy quietly)
-    vol_pts = pd.Series(5.0, index=vol_ratio.index)
-    vol_pts = vol_pts.where(~(vol_ratio < 0.5), 10.0)             # very dry
-    vol_pts = vol_pts.where(~((vol_ratio >= 0.5) & (vol_ratio < 0.8)), 8.0)
-    vol_pts = vol_pts.where(~((vol_ratio >= 0.8) & (vol_ratio < 1.2)), 5.0)
-    vol_pts = vol_pts.where(~(vol_ratio >= 1.2), 3.0)             # high volume
-    score += vol_pts
-
-    # ── Factor 6: Price Slope (10 points) ─────────────────────
-    # Flat/slightly positive price = ideal accumulation
-    p_slope_abs = price_slope.abs()
-    price_pts = pd.Series(5.0, index=price_slope.index)
-    price_pts = price_pts.where(~(p_slope_abs < 0.002), 10.0)     # very flat
-    price_pts = price_pts.where(~((p_slope_abs >= 0.002) & (p_slope_abs < 0.005)), 8.0)
-    price_pts = price_pts.where(~((p_slope_abs >= 0.005) & (p_slope_abs < 0.01)), 5.0)
-    price_pts = price_pts.where(~(p_slope_abs >= 0.01), 2.0)      # trending
-    score += price_pts
-
-    return score.clip(0, 100).round(1)
+    close_approx = (high + low) / 2
+    sma = close_approx.rolling(period).mean()
+    std = close_approx.rolling(period).std()
+    bandwidth = (2 * std) / sma.replace(0, np.nan) * 100
+    max_bw = bandwidth.rolling(100, min_periods=20).max()
+    contraction = 100 * (1 - bandwidth / max_bw.replace(0, np.nan))
+    return contraction.fillna(50)
 
 
-def compute_accumulation_pressure(
-    accum_days: int,
-    range_ratio: float,
-    vol_ratio: float,
-    cmf_slope: float,
-    score_slope: float,
-) -> float:
-    """
-    Accumulation Pressure Gauge — composite score 0-100.
-    Measures how much "energy" is built up during accumulation.
-    Higher pressure = closer to breakout.
-
-    5 weighted factors:
-      Time (30) + Range Squeeze (25) + Volume Dryup (20) + CMF Accel (15) + Score Velocity (10)
-    """
-    # ── Factor 1: Time Pressure (30 pts) ─────────────────────
-    # Longer accumulation = more compressed spring
-    # 40+ days = max pressure
-    time_pts = min(1.0, accum_days / 40.0) * 30.0
-
-    # ── Factor 2: Range Squeeze (25 pts) ─────────────────────
-    # Tighter range = more pressure. range_ratio < 0.5 = max
-    range_raw = max(0.0, (1.0 - range_ratio) / 0.5)
-    range_pts = min(1.0, range_raw) * 25.0
-
-    # ── Factor 3: Volume Dryup (20 pts) ──────────────────────
-    # Lower volume = institutions accumulating quietly
-    vol_raw = max(0.0, (1.0 - vol_ratio) / 0.5)
-    vol_pts = min(1.0, vol_raw) * 20.0
-
-    # ── Factor 4: CMF Acceleration (15 pts) ──────────────────
-    # Rising CMF slope = buying pressure increasing
-    # Clamp slope to [-0.05, +0.05] then normalize
-    cmf_clamped = max(-0.05, min(0.05, cmf_slope))
-    cmf_pts = ((cmf_clamped + 0.05) / 0.10) * 15.0
-
-    # ── Factor 5: Score Velocity (10 pts) ────────────────────
-    # Rising accumulation score = momentum building
-    # Clamp slope to [-0.03, +0.03] then normalize
-    score_clamped = max(-0.03, min(0.03, score_slope))
-    score_pts = ((score_clamped + 0.03) / 0.06) * 10.0
-
-    pressure = time_pts + range_pts + vol_pts + cmf_pts + score_pts
-    return round(max(0.0, min(100.0, pressure)), 1)
+# Legacy compatibility
+def compute_cmf(high, low, close, volume, period=20):
+    """Kept for backward compatibility. Use compute_rolling_delta instead."""
+    hl_range = high - low
+    hl_range = hl_range.replace(0, np.nan)
+    mf_multiplier = ((close - low) - (high - close)) / hl_range
+    mf_volume = mf_multiplier * volume
+    cmf = mf_volume.rolling(period).sum() / volume.rolling(period).sum()
+    return cmf.fillna(0)
 
 
-def compute_expected_move(
-    last_atr: float,
-    accum_days: int,
-    pressure_score: float,
-    last_close: float,
-) -> dict:
-    """
-    Estimate the expected breakout move based on accumulation characteristics.
-
-    Formula: move = ATR × (1 + days/20) × (pressure/50)
-    Capped at 30% of current price.
-
-    Returns: {move_value, move_pct, target_price}
-    """
-    if last_close <= 0 or last_atr <= 0:
-        return {"move_value": 0.0, "move_pct": 0.0, "target_price": last_close}
-
-    # Duration multiplier: longer accumulation → bigger expected move
-    duration_mult = 1.0 + (accum_days / 20.0)
-
-    # Pressure multiplier: higher pressure → bigger expected move
-    pressure_mult = max(0.1, pressure_score / 50.0)
-
-    # Raw expected move
-    move = last_atr * duration_mult * pressure_mult
-
-    # Cap at 30% of price
-    max_move = last_close * 0.30
-    move = min(move, max_move)
-
-    move_pct = (move / last_close) * 100.0
-    target = last_close + move
-
-    return {
-        "move_value": round(move, 4),
-        "move_pct": round(move_pct, 1),
-        "target_price": round(target, 4),
-    }
+def compute_obv(close, volume):
+    """Kept for backward compatibility. Use compute_cdv instead."""
+    direction = np.sign(close.diff())
+    return (direction * volume).cumsum()
 
 
-def detect_accumulation_phase(
-    accum_score: pd.Series, cmf: pd.Series, obv_slope: pd.Series
-) -> pd.Series:
-    """
-    Classify accumulation phase from score + CMF + OBV slope.
-    6 phases: neutral, early, mid, strong, late, distribute.
-
-    Phase logic (strict thresholds for higher accuracy):
-      - distribute: CMF < -0.05 AND OBV slope < 0  (selling despite any score)
-      - late:       score >= 80 AND CMF > 0.10 AND OBV slope > 0
-      - strong:     score >= 68 AND CMF > 0.05 AND OBV slope > 0
-      - mid:        score >= 45
-      - early:      score >= 30
-      - neutral:    score < 30
-    """
-    phase = pd.Series("neutral", index=accum_score.index)
-
-    # Layer by priority (lowest first, highest overwrites)
-    phase = phase.where(~(accum_score >= 30), "early")
-    phase = phase.where(~(accum_score >= 45), "mid")
-    phase = phase.where(~((accum_score >= 68) & (cmf > 0.05) & (obv_slope > 0)), "strong")
-    phase = phase.where(~((accum_score >= 80) & (cmf > 0.10) & (obv_slope > 0)), "late")
-
-    # Distribution override: CMF negative + OBV falling = institutional selling
-    distribute_mask = (cmf < -0.05) & (obv_slope < 0)
-    phase = phase.where(~distribute_mask, "distribute")
-
-    return phase
+def compute_obv_slope(close, volume, period=10):
+    """Kept for backward compatibility."""
+    obv = compute_obv(close, volume)
+    return (obv.diff(period) / period).fillna(0)
