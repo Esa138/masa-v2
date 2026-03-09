@@ -39,6 +39,10 @@ if "last_market" not in st.session_state:
     st.session_state.last_market = None
 if "selected_ticker" not in st.session_state:
     st.session_state.selected_ticker = None
+if "composite_dates" not in st.session_state:
+    st.session_state.composite_dates = None
+if "composite_vals" not in st.session_state:
+    st.session_state.composite_vals = None
 
 
 # ══════════════════════════════════════════════════════════════
@@ -635,8 +639,10 @@ def build_data_table(r):
 # BREAKOUTS CHART (الاختراقات)
 # ══════════════════════════════════════════════════════════════
 
-def build_breakouts_chart(r):
-    """Build a breakout chart with support/resistance for multiple timeframes."""
+def build_breakouts_chart(r, composite_dates=None, composite_vals=None):
+    """Build a breakout chart with support/resistance for multiple timeframes.
+    Optionally overlay the composite market index (normalized to stock price scale).
+    """
     dates = r.get("chart_dates", [])
     closes = r.get("chart_close", [])
     highs = r.get("chart_high", [])
@@ -650,7 +656,7 @@ def build_breakouts_chart(r):
     high_arr = np.array(highs, dtype=float)
     low_arr = np.array(lows, dtype=float)
 
-    fig = go.Figure()
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
 
     # Price line
     fig.add_trace(go.Scatter(
@@ -736,6 +742,28 @@ def build_breakouts_chart(r):
                 hovertemplate=f"كسر {tf['label']}<br>%{{x}}<br>%{{y:.2f}}<extra></extra>",
             ))
 
+    # ── Composite Market Index overlay ──
+    if composite_dates and composite_vals and len(composite_dates) > 10:
+        # Build lookup: date -> composite value
+        comp_map = dict(zip(composite_dates, composite_vals))
+        # Match stock dates to composite dates
+        matched_comp = []
+        matched_dates_comp = []
+        for d in dates:
+            if d in comp_map:
+                matched_comp.append(comp_map[d])
+                matched_dates_comp.append(d)
+
+        if len(matched_comp) > 10:
+            fig.add_trace(go.Scatter(
+                x=matched_dates_comp, y=matched_comp,
+                mode="lines",
+                line=dict(color="#FFD700", width=1.5, dash="dot"),
+                name="المؤشر المركب",
+                opacity=0.7,
+                hovertemplate="المؤشر المركب: %{y:.1f}<extra></extra>",
+            ), secondary_y=True)
+
     fig.update_layout(
         height=550,
         margin=dict(l=0, r=0, t=10, b=0),
@@ -750,7 +778,10 @@ def build_breakouts_chart(r):
         xaxis=dict(showgrid=False, tickfont=dict(size=9, color="#6b7280"),
                    tickformat="%d %b", dtick=14*86400000, tickangle=-45),
         yaxis=dict(showgrid=True, gridcolor="#151d30",
-                   tickfont=dict(size=10, color="#4b5563")),
+                   tickfont=dict(size=10, color="#4b5563"), title=None),
+        yaxis2=dict(showgrid=False,
+                    tickfont=dict(size=9, color="#FFD700"),
+                    title=None, overlaying="y", side="left"),
         hovermode="x unified",
     )
 
@@ -1416,8 +1447,12 @@ def show_detail_panel(r):
     )
 
     # Header
-    st.markdown(f'''
-    <div style="background:linear-gradient(135deg,#131a2e,#0e1424);border:1px solid #192035;
+    flow_color_val = '#00E676' if r['flow_bias'] > 0 else '#FF5252'
+    div_color_val = '#00E676' if r['divergence'] > 0 else '#FF5252'
+    zr_h = r.get("zr_high", "—")
+    zr_l = r.get("zr_low", "—")
+    st.html(f'''
+    <div style="font-family:Tajawal,sans-serif;background:linear-gradient(135deg,#131a2e,#0e1424);border:1px solid #192035;
                 border-radius:16px;padding:20px 24px;margin:10px 0;direction:rtl">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
             <div>
@@ -1434,19 +1469,19 @@ def show_detail_panel(r):
         <div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;color:#6b7280;font-size:0.85em">
             <span style="color:{phase_color};font-weight:600">{r["phase_label"]}</span>
             <span>📍 {r["location_label"]}</span>
-            <span>أوردر فلو: <b style="color:{'#00E676' if r['flow_bias'] > 0 else '#FF5252'}">{r["flow_bias"]:+.0f}</b></span>
+            <span>أوردر فلو: <b style="color:{flow_color_val}">{r["flow_bias"]:+.0f}</b></span>
             {agg_html}
             <span>امتصاص: <b>{r["absorption_score"]:.0f}</b></span>
-            <span>دايفرجنس: <b style="color:{'#00E676' if r['divergence'] > 0 else '#FF5252'}">{r["divergence"]:+.0f}</b></span>
+            <span>دايفرجنس: <b style="color:{div_color_val}">{r["divergence"]:+.0f}</b></span>
             <span>RSI: <b>{r["rsi"]:.0f}</b></span>
             {zr_detail_html}
         </div>
         <div style="display:flex;gap:16px;margin-top:6px;flex-wrap:wrap;color:#4b5563;font-size:0.80em">
-            <span>ZR سقف: <b style="color:#FFFFFF">{r.get("zr_high", "—")}</b></span>
-            <span>ZR قاع: <b style="color:#FF9800">{r.get("zr_low", "—")}</b></span>
+            <span>ZR سقف: <b style="color:#FFFFFF">{zr_h}</b></span>
+            <span>ZR قاع: <b style="color:#FF9800">{zr_l}</b></span>
         </div>
     </div>
-    ''', unsafe_allow_html=True)
+    ''')
 
     # ── Tabs: Chart / Data / Breakouts ──
     tab_chart, tab_data, tab_breakouts = st.tabs(["📊 الشارت", "📋 البيانات", "🚀 الاختراقات"])
@@ -1472,13 +1507,17 @@ def show_detail_panel(r):
         show_10 = bc3.checkbox("عرض 10 أيام 🟣", value=True, key=f"brk10_{r['ticker']}")
         show_15 = bc4.checkbox("عرض 15 أيام 🔴", value=False, key=f"brk15_{r['ticker']}")
 
-        brk_chart = build_breakouts_chart(r)
+        brk_chart = build_breakouts_chart(
+            r,
+            composite_dates=st.session_state.get("composite_dates"),
+            composite_vals=st.session_state.get("composite_vals"),
+        )
         if brk_chart:
             # Filter traces based on checkboxes
             tf_filter = {3: show_3, 4: show_4, 10: show_10, 15: show_15}
             for trace in brk_chart.data:
                 name = trace.name or ""
-                if name == "السعر":
+                if name in ("السعر", "المؤشر المركب"):
                     trace.visible = True
                     continue
                 for days, show in tf_filter.items():
@@ -1665,6 +1704,10 @@ if page == "🔬 Order Flow":
 
         st.session_state.scan_results = results
         st.session_state.market_health = health
+        # Pre-compute composite index for breakout overlay
+        comp_d, comp_v, _, _ = build_composite_index(results)
+        st.session_state.composite_dates = comp_d
+        st.session_state.composite_vals = comp_v
 
     results = st.session_state.scan_results
     health = st.session_state.market_health
