@@ -544,6 +544,137 @@ def _classify_location(close, zr_high, zr_low, ma200, ma50) -> str:
     return "middle"
 
 
+def compute_accumulation_maturity(
+    dates: list,
+    close: pd.Series,
+    rolling_delta: pd.Series,
+    cdv: pd.Series,
+    absorption: pd.Series,
+    contraction: pd.Series,
+    rsi: pd.Series,
+    volume: pd.Series,
+) -> dict:
+    """
+    Detect accumulation maturity stage with dates.
+
+    Returns:
+        stage: "early" | "mid" | "late" | "none"
+        stage_label: Arabic label
+        stage_color: color
+        timeline: list of {stage, date, label}
+        current_days: int — consecutive accumulation days
+    """
+    n = len(close)
+    if n < 30:
+        return {"stage": "none", "stage_label": "لا توجد بيانات كافية",
+                "stage_color": "#808080", "timeline": [], "current_days": 0}
+
+    # Walk through last 90 days to find phase transitions
+    lookback = min(90, n)
+    start_idx = n - lookback
+
+    # Track daily accumulation signal
+    daily_signals = []
+    for i in range(start_idx, n):
+        if i < 20:
+            daily_signals.append({"idx": i, "accum": False})
+            continue
+
+        rd = float(rolling_delta.iloc[i]) if pd.notna(rolling_delta.iloc[i]) else 0
+        cdv_5d = float(cdv.iloc[i]) - float(cdv.iloc[max(0, i - 5)]) if i >= 5 else 0
+        abs_val = float(absorption.iloc[i]) if pd.notna(absorption.iloc[i]) else 0
+        cont_val = float(contraction.iloc[i]) if pd.notna(contraction.iloc[i]) else 0
+        rsi_val = float(rsi.iloc[i]) if pd.notna(rsi.iloc[i]) else 50
+
+        # Is this day showing accumulation?
+        is_accum = rd > 0 and cdv_5d > 0
+
+        daily_signals.append({
+            "idx": i,
+            "accum": is_accum,
+            "rd": rd,
+            "cdv_5d": cdv_5d,
+            "abs": abs_val,
+            "cont": cont_val,
+            "rsi": rsi_val,
+        })
+
+    # Find consecutive accumulation streak from the end
+    streak = 0
+    for sig in reversed(daily_signals):
+        if sig["accum"]:
+            streak += 1
+        else:
+            break
+
+    if streak == 0:
+        return {"stage": "none", "stage_label": "لا يوجد تجميع نشط",
+                "stage_color": "#808080", "timeline": [], "current_days": 0}
+
+    # Determine stages with dates
+    timeline = []
+    accum_start_idx = len(daily_signals) - streak
+    accum_start = daily_signals[accum_start_idx]
+
+    # Map index back to date
+    def idx_to_date(idx):
+        offset = idx - start_idx
+        if 0 <= offset < len(dates[start_idx:]):
+            return dates[start_idx + offset] if start_idx + offset < len(dates) else "—"
+        return "—"
+
+    # Early: first day of accumulation
+    early_date = idx_to_date(accum_start["idx"])
+    timeline.append({"stage": "early", "date": early_date,
+                      "label": "🟡 بداية التجميع", "action": "انتظر"})
+
+    # Mid: after 5+ days
+    mid_date = None
+    if streak >= 5:
+        mid_sig = daily_signals[accum_start_idx + 5]
+        mid_date = idx_to_date(mid_sig["idx"])
+        timeline.append({"stage": "mid", "date": mid_date,
+                          "label": "🟠 منتصف التجميع", "action": "راقب وجهّز"})
+
+    # Late: after 15+ days AND (contraction > 60 OR RSI recovering)
+    late_date = None
+    if streak >= 15:
+        for sig in daily_signals[accum_start_idx + 14:]:
+            if sig["cont"] > 60 or sig["rsi"] < 40:
+                late_date = idx_to_date(sig["idx"])
+                timeline.append({"stage": "late", "date": late_date,
+                                  "label": "🟢 نهاية التجميع", "action": "ادخل"})
+                break
+        # If 15+ days but no contraction/RSI trigger yet
+        if not late_date and streak >= 20:
+            late_sig = daily_signals[accum_start_idx + 19]
+            late_date = idx_to_date(late_sig["idx"])
+            timeline.append({"stage": "late", "date": late_date,
+                              "label": "🟢 نهاية التجميع", "action": "ادخل"})
+
+    # Current stage
+    if late_date:
+        stage = "late"
+        stage_label = "🟢 نهاية التجميع — جاهز ينطلق"
+        stage_color = "#00E676"
+    elif mid_date:
+        stage = "mid"
+        stage_label = "🟠 منتصف التجميع — راقب"
+        stage_color = "#FF9800"
+    else:
+        stage = "early"
+        stage_label = "🟡 بداية التجميع — انتظر"
+        stage_color = "#FFD700"
+
+    return {
+        "stage": stage,
+        "stage_label": stage_label,
+        "stage_color": stage_color,
+        "timeline": timeline,
+        "current_days": streak,
+    }
+
+
 def _empty_result() -> dict:
     """Return empty result when data is insufficient."""
     return {

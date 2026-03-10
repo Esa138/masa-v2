@@ -8,7 +8,7 @@ import numpy as np
 import yfinance as yf
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from core.accumulation import detect_orderflow
+from core.accumulation import detect_orderflow, compute_accumulation_maturity
 from core.scorer import score_stock
 from core.indicators import compute_rolling_delta, compute_cdv, compute_rsi, compute_ma
 from core.institutional import get_ownership_batch, interpret_ownership
@@ -96,6 +96,22 @@ def scan_market(
                 orderflow_data=orderflow,
                 market_health=market_health,
                 institutional_data=inst_data,
+            )
+
+            # ── Accumulation maturity ─────────────────────
+            from core.indicators import (
+                compute_rolling_delta as _rd, compute_cdv as _cdv,
+                compute_absorption as _abs, compute_range_contraction as _rc,
+                compute_rsi as _rsi2,
+            )
+            _rolling = _rd(high, low, close, volume, 20)
+            _cdv_s = _cdv(high, low, close, volume)
+            _abs_s = _abs(high, low, close, volume, 20)
+            _rc_s = _rc(high, low, 20)
+            _rsi_s = _rsi2(close, 14)
+            _all_dates = [d.strftime("%Y-%m-%d") for d in close.index]
+            maturity = compute_accumulation_maturity(
+                _all_dates, close, _rolling, _cdv_s, _abs_s, _rc_s, _rsi_s, volume
             )
 
             last_close = float(close.iloc[-1])
@@ -186,6 +202,12 @@ def scan_market(
                 "chart_delta": orderflow["delta_series"],
                 "chart_cdv": orderflow["cdv_series"],
                 "chart_absorption": orderflow["absorption_series"],
+                # Accumulation maturity
+                "maturity_stage": maturity["stage"],
+                "maturity_label": maturity["stage_label"],
+                "maturity_color": maturity["stage_color"],
+                "maturity_timeline": maturity["timeline"],
+                "maturity_days": maturity["current_days"],
             })
 
         except Exception:
