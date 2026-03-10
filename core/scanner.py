@@ -114,6 +114,25 @@ def scan_market(
                 _all_dates, close, _rolling, _cdv_s, _abs_s, _rc_s, _rsi_s, volume
             )
 
+            # ── Override maturity if phase/decision contradicts ──
+            phase = orderflow["phase"]
+            decision = scored["decision"]
+            today_str = _all_dates[-1] if _all_dates else "—"
+
+            if phase in ("spring",) and maturity["stage"] != "late":
+                maturity = {
+                    "stage": "late",
+                    "stage_label": "🟢 سبرنق — جاهز للانطلاق",
+                    "stage_color": "#00E676",
+                    "timeline": [{"stage": "late", "date": today_str,
+                                   "label": "🟢 سبرنق", "action": "ادخل"}],
+                    "current_days": maturity["current_days"],
+                }
+            elif phase == "accumulation" and decision == "enter" and maturity["stage"] == "early":
+                maturity["stage"] = "mid"
+                maturity["stage_label"] = "🟠 تجميع نشط — راقب الدخول"
+                maturity["stage_color"] = "#FF9800"
+
             last_close = float(close.iloc[-1])
             prev_close = float(close.iloc[-2]) if len(close) >= 2 else last_close
             change_pct = (last_close - prev_close) / prev_close * 100
