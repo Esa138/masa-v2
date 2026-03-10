@@ -556,6 +556,7 @@ def compute_accumulation_maturity(
 ) -> dict:
     """
     Detect accumulation maturity stage with dates.
+    Uses BOTH duration (days) AND intensity (signal strength).
 
     Returns:
         stage: "early" | "mid" | "late" | "none"
@@ -611,6 +612,34 @@ def compute_accumulation_maturity(
         return {"stage": "none", "stage_label": "لا يوجد تجميع نشط",
                 "stage_color": "#808080", "timeline": [], "current_days": 0}
 
+    # ── Signal intensity (current values) ──
+    last_sig = daily_signals[-1]
+    last_rsi = last_sig.get("rsi", 50)
+    last_cont = last_sig.get("cont", 50)
+    last_cdv_5d = last_sig.get("cdv_5d", 0)
+
+    # Compute divergence from close vs CDV (last 20 days)
+    price_change_20d = 0
+    if n >= 20:
+        p_now = float(close.iloc[-1])
+        p_20 = float(close.iloc[-20])
+        if p_20 > 0:
+            price_change_20d = (p_now - p_20) / p_20 * 100
+
+    # Strong signal = price dropping but CDV rising
+    has_strong_divergence = price_change_20d < -3 and last_cdv_5d > 0
+    has_extreme_rsi = last_rsi < 30
+    has_high_contraction = last_cont > 65
+
+    # ── Intensity score (0-3) — how many strong signals ──
+    intensity = 0
+    if has_strong_divergence:
+        intensity += 1
+    if has_extreme_rsi:
+        intensity += 1
+    if has_high_contraction:
+        intensity += 1
+
     # Determine stages with dates
     timeline = []
     accum_start_idx = len(daily_signals) - streak
@@ -623,45 +652,55 @@ def compute_accumulation_maturity(
             return dates[start_idx + offset] if start_idx + offset < len(dates) else "—"
         return "—"
 
-    # Early: first day of accumulation
-    early_date = idx_to_date(accum_start["idx"])
-    timeline.append({"stage": "early", "date": early_date,
-                      "label": "🟡 بداية التجميع", "action": "انتظر"})
+    today_date = idx_to_date(daily_signals[-1]["idx"])
 
-    # Mid: after 5+ days
-    mid_date = None
-    if streak >= 5:
-        mid_sig = daily_signals[accum_start_idx + 5]
-        mid_date = idx_to_date(mid_sig["idx"])
+    # ── Stage determination: duration + intensity ──
+    # Strong signals can SKIP stages (sprint → spring)
+    if intensity >= 2:
+        # Very strong signals — jump to late regardless of days
+        timeline.append({"stage": "late", "date": today_date,
+                          "label": "🟢 سبرنق — إشارات قوية", "action": "ادخل"})
+        stage = "late"
+        stage_label = "🟢 سبرنق — إشارات قوية جداً"
+        stage_color = "#00E676"
+    elif intensity == 1 and streak >= 3:
+        # Moderate signals + some duration → mid/late
+        early_date = idx_to_date(accum_start["idx"])
+        timeline.append({"stage": "early", "date": early_date,
+                          "label": "🟡 بداية التجميع", "action": "انتظر"})
+        timeline.append({"stage": "late", "date": today_date,
+                          "label": "🟢 تسارع — إشارة قوية", "action": "ادخل"})
+        stage = "late"
+        stage_label = "🟢 تسارع في التجميع — إشارة قوية"
+        stage_color = "#00E676"
+    elif intensity == 1 or streak >= 5:
+        # Some intensity OR decent duration → mid
+        early_date = idx_to_date(accum_start["idx"])
+        timeline.append({"stage": "early", "date": early_date,
+                          "label": "🟡 بداية التجميع", "action": "انتظر"})
+        if streak >= 5:
+            mid_sig = daily_signals[accum_start_idx + min(4, streak - 1)]
+            mid_date = idx_to_date(mid_sig["idx"])
+        else:
+            mid_date = today_date
         timeline.append({"stage": "mid", "date": mid_date,
                           "label": "🟠 منتصف التجميع", "action": "راقب وجهّز"})
-
-    # Late: after 15+ days AND (contraction > 60 OR RSI recovering)
-    late_date = None
-    if streak >= 15:
-        for sig in daily_signals[accum_start_idx + 14:]:
-            if sig["cont"] > 60 or sig["rsi"] < 40:
-                late_date = idx_to_date(sig["idx"])
-                timeline.append({"stage": "late", "date": late_date,
-                                  "label": "🟢 نهاية التجميع", "action": "ادخل"})
-                break
-        # If 15+ days but no contraction/RSI trigger yet
-        if not late_date and streak >= 20:
-            late_sig = daily_signals[accum_start_idx + 19]
-            late_date = idx_to_date(late_sig["idx"])
-            timeline.append({"stage": "late", "date": late_date,
-                              "label": "🟢 نهاية التجميع", "action": "ادخل"})
-
-    # Current stage
-    if late_date:
-        stage = "late"
-        stage_label = "🟢 نهاية التجميع — جاهز ينطلق"
-        stage_color = "#00E676"
-    elif mid_date:
         stage = "mid"
         stage_label = "🟠 منتصف التجميع — راقب"
         stage_color = "#FF9800"
+
+        # Check if ready to graduate to late
+        if streak >= 15 and (last_cont > 60 or last_rsi < 40):
+            timeline.append({"stage": "late", "date": today_date,
+                              "label": "🟢 نهاية التجميع", "action": "ادخل"})
+            stage = "late"
+            stage_label = "🟢 نهاية التجميع — جاهز ينطلق"
+            stage_color = "#00E676"
     else:
+        # Low intensity + short duration → early
+        early_date = idx_to_date(accum_start["idx"])
+        timeline.append({"stage": "early", "date": early_date,
+                          "label": "🟡 بداية التجميع", "action": "انتظر"})
         stage = "early"
         stage_label = "🟡 بداية التجميع — انتظر"
         stage_color = "#FFD700"
