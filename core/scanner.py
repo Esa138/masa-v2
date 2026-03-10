@@ -114,12 +114,12 @@ def scan_market(
                 _all_dates, close, _rolling, _cdv_s, _abs_s, _rc_s, _rsi_s, volume
             )
 
-            # ── Override maturity if phase/decision contradicts ──
+            # ── Sync maturity ↔ decision ──────────────────
             phase = orderflow["phase"]
-            decision = scored["decision"]
             today_str = _all_dates[-1] if _all_dates else "—"
 
-            if phase in ("spring",) and maturity["stage"] != "late":
+            # Spring phase → maturity = late (always)
+            if phase == "spring" and maturity["stage"] != "late":
                 maturity = {
                     "stage": "late",
                     "stage_label": "🟢 سبرنق — جاهز للانطلاق",
@@ -128,10 +128,23 @@ def scan_market(
                                    "label": "🟢 سبرنق", "action": "ادخل"}],
                     "current_days": maturity["current_days"],
                 }
-            elif phase == "accumulation" and decision == "enter" and maturity["stage"] == "early":
-                maturity["stage"] = "mid"
-                maturity["stage_label"] = "🟠 تجميع نشط — راقب الدخول"
-                maturity["stage_color"] = "#FF9800"
+
+            # Maturity controls final decision (no contradiction)
+            m_stage = maturity["stage"]
+            if m_stage in ("early", "mid") and scored["decision"] == "enter":
+                # Downgrade: enter → watch (not mature enough)
+                scored["decision"] = "watch"
+                scored["decision_info"] = {
+                    "label": "⚠️ راقب",
+                    "color": "#FFD700",
+                    "description": "تجميع نشط لكن لم ينضج بعد — انتظر",
+                }
+                scored["reasons_against"].append(
+                    "التجميع لم ينضج بعد — انتظر نهاية التجميع"
+                )
+            # markup/markdown/neutral without accumulation → hide maturity
+            if m_stage == "none" and phase not in ("accumulation", "spring", "distribution"):
+                pass  # maturity stays "none", won't show in UI
 
             last_close = float(close.iloc[-1])
             prev_close = float(close.iloc[-2]) if len(close) >= 2 else last_close
