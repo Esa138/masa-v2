@@ -714,6 +714,146 @@ def compute_accumulation_maturity(
     }
 
 
+def compute_distribution_maturity(
+    dates: list,
+    close: pd.Series,
+    rolling_delta: pd.Series,
+    cdv: pd.Series,
+    absorption: pd.Series,
+    contraction: pd.Series,
+    rsi: pd.Series,
+    volume: pd.Series,
+) -> dict:
+    """
+    Detect distribution maturity stage with dates.
+    Mirror of accumulation maturity but for SELLING pressure.
+    """
+    n = len(close)
+    if n < 30:
+        return {"stage": "none", "stage_label": "لا توجد بيانات كافية",
+                "stage_color": "#808080", "timeline": [], "current_days": 0}
+
+    lookback = min(90, n)
+    start_idx = n - lookback
+
+    daily_signals = []
+    for i in range(start_idx, n):
+        if i < 20:
+            daily_signals.append({"idx": i, "dist": False})
+            continue
+
+        rd = float(rolling_delta.iloc[i]) if pd.notna(rolling_delta.iloc[i]) else 0
+        cdv_5d = float(cdv.iloc[i]) - float(cdv.iloc[max(0, i - 5)]) if i >= 5 else 0
+        abs_val = float(absorption.iloc[i]) if pd.notna(absorption.iloc[i]) else 0
+        cont_val = float(contraction.iloc[i]) if pd.notna(contraction.iloc[i]) else 0
+        rsi_val = float(rsi.iloc[i]) if pd.notna(rsi.iloc[i]) else 50
+
+        # Distribution = negative rolling delta + CDV falling
+        is_dist = rd < 0 and cdv_5d < 0
+
+        daily_signals.append({
+            "idx": i, "dist": is_dist,
+            "rd": rd, "cdv_5d": cdv_5d,
+            "abs": abs_val, "cont": cont_val, "rsi": rsi_val,
+        })
+
+    # Consecutive distribution streak
+    streak = 0
+    for sig in reversed(daily_signals):
+        if sig["dist"]:
+            streak += 1
+        else:
+            break
+
+    if streak == 0:
+        return {"stage": "none", "stage_label": "لا يوجد تصريف نشط",
+                "stage_color": "#808080", "timeline": [], "current_days": 0}
+
+    # Signal intensity
+    last_sig = daily_signals[-1]
+    last_rsi = last_sig.get("rsi", 50)
+    last_cont = last_sig.get("cont", 50)
+    last_cdv_5d = last_sig.get("cdv_5d", 0)
+
+    price_change_20d = 0
+    if n >= 20:
+        p_now = float(close.iloc[-1])
+        p_20 = float(close.iloc[-20])
+        if p_20 > 0:
+            price_change_20d = (p_now - p_20) / p_20 * 100
+
+    # Strong distribution = price rising but CDV falling (bearish divergence)
+    has_bearish_div = price_change_20d > 3 and last_cdv_5d < 0
+    has_overbought_rsi = last_rsi > 70
+    has_high_contraction = last_cont > 65
+
+    intensity = sum([has_bearish_div, has_overbought_rsi, has_high_contraction])
+
+    timeline = []
+    dist_start_idx = len(daily_signals) - streak
+    dist_start = daily_signals[dist_start_idx]
+
+    def idx_to_date(idx):
+        offset = idx - start_idx
+        if 0 <= offset < len(dates[start_idx:]):
+            return dates[start_idx + offset] if start_idx + offset < len(dates) else "—"
+        return "—"
+
+    today_date = idx_to_date(daily_signals[-1]["idx"])
+
+    if intensity >= 2:
+        timeline.append({"stage": "late", "date": today_date,
+                          "label": "🔴 أبثرست — تصريف حاد", "action": "اخرج فوراً"})
+        stage = "late"
+        stage_label = "🔴 أبثرست — تصريف حاد"
+        stage_color = "#FF5252"
+    elif intensity == 1 and streak >= 3:
+        early_date = idx_to_date(dist_start["idx"])
+        timeline.append({"stage": "early", "date": early_date,
+                          "label": "🟠 بداية التصريف", "action": "حذر"})
+        timeline.append({"stage": "late", "date": today_date,
+                          "label": "🔴 تسارع التصريف", "action": "اخرج"})
+        stage = "late"
+        stage_label = "🔴 تسارع في التصريف — اخرج"
+        stage_color = "#FF5252"
+    elif intensity == 1 or streak >= 5:
+        early_date = idx_to_date(dist_start["idx"])
+        timeline.append({"stage": "early", "date": early_date,
+                          "label": "🟠 بداية التصريف", "action": "حذر"})
+        if streak >= 5:
+            mid_sig = daily_signals[dist_start_idx + min(4, streak - 1)]
+            mid_date = idx_to_date(mid_sig["idx"])
+        else:
+            mid_date = today_date
+        timeline.append({"stage": "mid", "date": mid_date,
+                          "label": "🔴 منتصف التصريف", "action": "لا تدخل"})
+        stage = "mid"
+        stage_label = "🔴 منتصف التصريف — لا تدخل"
+        stage_color = "#FF5252"
+
+        if streak >= 15:
+            timeline.append({"stage": "late", "date": today_date,
+                              "label": "⚫ نهاية التصريف", "action": "اخرج فوراً"})
+            stage = "late"
+            stage_label = "⚫ نهاية التصريف — انهيار محتمل"
+            stage_color = "#FF1744"
+    else:
+        early_date = idx_to_date(dist_start["idx"])
+        timeline.append({"stage": "early", "date": early_date,
+                          "label": "🟠 بداية التصريف", "action": "حذر"})
+        stage = "early"
+        stage_label = "🟠 بداية التصريف — حذر"
+        stage_color = "#FF9800"
+
+    return {
+        "stage": stage,
+        "stage_label": stage_label,
+        "stage_color": stage_color,
+        "timeline": timeline,
+        "current_days": streak,
+    }
+
+
 def _empty_result() -> dict:
     """Return empty result when data is insufficient."""
     return {

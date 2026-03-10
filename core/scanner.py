@@ -8,7 +8,7 @@ import numpy as np
 import yfinance as yf
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from core.accumulation import detect_orderflow, compute_accumulation_maturity
+from core.accumulation import detect_orderflow, compute_accumulation_maturity, compute_distribution_maturity
 from core.scorer import score_stock
 from core.indicators import compute_rolling_delta, compute_cdv, compute_rsi, compute_ma
 from core.institutional import get_ownership_batch, interpret_ownership
@@ -143,8 +143,48 @@ def scan_market(
                     "التجميع لم ينضج بعد — انتظر نهاية التجميع"
                 )
             # markup/markdown/neutral without accumulation → hide maturity
-            if m_stage == "none" and phase not in ("accumulation", "spring", "distribution"):
+            if m_stage == "none" and phase not in ("accumulation", "spring"):
                 pass  # maturity stays "none", won't show in UI
+
+            # ── Distribution maturity ───────────────────────
+            dist_maturity = compute_distribution_maturity(
+                _all_dates, close, _rolling, _cdv_s, _abs_s, _rc_s, _rsi_s, volume
+            )
+
+            # Upthrust phase → distribution maturity = late (always)
+            if phase == "upthrust" and dist_maturity["stage"] != "late":
+                dist_maturity = {
+                    "stage": "late",
+                    "stage_label": "🔴 أبثرست — تصريف حاد",
+                    "stage_color": "#FF5252",
+                    "timeline": [{"stage": "late", "date": today_str,
+                                   "label": "🔴 أبثرست", "action": "اخرج فوراً"}],
+                    "current_days": dist_maturity["current_days"],
+                }
+
+            # Distribution maturity controls decision for distribution stocks
+            d_stage = dist_maturity["stage"]
+            if d_stage in ("mid", "late") and phase in ("distribution", "upthrust", "markdown"):
+                if scored["decision"] == "enter":
+                    scored["decision"] = "avoid"
+                    scored["decision_info"] = {
+                        "label": "🔴 تجنب",
+                        "color": "#FF5252",
+                        "description": "تصريف نشط — لا تدخل",
+                    }
+                    scored["reasons_against"].append(
+                        "تصريف نشط — ابتعد عن السهم"
+                    )
+                elif scored["decision"] == "watch":
+                    scored["decision"] = "avoid"
+                    scored["decision_info"] = {
+                        "label": "🔴 تجنب",
+                        "color": "#FF5252",
+                        "description": "تصريف مستمر — لا تدخل",
+                    }
+                    scored["reasons_against"].append(
+                        "تصريف مستمر — ابتعد عن السهم"
+                    )
 
             last_close = float(close.iloc[-1])
             prev_close = float(close.iloc[-2]) if len(close) >= 2 else last_close
@@ -240,6 +280,12 @@ def scan_market(
                 "maturity_color": maturity["stage_color"],
                 "maturity_timeline": maturity["timeline"],
                 "maturity_days": maturity["current_days"],
+                # Distribution maturity
+                "dist_maturity_stage": dist_maturity["stage"],
+                "dist_maturity_label": dist_maturity["stage_label"],
+                "dist_maturity_color": dist_maturity["stage_color"],
+                "dist_maturity_timeline": dist_maturity["timeline"],
+                "dist_maturity_days": dist_maturity["current_days"],
             })
 
         except Exception:

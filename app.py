@@ -1526,6 +1526,51 @@ def show_detail_panel(r):
         </div>
         ''')
 
+    # ── Distribution Maturity Timeline ──
+    dm_stage = r.get("dist_maturity_stage", "none")
+    dm_timeline = r.get("dist_maturity_timeline", [])
+    if dm_stage != "none" and dm_timeline:
+        dm_label = r.get("dist_maturity_label", "")
+        dm_color = r.get("dist_maturity_color", "#FF5252")
+        dm_days = r.get("dist_maturity_days", 0)
+
+        dm_steps_html = ""
+        for i, step in enumerate(dm_timeline):
+            is_current = (i == len(dm_timeline) - 1)
+            dot_size = "14px" if is_current else "10px"
+            border = f"3px solid {dm_color}" if is_current else "2px solid #374151"
+            bg = dm_color if is_current else "transparent"
+            font_w = "700" if is_current else "500"
+            opacity = "1" if is_current else "0.6"
+            dm_steps_html += f'''
+            <div style="display:flex;align-items:center;gap:10px;opacity:{opacity}">
+                <div style="width:{dot_size};height:{dot_size};border-radius:50%;border:{border};background:{bg};flex-shrink:0"></div>
+                <div>
+                    <span style="font-weight:{font_w};font-size:0.88em">{step["label"]}</span>
+                    <span style="color:#4b5563;font-size:0.78em;margin-right:8px">{step["date"]}</span>
+                    <span style="color:{dm_color if is_current else '#6b7280'};font-size:0.78em;font-weight:600">{step["action"]}</span>
+                </div>
+            </div>
+            '''
+            if i < len(dm_timeline) - 1:
+                dm_steps_html += '<div style="width:2px;height:16px;background:#374151;margin-right:5px"></div>'
+
+        r_hex = int(dm_color[1:3], 16)
+        g_hex = int(dm_color[3:5], 16)
+        b_hex = int(dm_color[5:7], 16)
+        st.html(f'''
+        <div style="font-family:Tajawal,sans-serif;background:linear-gradient(135deg,rgba({r_hex},{g_hex},{b_hex},0.05),#0e1424);
+                    border:1px solid {dm_color}25;border-radius:12px;padding:14px 18px;margin:8px 0;direction:rtl">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <span style="color:{dm_color};font-weight:700;font-size:0.92em">{dm_label}</span>
+                <span style="color:#4b5563;font-size:0.78em">تصريف مستمر: <b style="color:#fff">{dm_days} يوم</b></span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+                {dm_steps_html}
+            </div>
+        </div>
+        ''')
+
     # ── Tabs: Chart / Data / Breakouts ──
     tab_chart, tab_data, tab_breakouts = st.tabs(["📊 الشارت", "📋 البيانات", "🚀 الاختراقات"])
 
@@ -1856,7 +1901,7 @@ if page == "🔬 Order Flow":
     with fcol1:
         show_filter = st.selectbox(
             "🎯 التصنيف",
-            ["✅ ادخل + ⚠️ راقب", "✅ ادخل فقط", "الكل"],
+            ["✅ ادخل + ⚠️ راقب", "✅ ادخل فقط", "🔴 تصريف فقط", "الكل"],
         )
     with fcol2:
         sectors = sorted(set(r["sector"] for r in results))
@@ -1871,6 +1916,8 @@ if page == "🔬 Order Flow":
         filtered = [r for r in results if r["decision"] == "enter"]
     elif show_filter == "✅ ادخل + ⚠️ راقب":
         filtered = [r for r in results if r["decision"] in ("enter", "watch")]
+    elif show_filter == "🔴 تصريف فقط":
+        filtered = [r for r in results if r["phase"] in ("distribution", "upthrust", "markdown")]
     else:
         filtered = list(results)
 
