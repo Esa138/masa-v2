@@ -20,33 +20,38 @@ MIN_BARS = 50
 # ── Accumulation/Distribution Type Classifier ─────────────────
 def _classify_flow_type(phase: str, location: str, divergence: float,
                         last_close: float = 0, ma200: float = 0,
-                        maturity_days: int = 0) -> tuple:
+                        maturity_days: int = 0, zr_high: float = 0) -> tuple:
     """
     Classify the TYPE of accumulation or distribution.
     Returns (type_key, type_label, type_color, scope).
 
-    Scope requires TWO conditions:
-      Primary accumulation:  price < MA200  AND  duration >= 30 days
-      Secondary (re-accum):  price > MA200  OR   duration < 30 days
-      Primary distribution:  price > MA200  AND  duration >= 30 days
-      Secondary (re-dist):   price < MA200  OR   duration < 30 days
+    Primary accumulation requires ALL THREE:
+      1. price < MA200
+      2. duration >= 30 days
+      3. drop >= 20% from structural high (ZR ceiling)
     """
     # ── Scope: primary vs secondary ──
     scope = "none"
     scope_label = ""
 
+    # Drop from structural high
+    drop_pct = ((last_close - zr_high) / zr_high * 100) if zr_high > 0 and last_close > 0 else 0
+
     # ── Accumulation types ──
     if phase in ("accumulation", "spring"):
         if ma200 > 0 and last_close > 0:
-            if last_close < ma200 and maturity_days >= 30:
+            below_ma200 = last_close < ma200
+            deep_drop = drop_pct <= -20  # 20%+ drop from peak
+
+            if below_ma200 and maturity_days >= 30 and deep_drop:
                 scope = "primary"
                 scope_label = "رئيسي"
-            elif last_close > ma200:
-                scope = "secondary"
-                scope_label = "فرعي"
-            elif last_close < ma200 and maturity_days < 30:
+            elif below_ma200 and (maturity_days < 30 or not deep_drop):
                 scope = "early_primary"
                 scope_label = "بداية رئيسي"
+            else:
+                scope = "secondary"
+                scope_label = "فرعي"
 
         _s = f" — {scope_label}" if scope_label else ""
         if phase == "spring":
@@ -60,15 +65,20 @@ def _classify_flow_type(phase: str, location: str, divergence: float,
     # ── Distribution types ──
     if phase in ("distribution", "upthrust", "markdown"):
         if ma200 > 0 and last_close > 0:
-            if last_close > ma200 and maturity_days >= 30:
+            above_ma200 = last_close > ma200
+            # For distribution: "big rise" = price is 20%+ above ZR low
+            # But simpler: primary dist = above MA200 + long duration + near peak
+            near_peak = drop_pct >= -10  # within 10% of structural high
+
+            if above_ma200 and maturity_days >= 30 and near_peak:
                 scope = "primary"
                 scope_label = "رئيسي"
-            elif last_close < ma200:
-                scope = "secondary"
-                scope_label = "فرعي"
-            elif last_close > ma200 and maturity_days < 30:
+            elif above_ma200 and (maturity_days < 30 or not near_peak):
                 scope = "early_primary"
                 scope_label = "بداية رئيسي"
+            else:
+                scope = "secondary"
+                scope_label = "فرعي"
 
         _s = f" — {scope_label}" if scope_label else ""
         if phase == "upthrust":
@@ -256,9 +266,10 @@ def scan_market(
             change_pct = (last_close - prev_close) / prev_close * 100
 
             # ── Flow type classification ────────────────────
+            _zr_h = orderflow["zr_high"] if orderflow["zr_high"] is not None else 0
             flow_type, flow_type_label, flow_type_color, flow_scope = _classify_flow_type(
                 phase, orderflow["location"], orderflow["divergence"],
-                last_close, orderflow["ma200"], maturity["current_days"]
+                last_close, orderflow["ma200"], maturity["current_days"], _zr_h
             )
 
             # ── Chart data (last 180 days / 6 months) ──
