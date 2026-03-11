@@ -20,7 +20,7 @@ MIN_BARS = 50
 # ── Accumulation/Distribution Type Classifier ─────────────────
 def _classify_flow_type(phase: str, location: str, divergence: float,
                         last_close: float = 0, ma200: float = 0,
-                        maturity_days: int = 0, zr_high: float = 0) -> tuple:
+                        maturity_days: int = 0, peak_high: float = 0) -> tuple:
     """
     Classify the TYPE of accumulation or distribution.
     Returns (type_key, type_label, type_color, scope).
@@ -28,14 +28,14 @@ def _classify_flow_type(phase: str, location: str, divergence: float,
     Primary accumulation requires ALL THREE:
       1. price < MA200
       2. duration >= 30 days
-      3. drop >= 20% from structural high (ZR ceiling)
+      3. drop >= 20% from highest price in period
     """
     # ── Scope: primary vs secondary ──
     scope = "none"
     scope_label = ""
 
-    # Drop from structural high
-    drop_pct = ((last_close - zr_high) / zr_high * 100) if zr_high > 0 and last_close > 0 else 0
+    # Drop from actual highest price
+    drop_pct = ((last_close - peak_high) / peak_high * 100) if peak_high > 0 and last_close > 0 else 0
 
     # ── Accumulation types ──
     if phase in ("accumulation", "spring"):
@@ -266,10 +266,10 @@ def scan_market(
             change_pct = (last_close - prev_close) / prev_close * 100
 
             # ── Flow type classification ────────────────────
-            _zr_h = orderflow["zr_high"] if orderflow["zr_high"] is not None else 0
+            _peak = float(high.max())  # actual highest price in entire period
             flow_type, flow_type_label, flow_type_color, flow_scope = _classify_flow_type(
                 phase, orderflow["location"], orderflow["divergence"],
-                last_close, orderflow["ma200"], maturity["current_days"], _zr_h
+                last_close, orderflow["ma200"], maturity["current_days"], _peak
             )
 
             # ── Chart data (last 180 days / 6 months) ──
