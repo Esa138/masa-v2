@@ -116,6 +116,8 @@ def build_card_html(r):
     change = r["change_pct"]
     phase_label = r["phase_label"]
     phase_color = r["phase_color"]
+    flow_type_label = r.get("flow_type_label", "")
+    flow_type_color = r.get("flow_type_color", "#808080")
     flow_bias = r["flow_bias"]
     aggressor = r["aggressor"]
     aggressive_ratio = r["aggressive_ratio"]
@@ -230,6 +232,7 @@ def build_card_html(r):
 <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0 8px 0;padding-top:8px;border-top:1px solid #151d30">
 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
 <span style="color:{phase_color};font-weight:600;font-size:0.84em">{phase_label}</span>
+{f'<span style="background:{flow_type_color}15;color:{flow_type_color};font-size:0.72em;font-weight:600;padding:2px 8px;border-radius:8px;border:1px solid {flow_type_color}30">{flow_type_label}</span>' if flow_type_label else ''}
 {zr_badge}
 {inst_badge}
 </div>
@@ -1468,6 +1471,7 @@ def show_detail_panel(r):
         </div>
         <div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;color:#6b7280;font-size:0.85em">
             <span style="color:{phase_color};font-weight:600">{r["phase_label"]}</span>
+            {f'<span style="background:{r.get("flow_type_color","#808080")}15;color:{r.get("flow_type_color","#808080")};padding:3px 12px;border-radius:12px;font-size:0.88em;font-weight:700;border:1px solid {r.get("flow_type_color","#808080")}30">{r.get("flow_type_label","")}</span>' if r.get("flow_type_label") else ''}
             <span>📍 {r["location_label"]}</span>
             <span>أوردر فلو: <b style="color:{flow_color_val}">{r["flow_bias"]:+.0f}</b></span>
             {agg_html}

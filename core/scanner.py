@@ -17,6 +17,36 @@ from data.markets import get_stock_name, get_sector
 MIN_BARS = 50
 
 
+# ── Accumulation/Distribution Type Classifier ─────────────────
+def _classify_flow_type(phase: str, location: str, divergence: float) -> tuple:
+    """
+    Classify the TYPE of accumulation or distribution.
+    Returns (type_key, type_label, type_color).
+    Uses only already-computed data: phase + location + divergence.
+    """
+    # ── Accumulation types ──
+    if phase in ("accumulation", "spring"):
+        if phase == "spring":
+            return "spring", "🎯 سبرنق", "#00E676"
+        if location == "bottom":
+            return "bottom", "📦 تجميع قاعي", "#00E676"
+        if divergence > 25:
+            return "hidden", "🕵️ تجميع خفي", "#7C4DFF"
+        return "visible", "🟢 تجميع ظاهر", "#4FC3F7"
+
+    # ── Distribution types ──
+    if phase in ("distribution", "upthrust", "markdown"):
+        if phase == "upthrust":
+            return "upthrust", "⚠️ أبثرست", "#FF9800"
+        if location in ("resistance", "above"):
+            return "top", "🔺 تصريف قمّي", "#FF1744"
+        if divergence < -25:
+            return "hidden_dist", "🕵️ تصريف خفي", "#FF6D00"
+        return "visible_dist", "🔴 تصريف ظاهر", "#FF5252"
+
+    return "none", "", "#808080"
+
+
 def _fetch_ticker(ticker: str, period: str = "1y") -> tuple:
     """Fetch OHLCV data for a single ticker."""
     try:
@@ -186,6 +216,11 @@ def scan_market(
                         "تصريف مستمر — ابتعد عن السهم"
                     )
 
+            # ── Flow type classification ────────────────────
+            flow_type, flow_type_label, flow_type_color = _classify_flow_type(
+                phase, orderflow["location"], orderflow["divergence"]
+            )
+
             last_close = float(close.iloc[-1])
             prev_close = float(close.iloc[-2]) if len(close) >= 2 else last_close
             change_pct = (last_close - prev_close) / prev_close * 100
@@ -243,6 +278,10 @@ def scan_market(
                 "zr_status": orderflow["zr_status"],
                 "zr_status_label": orderflow["zr_status_label"],
                 "zr_status_color": orderflow["zr_status_color"],
+                # Flow type
+                "flow_type": flow_type,
+                "flow_type_label": flow_type_label,
+                "flow_type_color": flow_type_color,
                 # Decision
                 "decision": scored["decision"],
                 "decision_label": scored["decision_info"]["label"],
