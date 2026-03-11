@@ -18,33 +18,60 @@ MIN_BARS = 50
 
 
 # ── Accumulation/Distribution Type Classifier ─────────────────
-def _classify_flow_type(phase: str, location: str, divergence: float) -> tuple:
+def _classify_flow_type(phase: str, location: str, divergence: float,
+                        last_close: float = 0, ma200: float = 0) -> tuple:
     """
     Classify the TYPE of accumulation or distribution.
-    Returns (type_key, type_label, type_color).
-    Uses only already-computed data: phase + location + divergence.
+    Returns (type_key, type_label, type_color, scope).
+    scope = "primary" (رئيسي) or "secondary" (فرعي).
+    Primary: price below MA200 (accum) or above MA200 (dist).
+    Secondary: re-accumulation within uptrend / re-distribution within downtrend.
     """
+    # ── Scope: primary vs secondary ──
+    scope = "none"
+    scope_label = ""
+
     # ── Accumulation types ──
     if phase in ("accumulation", "spring"):
+        # Primary = below MA200 (first accumulation after downtrend)
+        # Secondary = above MA200 (re-accumulation within uptrend)
+        if ma200 > 0 and last_close > 0:
+            if last_close < ma200:
+                scope = "primary"
+                scope_label = "رئيسي"
+            else:
+                scope = "secondary"
+                scope_label = "فرعي"
+
         if phase == "spring":
-            return "spring", "🎯 سبرنق", "#00E676"
+            return "spring", f"🎯 سبرنق {'— ' + scope_label if scope_label else ''}", "#00E676", scope
         if location == "bottom":
-            return "bottom", "📦 تجميع قاعي", "#00E676"
+            return "bottom", f"📦 تجميع قاعي {'— ' + scope_label if scope_label else ''}", "#00E676", scope
         if divergence > 25:
-            return "hidden", "🕵️ تجميع خفي", "#7C4DFF"
-        return "visible", "🟢 تجميع ظاهر", "#4FC3F7"
+            return "hidden", f"🕵️ تجميع خفي {'— ' + scope_label if scope_label else ''}", "#7C4DFF", scope
+        return "visible", f"🟢 تجميع ظاهر {'— ' + scope_label if scope_label else ''}", "#4FC3F7", scope
 
     # ── Distribution types ──
     if phase in ("distribution", "upthrust", "markdown"):
-        if phase == "upthrust":
-            return "upthrust", "⚠️ أبثرست", "#FF9800"
-        if location in ("resistance", "above"):
-            return "top", "🔺 تصريف قمّي", "#FF1744"
-        if divergence < -25:
-            return "hidden_dist", "🕵️ تصريف خفي", "#FF6D00"
-        return "visible_dist", "🔴 تصريف ظاهر", "#FF5252"
+        # Primary = above MA200 (first distribution after uptrend)
+        # Secondary = below MA200 (re-distribution within downtrend)
+        if ma200 > 0 and last_close > 0:
+            if last_close > ma200:
+                scope = "primary"
+                scope_label = "رئيسي"
+            else:
+                scope = "secondary"
+                scope_label = "فرعي"
 
-    return "none", "", "#808080"
+        if phase == "upthrust":
+            return "upthrust", f"⚠️ أبثرست {'— ' + scope_label if scope_label else ''}", "#FF9800", scope
+        if location in ("resistance", "above"):
+            return "top", f"🔺 تصريف قمّي {'— ' + scope_label if scope_label else ''}", "#FF1744", scope
+        if divergence < -25:
+            return "hidden_dist", f"🕵️ تصريف خفي {'— ' + scope_label if scope_label else ''}", "#FF6D00", scope
+        return "visible_dist", f"🔴 تصريف ظاهر {'— ' + scope_label if scope_label else ''}", "#FF5252", scope
+
+    return "none", "", "#808080", "none"
 
 
 def _fetch_ticker(ticker: str, period: str = "1y") -> tuple:
@@ -216,14 +243,15 @@ def scan_market(
                         "تصريف مستمر — ابتعد عن السهم"
                     )
 
-            # ── Flow type classification ────────────────────
-            flow_type, flow_type_label, flow_type_color = _classify_flow_type(
-                phase, orderflow["location"], orderflow["divergence"]
-            )
-
             last_close = float(close.iloc[-1])
             prev_close = float(close.iloc[-2]) if len(close) >= 2 else last_close
             change_pct = (last_close - prev_close) / prev_close * 100
+
+            # ── Flow type classification ────────────────────
+            flow_type, flow_type_label, flow_type_color, flow_scope = _classify_flow_type(
+                phase, orderflow["location"], orderflow["divergence"],
+                last_close, orderflow["ma200"]
+            )
 
             # ── Chart data (last 180 days / 6 months) ──
             chart_days = 180
@@ -282,6 +310,7 @@ def scan_market(
                 "flow_type": flow_type,
                 "flow_type_label": flow_type_label,
                 "flow_type_color": flow_type_color,
+                "flow_scope": flow_scope,
                 # Decision
                 "decision": scored["decision"],
                 "decision_label": scored["decision_info"]["label"],
