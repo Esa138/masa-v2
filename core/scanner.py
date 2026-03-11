@@ -19,13 +19,17 @@ MIN_BARS = 50
 
 # ── Accumulation/Distribution Type Classifier ─────────────────
 def _classify_flow_type(phase: str, location: str, divergence: float,
-                        last_close: float = 0, ma200: float = 0) -> tuple:
+                        last_close: float = 0, ma200: float = 0,
+                        maturity_days: int = 0) -> tuple:
     """
     Classify the TYPE of accumulation or distribution.
     Returns (type_key, type_label, type_color, scope).
-    scope = "primary" (رئيسي) or "secondary" (فرعي).
-    Primary: price below MA200 (accum) or above MA200 (dist).
-    Secondary: re-accumulation within uptrend / re-distribution within downtrend.
+
+    Scope requires TWO conditions:
+      Primary accumulation:  price < MA200  AND  duration >= 30 days
+      Secondary (re-accum):  price > MA200  OR   duration < 30 days
+      Primary distribution:  price > MA200  AND  duration >= 30 days
+      Secondary (re-dist):   price < MA200  OR   duration < 30 days
     """
     # ── Scope: primary vs secondary ──
     scope = "none"
@@ -33,43 +37,47 @@ def _classify_flow_type(phase: str, location: str, divergence: float,
 
     # ── Accumulation types ──
     if phase in ("accumulation", "spring"):
-        # Primary = below MA200 (first accumulation after downtrend)
-        # Secondary = above MA200 (re-accumulation within uptrend)
         if ma200 > 0 and last_close > 0:
-            if last_close < ma200:
+            if last_close < ma200 and maturity_days >= 30:
                 scope = "primary"
                 scope_label = "رئيسي"
-            else:
+            elif last_close > ma200:
                 scope = "secondary"
                 scope_label = "فرعي"
+            elif last_close < ma200 and maturity_days < 30:
+                scope = "early_primary"
+                scope_label = "بداية رئيسي"
 
+        _s = f" — {scope_label}" if scope_label else ""
         if phase == "spring":
-            return "spring", f"🎯 سبرنق {'— ' + scope_label if scope_label else ''}", "#00E676", scope
+            return "spring", f"🎯 سبرنق{_s}", "#00E676", scope
         if location == "bottom":
-            return "bottom", f"📦 تجميع قاعي {'— ' + scope_label if scope_label else ''}", "#00E676", scope
+            return "bottom", f"📦 تجميع قاعي{_s}", "#00E676", scope
         if divergence > 25:
-            return "hidden", f"🕵️ تجميع خفي {'— ' + scope_label if scope_label else ''}", "#7C4DFF", scope
-        return "visible", f"🟢 تجميع ظاهر {'— ' + scope_label if scope_label else ''}", "#4FC3F7", scope
+            return "hidden", f"🕵️ تجميع خفي{_s}", "#7C4DFF", scope
+        return "visible", f"🟢 تجميع ظاهر{_s}", "#4FC3F7", scope
 
     # ── Distribution types ──
     if phase in ("distribution", "upthrust", "markdown"):
-        # Primary = above MA200 (first distribution after uptrend)
-        # Secondary = below MA200 (re-distribution within downtrend)
         if ma200 > 0 and last_close > 0:
-            if last_close > ma200:
+            if last_close > ma200 and maturity_days >= 30:
                 scope = "primary"
                 scope_label = "رئيسي"
-            else:
+            elif last_close < ma200:
                 scope = "secondary"
                 scope_label = "فرعي"
+            elif last_close > ma200 and maturity_days < 30:
+                scope = "early_primary"
+                scope_label = "بداية رئيسي"
 
+        _s = f" — {scope_label}" if scope_label else ""
         if phase == "upthrust":
-            return "upthrust", f"⚠️ أبثرست {'— ' + scope_label if scope_label else ''}", "#FF9800", scope
+            return "upthrust", f"⚠️ أبثرست{_s}", "#FF9800", scope
         if location in ("resistance", "above"):
-            return "top", f"🔺 تصريف قمّي {'— ' + scope_label if scope_label else ''}", "#FF1744", scope
+            return "top", f"🔺 تصريف قمّي{_s}", "#FF1744", scope
         if divergence < -25:
-            return "hidden_dist", f"🕵️ تصريف خفي {'— ' + scope_label if scope_label else ''}", "#FF6D00", scope
-        return "visible_dist", f"🔴 تصريف ظاهر {'— ' + scope_label if scope_label else ''}", "#FF5252", scope
+            return "hidden_dist", f"🕵️ تصريف خفي{_s}", "#FF6D00", scope
+        return "visible_dist", f"🔴 تصريف ظاهر{_s}", "#FF5252", scope
 
     return "none", "", "#808080", "none"
 
@@ -250,7 +258,7 @@ def scan_market(
             # ── Flow type classification ────────────────────
             flow_type, flow_type_label, flow_type_color, flow_scope = _classify_flow_type(
                 phase, orderflow["location"], orderflow["divergence"],
-                last_close, orderflow["ma200"]
+                last_close, orderflow["ma200"], maturity["current_days"]
             )
 
             # ── Chart data (last 180 days / 6 months) ──
