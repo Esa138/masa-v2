@@ -836,37 +836,35 @@ def build_composite_index(results):
     """
     Build a composite market index by aggregating daily returns of ALL stocks.
     Returns: (dates, index_values, index_highs, index_lows)
-    Starting at 100, each day = average daily return across all stocks.
+    Starting at 100, each day = volume-weighted average daily return.
     """
     if not results:
         return [], [], [], []
 
-    # Collect stocks with valid chart data
+    # Collect stocks with valid chart data (including volume)
     stocks = []
     for r in results:
         dates = r.get("chart_dates", [])
         closes = r.get("chart_close", [])
-        opens = r.get("chart_open", [])
         highs = r.get("chart_high", [])
         lows = r.get("chart_low", [])
+        volumes = r.get("chart_volume", [])
         if len(dates) < 15:
             continue
         stocks.append({
             "dates": dates,
             "closes": closes,
-            "opens": opens,
             "highs": highs,
             "lows": lows,
+            "volumes": volumes,
         })
 
     if not stocks:
         return [], [], [], []
 
-    # Build date -> return mapping for each stock
     all_dates = sorted(set(d for s in stocks for d in s["dates"]))
-    n_dates = len(all_dates)
 
-    # For each date, compute average daily return across all stocks
+    # For each date, compute volume-weighted average return
     avg_returns = []
     avg_high_returns = []
     avg_low_returns = []
@@ -875,6 +873,7 @@ def build_composite_index(results):
         day_returns = []
         day_high_returns = []
         day_low_returns = []
+        day_volumes = []
         for s in stocks:
             if date_str not in s["dates"]:
                 continue
@@ -884,14 +883,19 @@ def build_composite_index(results):
             prev_c = s["closes"][idx - 1]
             if prev_c == 0:
                 continue
+            vol = s["volumes"][idx] if idx < len(s["volumes"]) else 0
+            if vol <= 0:
+                continue
             day_returns.append((s["closes"][idx] - prev_c) / prev_c)
             day_high_returns.append((s["highs"][idx] - prev_c) / prev_c)
             day_low_returns.append((s["lows"][idx] - prev_c) / prev_c)
+            day_volumes.append(vol)
 
-        if day_returns:
-            avg_returns.append(np.mean(day_returns))
-            avg_high_returns.append(np.mean(day_high_returns))
-            avg_low_returns.append(np.mean(day_low_returns))
+        if day_returns and sum(day_volumes) > 0:
+            total_vol = sum(day_volumes)
+            avg_returns.append(sum(r * v for r, v in zip(day_returns, day_volumes)) / total_vol)
+            avg_high_returns.append(sum(r * v for r, v in zip(day_high_returns, day_volumes)) / total_vol)
+            avg_low_returns.append(sum(r * v for r, v in zip(day_low_returns, day_volumes)) / total_vol)
         else:
             avg_returns.append(0.0)
             avg_high_returns.append(0.0)
@@ -906,7 +910,6 @@ def build_composite_index(results):
         index_highs.append(round(index_vals[-2] * (1 + avg_high_returns[i]), 2))
         index_lows.append(round(index_vals[-2] * (1 + avg_low_returns[i]), 2))
 
-    # Handle first entry
     if len(index_vals) > 0:
         index_highs[0] = index_vals[0]
         index_lows[0] = index_vals[0]
