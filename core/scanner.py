@@ -193,16 +193,41 @@ def scan_market(
             phase = orderflow["phase"]
             today_str = _all_dates[-1] if _all_dates else "—"
 
-            # Spring phase → maturity = late (always)
+            # Spring phase → check confirmation before promoting
+            _vol_avg = float(volume.tail(20).mean()) if len(volume) >= 20 else 0
+            _vol_today = float(volume.iloc[-1]) if len(volume) > 0 else 0
+            _vol_ok = _vol_today >= _vol_avg * 0.5  # volume at least 50% of 20d avg
+            _days_ok = maturity["current_days"] >= 3  # at least 3 days of accumulation before spring
+
             if phase == "spring" and maturity["stage"] != "late":
-                maturity = {
-                    "stage": "late",
-                    "stage_label": "🟢 سبرنق — جاهز للانطلاق",
-                    "stage_color": "#00E676",
-                    "timeline": [{"stage": "late", "date": today_str,
-                                   "label": "🟢 سبرنق", "action": "ادخل"}],
-                    "current_days": maturity["current_days"],
-                }
+                if _days_ok and _vol_ok:
+                    # Confirmed spring — strong entry
+                    maturity = {
+                        "stage": "late",
+                        "stage_label": "🟢 سبرنق مؤكد — جاهز للانطلاق",
+                        "stage_color": "#00E676",
+                        "timeline": [{"stage": "late", "date": today_str,
+                                       "label": "🟢 سبرنق مؤكد", "action": "ادخل"}],
+                        "current_days": maturity["current_days"],
+                    }
+                else:
+                    # Unconfirmed spring — downgrade to watch
+                    _reason = []
+                    if not _days_ok:
+                        _reason.append(f"تجميع {maturity['current_days']} يوم فقط (أقل من 3)")
+                    if not _vol_ok:
+                        _reason.append("سيولة ضعيفة")
+                    maturity = {
+                        "stage": "early",
+                        "stage_label": "🟡 سبرنق غير مؤكد — راقب",
+                        "stage_color": "#FFD700",
+                        "timeline": [{"stage": "early", "date": today_str,
+                                       "label": "🟡 سبرنق مبكر", "action": "راقب"}],
+                        "current_days": maturity["current_days"],
+                    }
+                    scored["reasons_against"].append(
+                        f"سبرنق غير مؤكد: {' + '.join(_reason)}"
+                    )
 
             # Maturity controls final decision (no contradiction)
             m_stage = maturity["stage"]
@@ -226,16 +251,34 @@ def scan_market(
                 _all_dates, close, _rolling, _cdv_s, _abs_s, _rc_s, _rsi_s, volume
             )
 
-            # Upthrust phase → distribution maturity = late (always)
+            # Upthrust phase → check confirmation before promoting
+            _dist_days_ok = dist_maturity["current_days"] >= 3
+
             if phase == "upthrust" and dist_maturity["stage"] != "late":
-                dist_maturity = {
-                    "stage": "late",
-                    "stage_label": "🔴 أبثرست — تصريف حاد",
-                    "stage_color": "#FF5252",
-                    "timeline": [{"stage": "late", "date": today_str,
-                                   "label": "🔴 أبثرست", "action": "اخرج فوراً"}],
-                    "current_days": dist_maturity["current_days"],
-                }
+                if _dist_days_ok and _vol_ok:
+                    # Confirmed upthrust
+                    dist_maturity = {
+                        "stage": "late",
+                        "stage_label": "🔴 أبثرست مؤكد — تصريف حاد",
+                        "stage_color": "#FF5252",
+                        "timeline": [{"stage": "late", "date": today_str,
+                                       "label": "🔴 أبثرست مؤكد", "action": "اخرج فوراً"}],
+                        "current_days": dist_maturity["current_days"],
+                    }
+                else:
+                    _dreason = []
+                    if not _dist_days_ok:
+                        _dreason.append(f"تصريف {dist_maturity['current_days']} يوم فقط (أقل من 3)")
+                    if not _vol_ok:
+                        _dreason.append("سيولة ضعيفة")
+                    dist_maturity = {
+                        "stage": "early",
+                        "stage_label": "🟡 أبثرست غير مؤكد — راقب",
+                        "stage_color": "#FFD700",
+                        "timeline": [{"stage": "early", "date": today_str,
+                                       "label": "🟡 أبثرست مبكر", "action": "راقب"}],
+                        "current_days": dist_maturity["current_days"],
+                    }
 
             # Distribution maturity controls decision for distribution stocks
             d_stage = dist_maturity["stage"]
