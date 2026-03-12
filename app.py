@@ -917,6 +917,118 @@ def build_composite_index(results):
     return all_dates, index_vals, index_highs, index_lows
 
 
+def build_platform_flow_index(results):
+    """
+    Build Platform Flow Index (PFI) — volume-weighted aggregate of
+    CDV, FlowBias, Absorption, and Phase across all stocks.
+
+    Returns: pfi_value (0-100), acc_breadth (%), dist_breadth (%),
+             flow_scores list, interpretation string
+    """
+    import math
+
+    if not results:
+        return 50.0, 0.0, 0.0, [], "لا توجد بيانات"
+
+    flow_scores = []
+
+    for r in results:
+        # ── 1. Normalize each component to -1..+1 ──
+
+        # CDV norm: use tanh to cap outliers
+        cdv_series = r.get("chart_cdv", [])
+        if len(cdv_series) >= 20:
+            cdv_recent = cdv_series[-1] if cdv_series[-1] else 0
+            cdv_vals = [v for v in cdv_series[-20:] if v is not None]
+            cdv_std = np.std(cdv_vals) if cdv_vals else 1
+            cdv_norm = math.tanh(cdv_recent / cdv_std) if cdv_std > 0 else 0
+        else:
+            cdv_norm = 0
+
+        # Flow Bias norm: already -100..+100
+        fb = r.get("flow_bias", 0)
+        fb_norm = max(-1, min(1, fb / 100))
+
+        # Absorption norm: 0..100 → scale by bias direction
+        abs_score = r.get("absorption_score", 0)
+        abs_bias = r.get("absorption_bias", "neutral")
+        if abs_bias == "buy":
+            abs_norm = abs_score / 100
+        elif abs_bias == "sell":
+            abs_norm = -abs_score / 100
+        else:
+            abs_norm = 0
+
+        # Phase/State norm: accumulation/spring = +1, distribution/upthrust = -1
+        phase = r.get("phase", "neutral")
+        if phase in ("accumulation", "spring", "markup"):
+            state_norm = 1.0
+        elif phase in ("distribution", "upthrust", "markdown"):
+            state_norm = -1.0
+        else:
+            state_norm = 0.0
+
+        # ── 2. FlowScore = weighted sum ──
+        score = (0.40 * cdv_norm +
+                 0.30 * fb_norm +
+                 0.20 * abs_norm +
+                 0.10 * state_norm)
+
+        # ── 3. Volume weight ──
+        volumes = r.get("chart_volume", [])
+        avg_vol = np.mean(volumes[-20:]) if len(volumes) >= 20 else 1
+        today_vol = volumes[-1] if volumes else 0
+        vol_weight = max(0.5, min(2.0, today_vol / avg_vol if avg_vol > 0 else 1))
+
+        flow_scores.append({
+            "ticker": r["ticker"],
+            "name": r["name"],
+            "score": round(score, 3),
+            "vol_weight": round(vol_weight, 2),
+            "cdv_norm": round(cdv_norm, 2),
+            "fb_norm": round(fb_norm, 2),
+            "abs_norm": round(abs_norm, 2),
+            "state_norm": round(state_norm, 1),
+            "volume": today_vol,
+        })
+
+    if not flow_scores:
+        return 50.0, 0.0, 0.0, [], "لا توجد بيانات"
+
+    # ── 3. Platform Flow Index (volume-weighted) ──
+    total_w = sum(fs["vol_weight"] for fs in flow_scores)
+    pfi_raw = sum(fs["score"] * fs["vol_weight"] for fs in flow_scores) / total_w if total_w > 0 else 0
+
+    # Convert to 0-100 scale
+    pfi = round(50 + 50 * max(-1, min(1, pfi_raw)), 1)
+
+    # ── 4. Breadth ──
+    n = len(flow_scores)
+    acc_breadth = round(sum(1 for fs in flow_scores if fs["score"] > 0.2) / n * 100, 1)
+    dist_breadth = round(sum(1 for fs in flow_scores if fs["score"] < -0.2) / n * 100, 1)
+
+    # ── 5. Interpretation ──
+    if pfi >= 65 and acc_breadth >= 50:
+        interp = "🟢 تجميع سوقي حقيقي — فلوس تدخل على نطاق واسع"
+    elif pfi >= 60 and acc_breadth < 40:
+        interp = "🟡 تجميع مركّز — فلوس تدخل أسهم محددة فقط"
+    elif pfi <= 35 and dist_breadth >= 50:
+        interp = "🔴 تصريف سوقي — فلوس تطلع على نطاق واسع"
+    elif pfi <= 40 and dist_breadth < 40:
+        interp = "🟠 تصريف مركّز — خروج من أسهم محددة"
+    elif pfi >= 55:
+        interp = "🟢 ميل شرائي خفيف"
+    elif pfi <= 45:
+        interp = "🔴 ميل بيعي خفيف"
+    else:
+        interp = "⚪ حياد — السوق متوازن"
+
+    # Sort by score for display
+    flow_scores.sort(key=lambda x: x["score"], reverse=True)
+
+    return pfi, acc_breadth, dist_breadth, flow_scores, interp
+
+
 def build_composite_data_table(dates, index_vals):
     """Build HTML data table for the composite index (like individual stock table)."""
     n = len(dates)
@@ -1317,6 +1429,42 @@ def show_breakout_index(results, market_key="saudi"):
                     display:flex;justify-content:space-between;align-items:center">
             <span style="color:{bench_color};font-weight:700;font-size:0.88em">عائد {bench_name}</span>
             <span style="color:{bench_tc};font-weight:800;font-size:1.2em">{bench_total_ret:+.2f}%</span>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # ── Platform Flow Index (PFI) ──────────────────────────
+    pfi, acc_breadth, dist_breadth, flow_scores, pfi_interp = build_platform_flow_index(results)
+    pfi_color = "#00E676" if pfi >= 55 else "#FF5252" if pfi <= 45 else "#FFD700"
+    acc_color = "#00E676" if acc_breadth >= 40 else "#FFD700" if acc_breadth >= 25 else "#FF5252"
+    dist_color = "#FF5252" if dist_breadth >= 40 else "#FFD700" if dist_breadth >= 25 else "#9ca3af"
+    neutral_breadth = round(100 - acc_breadth - dist_breadth, 1)
+
+    st.markdown(f'''
+    <div style="background:linear-gradient(135deg,rgba({int(pfi_color[1:3],16)},{int(pfi_color[3:5],16)},{int(pfi_color[5:7],16)},0.06),#0e1424);
+                border:1px solid {pfi_color}30;border-radius:14px;padding:18px 22px;margin:6px 0 16px 0;direction:rtl">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <span style="font-size:1.2em;font-weight:800;color:#fff">⚡ مؤشر تدفق الأموال (PFI)</span>
+            <span style="color:{pfi_color};font-size:2em;font-weight:900">{pfi:.0f}</span>
+        </div>
+        <div style="background:#0a0f1a;border-radius:8px;height:14px;margin-bottom:12px;overflow:hidden;position:relative">
+            <div style="position:absolute;right:0;height:100%;width:{pfi}%;background:linear-gradient(90deg,{pfi_color}88,{pfi_color});border-radius:8px;transition:width 0.5s"></div>
+            <div style="position:absolute;right:50%;top:0;height:100%;width:2px;background:#333"></div>
+        </div>
+        <div style="color:{pfi_color};font-weight:700;font-size:0.95em;margin-bottom:10px">{pfi_interp}</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+            <div style="text-align:center;background:rgba(0,230,118,0.06);border-radius:10px;padding:8px">
+                <div style="color:#6b7280;font-size:0.68em;margin-bottom:2px">📦 تجميع</div>
+                <div style="color:{acc_color};font-weight:800;font-size:1.2em">{acc_breadth:.0f}%</div>
+            </div>
+            <div style="text-align:center;background:rgba(156,163,175,0.06);border-radius:10px;padding:8px">
+                <div style="color:#6b7280;font-size:0.68em;margin-bottom:2px">⚪ حياد</div>
+                <div style="color:#9ca3af;font-weight:800;font-size:1.2em">{neutral_breadth:.0f}%</div>
+            </div>
+            <div style="text-align:center;background:rgba(255,82,82,0.06);border-radius:10px;padding:8px">
+                <div style="color:#6b7280;font-size:0.68em;margin-bottom:2px">🔻 تصريف</div>
+                <div style="color:{dist_color};font-weight:800;font-size:1.2em">{dist_breadth:.0f}%</div>
+            </div>
         </div>
     </div>
     ''', unsafe_allow_html=True)
