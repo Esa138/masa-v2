@@ -309,7 +309,7 @@ def scan_market(
             change_pct = (last_close - prev_close) / prev_close * 100
 
             # ── Flow type classification ────────────────────
-            _peak = float(high.max())  # actual highest price in entire period
+            _peak = float(high.tail(250).max())  # peak of last ~1 year only
             flow_type, flow_type_label, flow_type_color, flow_scope = _classify_flow_type(
                 phase, orderflow["location"], orderflow["divergence"],
                 last_close, orderflow["ma200"], maturity["current_days"], _peak
