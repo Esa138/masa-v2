@@ -199,7 +199,7 @@ def scan_market(
             _vol_ok = _vol_today >= _vol_avg * 0.5  # volume at least 50% of 20d avg
             _days_ok = maturity["current_days"] >= 3  # at least 3 days of accumulation before spring
 
-            if phase == "spring" and maturity["stage"] != "late":
+            if phase == "spring":
                 if _days_ok and _vol_ok:
                     # Confirmed spring — strong entry
                     maturity = {
@@ -254,7 +254,7 @@ def scan_market(
             # Upthrust phase → check confirmation before promoting
             _dist_days_ok = dist_maturity["current_days"] >= 3
 
-            if phase == "upthrust" and dist_maturity["stage"] != "late":
+            if phase == "upthrust":
                 if _dist_days_ok and _vol_ok:
                     # Confirmed upthrust
                     dist_maturity = {

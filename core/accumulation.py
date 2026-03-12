@@ -655,14 +655,21 @@ def compute_accumulation_maturity(
     today_date = idx_to_date(daily_signals[-1]["idx"])
 
     # ── Stage determination: duration + intensity ──
-    # Strong signals can SKIP stages (sprint → spring)
-    if intensity >= 2:
-        # Very strong signals — jump to late regardless of days
+    # Strong signals still need minimum duration for confirmation
+    if intensity >= 2 and streak >= 3:
+        # Very strong signals + enough duration → confirmed late
         timeline.append({"stage": "late", "date": today_date,
                           "label": "🟢 سبرنق — إشارات قوية", "action": "ادخل"})
         stage = "late"
         stage_label = "🟢 سبرنق — إشارات قوية جداً"
         stage_color = "#00E676"
+    elif intensity >= 2 and streak < 3:
+        # Strong signals but too early — needs confirmation
+        timeline.append({"stage": "early", "date": today_date,
+                          "label": "🟡 إشارات قوية — تحتاج تأكيد", "action": "راقب"})
+        stage = "early"
+        stage_label = "🟡 سبرنق مبكر — تحتاج تأكيد"
+        stage_color = "#FFD700"
     elif intensity == 1 and streak >= 3:
         # Moderate signals + some duration → mid/late
         early_date = idx_to_date(accum_start["idx"])
