@@ -315,8 +315,8 @@ def scan_market(
                 last_close, orderflow["ma200"], maturity["current_days"], _peak
             )
 
-            # ── Chart data (last 500 days / ~2 years) ──
-            chart_days = min(500, len(close))
+            # ── Chart data — use all available data from the requested period ──
+            chart_days = len(close)
             chart_dates = [d.strftime("%Y-%m-%d") for d in close.index[-chart_days:]]
             chart_open = [round(float(v), 2) for v in open_.iloc[-chart_days:]]
             chart_high = [round(float(v), 2) for v in high.iloc[-chart_days:]]

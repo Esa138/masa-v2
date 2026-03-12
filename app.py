@@ -1795,7 +1795,7 @@ with st.sidebar:
 
 if page == "🔬 Order Flow":
 
-    hcol1, hcol2 = st.columns([3, 1])
+    hcol1, hcol2, hcol3 = st.columns([3, 1, 1])
     with hcol1:
         n_stocks = len(get_all_tickers(market_key))
         st.markdown(f'''
@@ -1806,6 +1806,13 @@ if page == "🔬 Order Flow":
         </div>
         ''', unsafe_allow_html=True)
     with hcol2:
+        period_options = {"سنة": "1y", "سنتين": "2y", "٣ سنوات": "3y", "٥ سنوات": "5y"}
+        selected_period_label = st.selectbox(
+            "📅 الفترة", list(period_options.keys()), index=2,
+            key="scan_period", label_visibility="collapsed"
+        )
+        selected_period = period_options[selected_period_label]
+    with hcol3:
         scan_btn = st.button("▶️ ابدأ المسح", use_container_width=True, type="primary")
 
     if scan_btn:
@@ -1818,6 +1825,7 @@ if page == "🔬 Order Flow":
 
         results = scan_market(
             tickers=tickers,
+            period=selected_period,
             market_health=50.0,
             progress_callback=_update,
         )
