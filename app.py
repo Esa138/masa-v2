@@ -84,6 +84,40 @@ def make_sparkline(values, color="#4FC3F7", uid="x"):
     </svg>'''
 
 
+def _maturity_mini(r):
+    """Build mini maturity badge for card: stage + days + start date."""
+    parts = []
+    # Accumulation maturity
+    m_stage = r.get("maturity_stage", "none")
+    if m_stage != "none":
+        m_label = r.get("maturity_label", "")
+        m_color = r.get("maturity_color", "#808080")
+        m_days = r.get("maturity_days", 0)
+        m_timeline = r.get("maturity_timeline", [])
+        start = m_timeline[0]["date"] if m_timeline else ""
+        parts.append(
+            f'<span style="background:{m_color}12;color:{m_color};font-size:0.68em;'
+            f'font-weight:600;padding:2px 8px;border-radius:8px;border:1px solid {m_color}25">'
+            f'📦 {m_label} • {m_days} يوم'
+            f'{f" • من {start}" if start else ""}</span>'
+        )
+    # Distribution maturity
+    dm_stage = r.get("dist_maturity_stage", "none")
+    if dm_stage != "none":
+        dm_label = r.get("dist_maturity_label", "")
+        dm_color = r.get("dist_maturity_color", "#FF5252")
+        dm_days = r.get("dist_maturity_days", 0)
+        dm_timeline = r.get("dist_maturity_timeline", [])
+        start = dm_timeline[0]["date"] if dm_timeline else ""
+        parts.append(
+            f'<span style="background:{dm_color}12;color:{dm_color};font-size:0.68em;'
+            f'font-weight:600;padding:2px 8px;border-radius:8px;border:1px solid {dm_color}25">'
+            f'🔻 {dm_label} • {dm_days} يوم'
+            f'{f" • من {start}" if start else ""}</span>'
+        )
+    return "".join(parts)
+
+
 def _flow_bar_svg(flow_bias, width=240, height=16):
     """Generate an SVG bar showing flow bias (-100 to +100)."""
     mid = width / 2
@@ -237,6 +271,9 @@ def build_card_html(r):
 {inst_badge}
 </div>
 <span style="color:#4b5563;font-size:0.72em">📍 {location_label} • {abs(days)} يوم</span>
+</div>
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px">
+{_maturity_mini(r)}
 </div>
 <div style="margin:6px 0 8px 0">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
