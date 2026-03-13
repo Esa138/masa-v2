@@ -137,6 +137,13 @@ h1, h2, h3 { color: #ffffff !important; }
 .masa-card-avoid { opacity: 0.78; }
 .masa-card-avoid:hover { opacity: 1; }
 
+/* ── Event Cards ── */
+.masa-card-bounce::before { background: linear-gradient(90deg, #00E676, #69F0AE); }
+.masa-card-breakout::before { background: linear-gradient(90deg, #FFD700, #FFF176); }
+.masa-card-breakdown::before { background: linear-gradient(90deg, #FF5252, #FF8A80); }
+.masa-card-breakdown { opacity: 0.78; }
+.masa-card-breakdown:hover { opacity: 1; }
+
 /* ── MASA Stat Cards ── */
 .masa-stat {
     background: linear-gradient(145deg, #131a2e 0%, #0e1424 100%);

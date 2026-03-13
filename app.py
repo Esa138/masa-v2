@@ -16,6 +16,7 @@ from core.database import init_database, log_signal, get_win_rates, get_total_pe
 from core.tracker import update_signal_outcomes, get_tracking_status
 from core.institutional import get_ownership_summary, import_from_csv
 from data.markets import get_all_tickers, SAUDI_STOCKS, US_STOCKS, MARKETS
+from core.events import classify_events
 from ui.styles import DARK_THEME_CSS, SECTOR_COLORS
 
 # ── Page Config ──────────────────────────────────────────────
@@ -837,6 +838,327 @@ def build_breakouts_chart(r, composite_dates=None, composite_vals=None):
     )
 
     return fig
+
+
+# ══════════════════════════════════════════════════════════════
+# EVENTS PAGE — الارتدادات والاختراقات
+# ══════════════════════════════════════════════════════════════
+
+def build_event_card_html(r):
+    """Build HTML card for a bounce/breakout/breakdown event."""
+    event_type = r["event_type"]
+    name = r["name"]
+    ticker_display = r["ticker"].replace(".SR", "")
+    sector = r["sector"]
+    price = r["price"]
+    change = r["change_pct"]
+    phase_label = r["phase_label"]
+    phase_color = r["phase_color"]
+    flow_type_label = r.get("flow_type_label", "")
+    flow_type_color = r.get("flow_type_color", "#808080")
+    flow_bias = r["flow_bias"]
+    absorption_score = r["absorption_score"]
+    divergence = r["divergence"]
+    rsi = r["rsi"]
+    aggressor = r["aggressor"]
+
+    event_type_display = r["event_type_display"]
+    event_type_color = r["event_type_color"]
+    event_label = r["event_label"]
+    event_strength = r["event_strength"]
+    event_grade_label = r["event_grade_label"]
+    event_grade_color = r["event_grade_color"]
+    event_backing_label = r["event_backing_label"]
+    event_date = r["event_date"]
+    event_factors = r["event_factors"]
+
+    sector_color = SECTOR_COLORS.get(sector, "#607D8B")
+    change_color = "#00E676" if change >= 0 else "#FF5252"
+    change_icon = "▲" if change >= 0 else "▼"
+    flow_color = "#00E676" if flow_bias > 10 else "#FF5252" if flow_bias < -10 else "#9ca3af"
+    div_color = "#00E676" if divergence > 15 else "#FF5252" if divergence < -15 else "#9ca3af"
+    rsi_color = "#FF5252" if rsi > 70 else "#00E676" if rsi < 30 else "#9ca3af"
+
+    if aggressor == "buyers":
+        agg_text, agg_color = "🟢 مشتري", "#00E676"
+    elif aggressor == "sellers":
+        agg_text, agg_color = "🔴 بائع", "#FF5252"
+    else:
+        agg_text, agg_color = "⚪ متوازن", "#9ca3af"
+
+    # Sparkline
+    close_vals = r.get("chart_close", [])
+    uid = r["ticker"].replace(".", "").replace("-", "")
+    sparkline = make_sparkline(close_vals, color=phase_color, uid=f"ev_{uid}")
+
+    # Strength bar
+    bar_color = event_grade_color
+    bar_pct = min(event_strength, 100)
+    strength_bar = (
+        f'<div style="display:flex;align-items:center;gap:8px;margin:8px 0">'
+        f'<span style="color:#4b5563;font-size:0.68em;font-weight:600">القوة</span>'
+        f'<div style="flex:1;background:#080b14;border-radius:4px;height:6px;overflow:hidden">'
+        f'<div style="width:{bar_pct}%;height:100%;background:{bar_color};border-radius:4px"></div>'
+        f'</div>'
+        f'<span style="color:{bar_color};font-weight:700;font-size:0.80em">{event_strength}</span>'
+        f'</div>'
+    )
+
+    # Backing badge
+    if r["event_backing"] == "accumulation":
+        backing_html = (
+            '<span style="background:rgba(0,230,118,0.08);color:#00E676;padding:3px 10px;'
+            'border-radius:8px;font-size:0.72em;font-weight:600;border:1px solid rgba(0,230,118,0.15)">'
+            f'📦 {event_backing_label}</span>'
+        )
+    elif r["event_backing"] == "distribution":
+        backing_html = (
+            '<span style="background:rgba(255,82,82,0.08);color:#FF5252;padding:3px 10px;'
+            'border-radius:8px;font-size:0.72em;font-weight:600;border:1px solid rgba(255,82,82,0.15)">'
+            f'🔴 {event_backing_label}</span>'
+        )
+    else:
+        backing_html = (
+            '<span style="background:rgba(156,163,175,0.08);color:#9ca3af;padding:3px 10px;'
+            'border-radius:8px;font-size:0.72em;font-weight:600;border:1px solid rgba(156,163,175,0.15)">'
+            f'⚪ {event_backing_label}</span>'
+        )
+
+    # Early bounce badge
+    bounce_badge = ""
+    if r.get("early_bounce") and event_type == "bounce":
+        _bl = r.get("early_bounce_label", "")
+        if _bl:
+            bounce_badge = (
+                f'<div style="color:#FF9800;font-weight:700;font-size:0.75em;margin-top:6px;'
+                f'padding:5px 8px;background:rgba(255,152,0,0.08);border-radius:8px;'
+                f'border:1px solid rgba(255,152,0,0.15);text-align:center">{_bl}</div>'
+            )
+
+    # ZR badge
+    zr_badge = ""
+    zr_status = r.get("zr_status", "normal")
+    zr_status_label = r.get("zr_status_label", "")
+    zr_status_color = r.get("zr_status_color", "#808080")
+    if zr_status != "normal" and zr_status_label:
+        zr_badge = (
+            f'<span style="background:{zr_status_color}12;color:{zr_status_color};'
+            f'padding:2px 8px;border-radius:8px;font-size:0.72em;font-weight:700;'
+            f'border:1px solid {zr_status_color}25">{zr_status_label}</span>'
+        )
+
+    # Factors breakdown
+    factors_html = ""
+    for f in event_factors:
+        f_pct = round(f["score"] / f["max"] * 100) if f["max"] > 0 else 0
+        f_color = "#00E676" if f_pct >= 60 else "#FFD700" if f_pct >= 30 else "#4b5563"
+        factors_html += (
+            f'<div style="display:flex;justify-content:space-between;align-items:center;'
+            f'padding:2px 0;font-size:0.68em">'
+            f'<span style="color:#6b7280">{f["name"]}</span>'
+            f'<span style="color:{f_color};font-weight:600">{f["score"]}/{f["max"]}</span>'
+            f'</div>'
+        )
+
+    return f'''<div class="masa-card masa-card-{event_type}">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+<span style="background:{event_type_color}18;color:{event_type_color};padding:4px 14px;border-radius:20px;font-weight:700;font-size:0.82em">{event_type_display}</span>
+<span style="background:{event_grade_color}18;color:{event_grade_color};padding:3px 10px;border-radius:12px;font-size:0.75em;font-weight:700">{event_grade_label} {event_strength}/100</span>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+<span style="background:{sector_color}12;color:{sector_color};padding:2px 8px;border-radius:10px;font-size:0.68em;font-weight:500;border:1px solid {sector_color}18">{sector}</span>
+<span style="color:{event_type_color};font-size:0.72em;font-weight:600">{event_label}</span>
+</div>
+<div style="margin-bottom:4px">
+<div style="font-size:1.10em;font-weight:700;color:#fff;line-height:1.3">{name}</div>
+<div style="display:flex;align-items:baseline;gap:8px;margin-top:4px;flex-wrap:wrap">
+<span style="color:#4b5563;font-size:0.82em">{ticker_display}</span>
+<span style="color:#fff;font-size:1.30em;font-weight:800">{price}</span>
+<span style="color:{change_color};font-weight:700;font-size:0.88em">{change_icon} {abs(change):.1f}%</span>
+<span style="color:#4b5563;font-size:0.72em">📅 {event_date}</span>
+</div>
+</div>
+{sparkline}
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0 6px 0;padding-top:6px;border-top:1px solid #151d30">
+<span style="color:{phase_color};font-weight:600;font-size:0.80em">{phase_label}</span>
+{f'<span style="background:{flow_type_color}15;color:{flow_type_color};font-size:0.68em;font-weight:600;padding:2px 6px;border-radius:6px;border:1px solid {flow_type_color}30">{flow_type_label}</span>' if flow_type_label else ''}
+{zr_badge}
+</div>
+{strength_bar}
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:rgba(8,11,20,0.6);border-radius:10px;padding:8px 4px">
+<div style="text-align:center">
+<div style="color:#374151;font-size:0.58em;margin-bottom:2px;font-weight:600">المهاجم</div>
+<div style="color:{agg_color};font-weight:700;font-size:0.75em">{agg_text}</div>
+</div>
+<div style="text-align:center;border-left:1px solid #151d30;border-right:1px solid #151d30">
+<div style="color:#374151;font-size:0.58em;margin-bottom:2px;font-weight:600">امتصاص</div>
+<div style="color:#9ca3af;font-weight:700;font-size:0.78em">{absorption_score:.0f}</div>
+</div>
+<div style="text-align:center;border-right:1px solid #151d30">
+<div style="color:#374151;font-size:0.58em;margin-bottom:2px;font-weight:600">دايفرجنس</div>
+<div style="color:{div_color};font-weight:700;font-size:0.78em">{divergence:+.0f}</div>
+</div>
+<div style="text-align:center">
+<div style="color:#374151;font-size:0.58em;margin-bottom:2px;font-weight:600">RSI</div>
+<div style="color:{rsi_color};font-weight:700;font-size:0.78em">{rsi:.0f}</div>
+</div>
+</div>
+<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
+{backing_html}
+<span style="color:#374151;font-size:0.68em">فلو: <b style="color:{flow_color}">{flow_bias:+.0f}</b></span>
+</div>
+{bounce_badge}
+<div style="margin-top:8px;padding:6px 8px;background:rgba(8,11,20,0.4);border-radius:8px">
+{factors_html}
+</div>
+</div>'''
+
+
+def show_events_page(results):
+    """Display the Events page — bounces, breakouts, breakdowns."""
+    events = classify_events(results)
+    all_events = events["bounces"] + events["breakouts"] + events["breakdowns"]
+
+    bounce_count = len(events["bounces"])
+    breakout_count = len(events["breakouts"])
+    breakdown_count = len(events["breakdowns"])
+    total_count = len(all_events)
+
+    # Header
+    st.markdown('''
+    <div style="text-align:center;padding:20px 0 10px 0">
+        <span style="font-size:1.8em;font-weight:800;color:#fff">⚡ الارتدادات والاختراقات</span>
+        <div style="color:#6b7280;font-size:0.92em;margin-top:6px">
+            كشف تلقائي لكل ارتداد واختراق وكسر — مع تحليل القوة والتصنيف
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    if total_count == 0:
+        st.info("لا توجد أحداث مكتشفة في المسح الحالي. جرب مسح أوسع.")
+        return
+
+    # Stats
+    avg_strength = round(sum(e["event_strength"] for e in all_events) / total_count) if total_count else 0
+    strong_count = sum(1 for e in all_events if e["event_grade"] == "strong")
+    acc_count = sum(1 for e in all_events if e["event_backing"] == "accumulation")
+    dist_count = sum(1 for e in all_events if e["event_backing"] == "distribution")
+    acc_pct = round(acc_count / total_count * 100) if total_count else 0
+    dist_pct = round(dist_count / total_count * 100) if total_count else 0
+
+    avg_color = "#00E676" if avg_strength >= 65 else "#FFD700" if avg_strength >= 40 else "#9ca3af"
+
+    st.markdown(f'''
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:10px 0">
+        <div class="masa-stat">
+            <div class="masa-stat-label">📊 إجمالي الأحداث</div>
+            <div class="masa-stat-value" style="color:#fff;font-size:1.4em">{total_count}</div>
+        </div>
+        <div class="masa-stat">
+            <div class="masa-stat-label">⚡ ارتدادات</div>
+            <div class="masa-stat-value" style="color:#00E676;font-size:1.4em">{bounce_count}</div>
+        </div>
+        <div class="masa-stat">
+            <div class="masa-stat-label">🚀 اختراقات</div>
+            <div class="masa-stat-value" style="color:#FFD700;font-size:1.4em">{breakout_count}</div>
+        </div>
+        <div class="masa-stat">
+            <div class="masa-stat-label">📉 كسرات</div>
+            <div class="masa-stat-value" style="color:#FF5252;font-size:1.4em">{breakdown_count}</div>
+        </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:0 0 16px 0">
+        <div class="masa-stat">
+            <div class="masa-stat-label">💪 متوسط القوة</div>
+            <div class="masa-stat-value" style="color:{avg_color};font-size:1.4em">{avg_strength}/100</div>
+        </div>
+        <div class="masa-stat">
+            <div class="masa-stat-label">🏆 أحداث قوية</div>
+            <div class="masa-stat-value" style="color:#00E676;font-size:1.4em">{strong_count}</div>
+        </div>
+        <div class="masa-stat">
+            <div class="masa-stat-label">📦 مدعومة بتجميع</div>
+            <div class="masa-stat-value" style="color:#00E676;font-size:1.4em">{acc_pct}%</div>
+        </div>
+        <div class="masa-stat">
+            <div class="masa-stat-label">🔴 مدعومة بتصريف</div>
+            <div class="masa-stat-value" style="color:#FF5252;font-size:1.4em">{dist_pct}%</div>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # Filters
+    fcol1, fcol2, fcol3, fcol4 = st.columns(4)
+    with fcol1:
+        type_filter = st.selectbox(
+            "🏷️ النوع",
+            ["الكل", "⚡ ارتدادات فقط", "🚀 اختراقات فقط", "📉 كسرات فقط"],
+            key="ev_type_filter",
+        )
+    with fcol2:
+        strength_filter = st.selectbox(
+            "💪 القوة",
+            ["الكل", "قوية فقط (65+)", "متوسطة+ (40+)", "ضعيفة فقط (<40)"],
+            key="ev_strength_filter",
+        )
+    with fcol3:
+        ev_sectors = sorted(set(e["sector"] for e in all_events))
+        ev_sector = st.selectbox("📂 القطاع", ["كل القطاعات"] + ev_sectors, key="ev_sector")
+    with fcol4:
+        ev_sort = st.selectbox(
+            "📊 الترتيب",
+            ["أقوى حدث", "أقوى أوردر فلو", "أعلى تغير ↑"],
+            key="ev_sort",
+        )
+
+    # Apply filters
+    if type_filter == "⚡ ارتدادات فقط":
+        filtered = list(events["bounces"])
+    elif type_filter == "🚀 اختراقات فقط":
+        filtered = list(events["breakouts"])
+    elif type_filter == "📉 كسرات فقط":
+        filtered = list(events["breakdowns"])
+    else:
+        filtered = list(all_events)
+
+    if strength_filter == "قوية فقط (65+)":
+        filtered = [e for e in filtered if e["event_strength"] >= 65]
+    elif strength_filter == "متوسطة+ (40+)":
+        filtered = [e for e in filtered if e["event_strength"] >= 40]
+    elif strength_filter == "ضعيفة فقط (<40)":
+        filtered = [e for e in filtered if e["event_strength"] < 40]
+
+    if ev_sector != "كل القطاعات":
+        filtered = [e for e in filtered if e["sector"] == ev_sector]
+
+    if ev_sort == "أقوى أوردر فلو":
+        filtered.sort(key=lambda x: abs(x["flow_bias"]), reverse=True)
+    elif ev_sort == "أعلى تغير ↑":
+        filtered.sort(key=lambda x: x["change_pct"], reverse=True)
+    else:
+        filtered.sort(key=lambda x: x["event_strength"], reverse=True)
+
+    if not filtered:
+        st.info("لا توجد أحداث مع هذا الفلتر.")
+        return
+
+    st.markdown(f'<div style="color:#4b5563;font-size:0.82em;margin-bottom:8px">'
+                f'عرض {len(filtered)} من {total_count} حدث</div>',
+                unsafe_allow_html=True)
+
+    # Cards grid
+    cols = st.columns(3)
+    for idx, ev in enumerate(filtered):
+        with cols[idx % 3]:
+            st.markdown(build_event_card_html(ev), unsafe_allow_html=True)
+            if st.button(
+                f"📊 تفاصيل {ev['name']}",
+                key=f"ev_detail_{ev['ticker']}_{idx}",
+                use_container_width=True,
+            ):
+                st.session_state.selected_ticker = ev["ticker"]
+                st.session_state.prev_page = "events"
+                st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════
@@ -1976,7 +2298,7 @@ with st.sidebar:
 
     page = st.radio(
         "الصفحة",
-        ["🔬 Order Flow", "🚀 مؤشر الاختراقات", "📊 أداء النظام"],
+        ["🔬 Order Flow", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "📊 أداء النظام"],
         label_visibility="collapsed",
     )
 
@@ -2294,6 +2616,21 @@ if page == "🔬 Order Flow":
 # ══════════════════════════════════════════════════════════════
 # PAGE: Market Breakout Index
 # ══════════════════════════════════════════════════════════════
+
+elif page == "⚡ الارتدادات والاختراقات":
+    results = st.session_state.scan_results
+    if results is None:
+        st.markdown('''
+        <div style="text-align:center;padding:80px 20px;color:#4b5563">
+            <div style="font-size:4em;margin-bottom:20px;opacity:0.4">⚡</div>
+            <div style="font-size:1.3em;color:#6b7280;margin-bottom:10px">
+                اضغط <b style="color:#00E676">ابدأ المسح</b> أولاً في صفحة Order Flow
+            </div>
+            <div style="font-size:0.88em">لاكتشاف الارتدادات والاختراقات والكسرات</div>
+        </div>
+        ''', unsafe_allow_html=True)
+    else:
+        show_events_page(results)
 
 elif page == "🚀 مؤشر الاختراقات":
     results = st.session_state.scan_results
