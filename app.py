@@ -240,6 +240,16 @@ def build_card_html(r):
             f'</div>'
         )
 
+    # Early bounce badge
+    bounce_badge = ""
+    if r.get("early_bounce"):
+        _bl = r.get("early_bounce_label", "")
+        bounce_badge = (
+            f'<div style="color:#FF9800;font-weight:700;font-size:0.78em;margin-top:8px;'
+            f'padding:6px 10px;background:rgba(255,152,0,0.08);border-radius:8px;'
+            f'border:1px solid rgba(255,152,0,0.15);text-align:center">{_bl}</div>'
+        )
+
     # Veto
     veto_html = ""
     if r.get("veto"):
@@ -300,6 +310,7 @@ def build_card_html(r):
 <div style="color:{rsi_color};font-weight:700;font-size:0.82em">{rsi:.0f}</div>
 </div>
 </div>
+{bounce_badge}
 {trade_html}
 {veto_html}
 </div>'''
@@ -1688,6 +1699,7 @@ def show_detail_panel(r):
             <span>ZR سقف: <b style="color:#FFFFFF">{zr_h}</b></span>
             <span>ZR قاع: <b style="color:#FF9800">{zr_l}</b></span>
         </div>
+        {f'<div style="margin-top:10px;padding:8px 14px;background:rgba(255,152,0,0.08);border-radius:10px;border:1px solid rgba(255,152,0,0.15);color:#FF9800;font-weight:700;font-size:0.88em;text-align:center">{r.get("early_bounce_label","")}</div>' if r.get("early_bounce") else ''}
     </div>
     ''')
 

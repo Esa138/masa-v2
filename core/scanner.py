@@ -315,6 +315,25 @@ def scan_market(
                 last_close, orderflow["ma200"], maturity["current_days"], _peak
             )
 
+            # ── Early bounce detection ─────────────────────────
+            _recent_low = float(low.tail(20).min())  # lowest in last 20 days
+            _drop_from_peak = ((_recent_low - _peak) / _peak * 100) if _peak > 0 else 0
+            _bounce_from_low = ((last_close - _recent_low) / _recent_low * 100) if _recent_low > 0 else 0
+            _bounce_vol_ok = _vol_today >= _vol_avg * 0.8  # volume at least 80% of 20d avg
+
+            _is_early_bounce = (
+                _drop_from_peak <= -20          # dropped 20%+ from peak
+                and _bounce_from_low >= 5       # bounced 5%+ from recent low
+                and _bounce_vol_ok              # decent volume
+                and maturity["current_days"] <= 10  # accumulation is young or absent
+                and m_stage != "late"           # not already mature accumulation
+            )
+
+            _early_bounce_label = ""
+            _early_bounce_color = "#FF9800"
+            if _is_early_bounce:
+                _early_bounce_label = f"⚡ ارتداد حاد — هبط {abs(_drop_from_peak):.0f}% وارتد {_bounce_from_low:.0f}%"
+
             # ── Chart data — use all available data from the requested period ──
             chart_days = len(close)
             chart_dates = [d.strftime("%Y-%m-%d") for d in close.index[-chart_days:]]
@@ -373,6 +392,12 @@ def scan_market(
                 "flow_type_label": flow_type_label,
                 "flow_type_color": flow_type_color,
                 "flow_scope": flow_scope,
+                # Early bounce
+                "early_bounce": _is_early_bounce,
+                "early_bounce_label": _early_bounce_label,
+                "early_bounce_color": _early_bounce_color,
+                "early_bounce_drop": round(_drop_from_peak, 1),
+                "early_bounce_rise": round(_bounce_from_low, 1),
                 # Decision
                 "decision": scored["decision"],
                 "decision_label": scored["decision_info"]["label"],
