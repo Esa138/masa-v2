@@ -1016,6 +1016,21 @@ def build_event_card_html(r):
 
 def show_events_page(results):
     """Display the Events page — bounces, breakouts, breakdowns."""
+
+    # ── Detail panel (if a stock is selected) ──
+    if st.session_state.selected_ticker:
+        selected_r = None
+        for r in results:
+            if r["ticker"] == st.session_state.selected_ticker:
+                selected_r = r
+                break
+        if selected_r:
+            if st.button("→ رجوع للأحداث", key="ev_back_btn", type="secondary"):
+                st.session_state.selected_ticker = None
+                st.rerun()
+            show_detail_panel(selected_r)
+            return
+
     events = classify_events(results)
     all_events = events["bounces"] + events["breakouts"] + events["breakdowns"]
 
