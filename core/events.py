@@ -4,6 +4,8 @@ Classifies scanned stocks into events with strength scoring.
 No new API calls — works entirely from existing scanner results.
 """
 
+from datetime import datetime
+
 
 def classify_events(results: list) -> dict:
     """
@@ -320,8 +322,9 @@ def _build_event(r: dict, event_type: str, event_label: str) -> dict:
     }
     type_display, type_color = type_labels[event_type]
 
-    # Date — find when the event actually started
+    # Date — find when the event actually started + scan time
     event_date = _find_event_date(r, event_type)
+    scan_time = datetime.now().strftime("%H:%M")
 
     return {
         **r,
@@ -336,5 +339,6 @@ def _build_event(r: dict, event_type: str, event_label: str) -> dict:
         "event_backing": backing,
         "event_backing_label": backing_label,
         "event_date": event_date,
+        "event_scan_time": scan_time,
         "event_factors": factors,
     }

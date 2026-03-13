@@ -870,6 +870,7 @@ def build_event_card_html(r):
     event_grade_color = r["event_grade_color"]
     event_backing_label = r["event_backing_label"]
     event_date = r["event_date"]
+    event_scan_time = r.get("event_scan_time", "")
     event_factors = r["event_factors"]
 
     sector_color = SECTOR_COLORS.get(sector, "#607D8B")
@@ -975,7 +976,7 @@ def build_event_card_html(r):
 <span style="color:#4b5563;font-size:0.82em">{ticker_display}</span>
 <span style="color:#fff;font-size:1.30em;font-weight:800">{price}</span>
 <span style="color:{change_color};font-weight:700;font-size:0.88em">{change_icon} {abs(change):.1f}%</span>
-<span style="color:#4b5563;font-size:0.72em">📅 {event_date}</span>
+<span style="color:#4b5563;font-size:0.72em">📅 {event_date} • 🕐 {event_scan_time}</span>
 </div>
 </div>
 {sparkline}
