@@ -883,19 +883,23 @@ def build_composite_index(results):
             prev_c = s["closes"][idx - 1]
             if prev_c == 0:
                 continue
-            vol = s["volumes"][idx] if idx < len(s["volumes"]) else 0
-            if vol <= 0:
-                continue
+            vol = s["volumes"][idx] if s["volumes"] and idx < len(s["volumes"]) else 0
+            vol = max(vol, 1)  # fallback: minimum weight of 1
             day_returns.append((s["closes"][idx] - prev_c) / prev_c)
             day_high_returns.append((s["highs"][idx] - prev_c) / prev_c)
             day_low_returns.append((s["lows"][idx] - prev_c) / prev_c)
             day_volumes.append(vol)
 
-        if day_returns and sum(day_volumes) > 0:
+        if day_returns:
             total_vol = sum(day_volumes)
-            avg_returns.append(sum(r * v for r, v in zip(day_returns, day_volumes)) / total_vol)
-            avg_high_returns.append(sum(r * v for r, v in zip(day_high_returns, day_volumes)) / total_vol)
-            avg_low_returns.append(sum(r * v for r, v in zip(day_low_returns, day_volumes)) / total_vol)
+            if total_vol > 0:
+                avg_returns.append(sum(r * v for r, v in zip(day_returns, day_volumes)) / total_vol)
+                avg_high_returns.append(sum(r * v for r, v in zip(day_high_returns, day_volumes)) / total_vol)
+                avg_low_returns.append(sum(r * v for r, v in zip(day_low_returns, day_volumes)) / total_vol)
+            else:
+                avg_returns.append(np.mean(day_returns))
+                avg_high_returns.append(np.mean(day_high_returns))
+                avg_low_returns.append(np.mean(day_low_returns))
         else:
             avg_returns.append(0.0)
             avg_high_returns.append(0.0)
