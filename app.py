@@ -1917,12 +1917,34 @@ def show_detail_panel(r):
 
 with st.sidebar:
     st.markdown('''
-    <div style="text-align:center;padding:12px 0 8px 0">
-        <span style="font-size:2.2em">🔬</span>
-        <div style="font-size:1.4em;font-weight:800;color:#fff;margin-top:4px;
-                    letter-spacing:1px">MASA V2</div>
-        <div style="color:#4b5563;font-size:0.78em;margin-top:2px">
-            Order Flow Scanner — من المهاجم؟</div>
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;margin-bottom:4px;margin-top:-10px;">
+        <svg width="70" height="70" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="neonBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#00d2ff"/>
+                    <stop offset="100%" stop-color="#3a7bd5"/>
+                </linearGradient>
+                <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#ffd700"/>
+                    <stop offset="100%" stop-color="#ffaa00"/>
+                </linearGradient>
+                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur"/>
+                    <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+                </filter>
+            </defs>
+            <path d="M 50,5 L 90,35 L 50,95 L 10,35 Z" fill="rgba(0,210,255,0.05)" stroke="url(#neonBlue)" stroke-width="2.5" filter="url(#glow)" stroke-linejoin="round"/>
+            <path d="M 20,35 L 50,60 L 80,35" fill="none" stroke="url(#neonBlue)" stroke-width="2" opacity="0.6" stroke-linejoin="round"/>
+            <path d="M 50,5 L 50,60" fill="none" stroke="url(#neonBlue)" stroke-width="2" opacity="0.6"/>
+            <path d="M 30,75 L 75,25 M 55,25 L 75,25 L 75,45" fill="none" stroke="url(#goldGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+        </svg>
+        <div style="text-align:center;margin-top:8px;line-height:1;">
+            <span style="font-size:24px;font-weight:900;letter-spacing:3px;color:#fff;text-shadow:0 0 10px rgba(255,255,255,0.1);">MASA</span>
+            <span style="font-size:24px;font-weight:300;letter-spacing:3px;color:#00d2ff;text-shadow:0 0 15px rgba(0,210,255,0.4);"> QUANT</span>
+        </div>
+        <div style="color:#888;font-size:9px;letter-spacing:2px;font-weight:bold;margin-top:4px">
+            Order Flow Scanner — من المهاجم؟
+        </div>
     </div>
     ''', unsafe_allow_html=True)
 
