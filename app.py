@@ -2135,16 +2135,31 @@ if page == "🔬 Order Flow":
     ''', unsafe_allow_html=True)
 
     # ── Filters ───────────────────────────────────────────
-    fcol1, fcol2, fcol3 = st.columns(3)
+    fcol1, fcol2, fcol3, fcol4 = st.columns(4)
     with fcol1:
         show_filter = st.selectbox(
             "🎯 التصنيف",
             ["✅ ادخل + ⚠️ راقب", "✅ ادخل فقط", "🔴 تصريف فقط", "الكل"],
         )
     with fcol2:
+        # Flow type filter
+        _type_map = {
+            "الكل": None,
+            "📦 تجميع قاعي": "bottom",
+            "🕵️ تجميع خفي": "hidden",
+            "🟢 تجميع ظاهر": "visible",
+            "🎯 سبرنق": "spring",
+            "🔺 تصريف قمّي": "top",
+            "🕵️ تصريف خفي": "hidden_dist",
+            "🔴 تصريف ظاهر": "visible_dist",
+            "⚠️ أبثرست": "upthrust",
+        }
+        selected_type_label = st.selectbox("🏷️ النوع", list(_type_map.keys()))
+        selected_type = _type_map[selected_type_label]
+    with fcol3:
         sectors = sorted(set(r["sector"] for r in results))
         selected_sector = st.selectbox("📂 القطاع", ["كل القطاعات"] + sectors)
-    with fcol3:
+    with fcol4:
         sort_by = st.selectbox(
             "📊 الترتيب",
             ["أقوى أوردر فلو", "أكبر تغير ↑", "أعلى امتصاص", "أقوى دايفرجنس"],
@@ -2158,6 +2173,9 @@ if page == "🔬 Order Flow":
         filtered = [r for r in results if r["phase"] in ("distribution", "upthrust", "markdown")]
     else:
         filtered = list(results)
+
+    if selected_type:
+        filtered = [r for r in filtered if r.get("flow_type") == selected_type]
 
     if selected_sector != "كل القطاعات":
         filtered = [r for r in filtered if r["sector"] == selected_sector]
