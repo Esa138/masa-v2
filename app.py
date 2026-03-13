@@ -881,13 +881,19 @@ def build_composite_index(results):
             if idx == 0:
                 continue
             prev_c = s["closes"][idx - 1]
-            if prev_c == 0:
+            cur_c = s["closes"][idx]
+            cur_h = s["highs"][idx]
+            cur_l = s["lows"][idx]
+            # Skip NaN or zero values
+            if not prev_c or prev_c == 0 or prev_c != prev_c:  # NaN check
+                continue
+            if not cur_c or cur_c != cur_c:
                 continue
             vol = s["volumes"][idx] if s["volumes"] and idx < len(s["volumes"]) else 0
             vol = max(vol, 1)  # fallback: minimum weight of 1
-            day_returns.append((s["closes"][idx] - prev_c) / prev_c)
-            day_high_returns.append((s["highs"][idx] - prev_c) / prev_c)
-            day_low_returns.append((s["lows"][idx] - prev_c) / prev_c)
+            day_returns.append((cur_c - prev_c) / prev_c)
+            day_high_returns.append(((cur_h if cur_h == cur_h else cur_c) - prev_c) / prev_c)
+            day_low_returns.append(((cur_l if cur_l == cur_l else cur_c) - prev_c) / prev_c)
             day_volumes.append(vol)
 
         if day_returns:
@@ -910,9 +916,15 @@ def build_composite_index(results):
     index_highs = [100.0]
     index_lows = [100.0]
     for i in range(1, len(avg_returns)):
-        index_vals.append(round(index_vals[-1] * (1 + avg_returns[i]), 2))
-        index_highs.append(round(index_vals[-2] * (1 + avg_high_returns[i]), 2))
-        index_lows.append(round(index_vals[-2] * (1 + avg_low_returns[i]), 2))
+        r = avg_returns[i]
+        r = r if r == r else 0.0  # NaN guard
+        index_vals.append(round(index_vals[-1] * (1 + r), 2))
+        rh = avg_high_returns[i]
+        rh = rh if rh == rh else 0.0
+        rl = avg_low_returns[i]
+        rl = rl if rl == rl else 0.0
+        index_highs.append(round(index_vals[-2] * (1 + rh), 2))
+        index_lows.append(round(index_vals[-2] * (1 + rl), 2))
 
     if len(index_vals) > 0:
         index_highs[0] = index_vals[0]
