@@ -225,6 +225,70 @@ def _score_event(r: dict, event_type: str) -> tuple:
     return total, factors
 
 
+# ── Event Date Detection ─────────────────────────────────────
+
+def _find_event_date(r: dict, event_type: str) -> str:
+    """
+    Find the approximate date when the event started.
+    - Bounce: date of the recent low (bottom before the bounce)
+    - Breakout: date when price first crossed above ZR high
+    - Breakdown: date when the decline streak started
+    """
+    chart_dates = r.get("chart_dates", [])
+    chart_close = r.get("chart_close", [])
+    chart_low = r.get("chart_low", [])
+
+    if not chart_dates or not chart_close:
+        return "—"
+
+    n = len(chart_close)
+
+    if event_type == "bounce":
+        # Find the date of the lowest low in last 20 days = the bounce point
+        lookback = min(20, n)
+        lows = chart_low[-lookback:] if chart_low else chart_close[-lookback:]
+        if lows:
+            min_idx = 0
+            min_val = lows[0]
+            for i, v in enumerate(lows):
+                if v <= min_val:
+                    min_val = v
+                    min_idx = i
+            date_idx = n - lookback + min_idx
+            if 0 <= date_idx < len(chart_dates):
+                return chart_dates[date_idx]
+
+    elif event_type == "breakout":
+        # Find when price first crossed above ZR high (scan backwards)
+        zr_high = r.get("zr_high", 0)
+        if zr_high > 0 and n >= 2:
+            for i in range(n - 1, 0, -1):
+                if chart_close[i] > zr_high and chart_close[i - 1] <= zr_high:
+                    return chart_dates[i]
+            # If no crossover found, use maturity start date
+            timeline = r.get("maturity_timeline", [])
+            if timeline:
+                return timeline[0].get("date", chart_dates[-1])
+
+    elif event_type == "breakdown":
+        # Find when the current decline streak started (scan backwards)
+        if n >= 2:
+            for i in range(n - 1, 0, -1):
+                if chart_close[i - 1] >= chart_close[i]:
+                    # Still declining, keep going back
+                    continue
+                else:
+                    # Found the start of the decline
+                    return chart_dates[i]
+
+    # Fallback: use maturity timeline date or last date
+    timeline = r.get("maturity_timeline", [])
+    if timeline:
+        return timeline[0].get("date", chart_dates[-1])
+
+    return chart_dates[-1]
+
+
 # ── Event Builder ────────────────────────────────────────────
 
 def _build_event(r: dict, event_type: str, event_label: str) -> dict:
@@ -256,9 +320,8 @@ def _build_event(r: dict, event_type: str, event_label: str) -> dict:
     }
     type_display, type_color = type_labels[event_type]
 
-    # Date
-    chart_dates = r.get("chart_dates", [])
-    event_date = chart_dates[-1] if chart_dates else "—"
+    # Date — find when the event actually started
+    event_date = _find_event_date(r, event_type)
 
     return {
         **r,
