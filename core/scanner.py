@@ -96,12 +96,23 @@ def _classify_flow_type(phase: str, location: str, divergence: float,
     return "none", "", "#808080", "none"
 
 
-def _fetch_ticker(ticker: str, period: str = "1y") -> tuple:
+# ── Timeframe configuration ──────────────────────────────
+TIMEFRAMES = {
+    "1d": {"label": "يومي", "period": "2y", "min_bars": 50},
+    "1h": {"label": "1 ساعة", "period": "60d", "min_bars": 40},
+    "15m": {"label": "15 دقيقة", "period": "30d", "min_bars": 40},
+    "5m": {"label": "5 دقائق", "period": "10d", "min_bars": 30},
+}
+
+
+def _fetch_ticker(ticker: str, period: str = "1y",
+                  interval: str = "1d") -> tuple:
     """Fetch OHLCV data for a single ticker."""
     try:
         t = yf.Ticker(ticker)
-        df = t.history(period=period, interval="1d")
-        if df is None or df.empty or len(df) < MIN_BARS:
+        df = t.history(period=period, interval=interval)
+        min_bars = TIMEFRAMES.get(interval, {}).get("min_bars", MIN_BARS)
+        if df is None or df.empty or len(df) < min_bars:
             return ticker, None
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
@@ -116,20 +127,29 @@ def scan_market(
     market_health: float = 50.0,
     max_workers: int = 10,
     progress_callback=None,
+    interval: str = "1d",
 ) -> list:
     """
     Scan a list of tickers using Order Flow analysis.
 
+    Args:
+        interval: "1d" (daily), "1h", "15m", "5m"
+
     Returns:
         List of dicts, sorted by decision quality (enter first)
     """
+    # Auto-adjust period for intraday
+    tf_config = TIMEFRAMES.get(interval, TIMEFRAMES["1d"])
+    if interval != "1d":
+        period = tf_config["period"]
+
     # ── Fetch data in parallel ────────────────────────────
     histories = {}
     total = len(tickers)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(_fetch_ticker, tk, period): tk
+            executor.submit(_fetch_ticker, tk, period, interval): tk
             for tk in tickers
         }
         done = 0
@@ -377,6 +397,8 @@ def scan_market(
                 "ticker": tk,
                 "name": get_stock_name(tk),
                 "sector": get_sector(tk),
+                "timeframe": interval,
+                "timeframe_label": tf_config["label"],
                 "price": round(last_close, 2),
                 "change_pct": round(change_pct, 2),
                 # Order Flow

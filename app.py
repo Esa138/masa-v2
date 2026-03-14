@@ -322,6 +322,17 @@ def build_card_html(r):
             f'border:1px solid #AB47BC25">POC {vp_poc}</span>'
         )
 
+    # Timeframe badge (only for intraday)
+    tf_badge = ""
+    timeframe = r.get("timeframe", "1d")
+    timeframe_label = r.get("timeframe_label", "يومي")
+    if timeframe != "1d":
+        tf_badge = (
+            f'<span style="background:#FF980012;color:#FF9800;'
+            f'padding:2px 8px;border-radius:8px;font-size:0.70em;font-weight:600;'
+            f'border:1px solid #FF980025">⏱️ {timeframe_label}</span>'
+        )
+
     # Trade info (enter only)
     trade_html = ""
     if decision == "enter":
@@ -377,8 +388,9 @@ def build_card_html(r):
 {rel_badge}
 {vol_badge}
 {vp_badge}
+{tf_badge}
 </div>
-<span style="color:#4b5563;font-size:0.72em">📍 {location_label} • {abs(days)} يوم</span>
+<span style="color:#4b5563;font-size:0.72em">📍 {location_label} • {abs(days)} {"شمعة" if timeframe != "1d" else "يوم"}</span>
 </div>
 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px">
 {_maturity_mini(r)}
@@ -1123,6 +1135,17 @@ def build_event_card_html(r):
             f'border:1px solid #AB47BC25">POC {ev_vp_poc}</span>'
         )
 
+    # Timeframe badge (event card — only for intraday)
+    ev_tf_badge = ""
+    ev_timeframe = r.get("timeframe", "1d")
+    ev_timeframe_label = r.get("timeframe_label", "يومي")
+    if ev_timeframe != "1d":
+        ev_tf_badge = (
+            f'<span style="background:#FF980012;color:#FF9800;'
+            f'padding:2px 8px;border-radius:8px;font-size:0.70em;font-weight:600;'
+            f'border:1px solid #FF980025">⏱️ {ev_timeframe_label}</span>'
+        )
+
     # Factors breakdown
     factors_html = ""
     for f in event_factors:
@@ -1162,6 +1185,7 @@ def build_event_card_html(r):
 {ev_rel_badge}
 {ev_vol_badge}
 {ev_vp_badge}
+{ev_tf_badge}
 </div>
 {strength_bar}
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:rgba(8,11,20,0.6);border-radius:10px;padding:8px 4px">
@@ -2829,7 +2853,7 @@ with st.sidebar:
 
 if page == "🔬 Order Flow":
 
-    hcol1, hcol2, hcol3 = st.columns([3, 1, 1])
+    hcol1, hcol2, hcol3, hcol4 = st.columns([3, 1, 1, 1])
     with hcol1:
         n_stocks = len(get_all_tickers(market_key))
         st.markdown(f'''
@@ -2840,28 +2864,43 @@ if page == "🔬 Order Flow":
         </div>
         ''', unsafe_allow_html=True)
     with hcol2:
+        timeframe_options = {
+            "📊 يومي": "1d",
+            "⏱️ 1 ساعة": "1h",
+            "⏱️ 15 دقيقة": "15m",
+            "⏱️ 5 دقائق": "5m",
+        }
+        selected_tf_label = st.selectbox(
+            "⏱️ الإطار", list(timeframe_options.keys()), index=0,
+            key="scan_timeframe", label_visibility="collapsed"
+        )
+        selected_interval = timeframe_options[selected_tf_label]
+    with hcol3:
         period_options = {"سنة": "1y", "سنتين": "2y", "٣ سنوات": "3y", "٥ سنوات": "5y"}
         selected_period_label = st.selectbox(
             "📅 الفترة", list(period_options.keys()), index=2,
-            key="scan_period", label_visibility="collapsed"
+            key="scan_period", label_visibility="collapsed",
+            disabled=(selected_interval != "1d"),  # فترة تلقائية للإطار اللحظي
         )
         selected_period = period_options[selected_period_label]
-    with hcol3:
+    with hcol4:
         scan_btn = st.button("▶️ ابدأ المسح", use_container_width=True, type="primary")
 
     if scan_btn:
         tickers = get_all_tickers(market_key)
 
-        progress = st.progress(0, text="جاري المسح...")
+        tf_display = selected_tf_label.replace("📊 ", "").replace("⏱️ ", "")
+        progress = st.progress(0, text=f"جاري المسح ({tf_display})...")
 
         def _update(current, total):
-            progress.progress(current / total, text=f"تحليل {current}/{total}")
+            progress.progress(current / total, text=f"تحليل {current}/{total} ({tf_display})")
 
         results = scan_market(
             tickers=tickers,
             period=selected_period,
             market_health=50.0,
             progress_callback=_update,
+            interval=selected_interval,
         )
         progress.empty()
 
