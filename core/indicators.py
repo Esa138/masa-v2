@@ -432,3 +432,210 @@ def compute_obv_slope(close, volume, period=10):
     """Kept for backward compatibility."""
     obv = compute_obv(close, volume)
     return (obv.diff(period) / period).fillna(0)
+
+
+# ══════════════════════════════════════════════════════════════
+# ADAPTIVE PARAMETERS — ATR-Based Dynamic Thresholds
+# ══════════════════════════════════════════════════════════════
+
+def compute_adaptive_params(high: pd.Series, low: pd.Series,
+                            close: pd.Series, period: int = 14) -> dict:
+    """
+    Compute ATR-based adaptive parameters for dynamic indicator tuning.
+
+    ATR% = ATR / Price × 100 → measures volatility as % of price.
+    Low-volatility stocks get longer lookbacks, tighter thresholds.
+    High-volatility stocks get shorter lookbacks, wider thresholds.
+
+    Returns dict with adjusted parameters:
+        atr_pct, volatility, volatility_label, volatility_color,
+        flow_lookback, bounce_drop_threshold, bounce_rise_threshold,
+        maturity_speed
+    """
+    atr = compute_atr(high, low, close, period)
+    last_atr = float(atr.iloc[-1]) if len(atr) > 0 and pd.notna(atr.iloc[-1]) else 0
+    last_close = float(close.iloc[-1]) if len(close) > 0 else 1
+
+    atr_pct = (last_atr / last_close * 100) if last_close > 0 else 2.0
+
+    if atr_pct < 1.5:
+        # Low volatility — slow mover (e.g., Aramco, large caps)
+        return {
+            "atr_pct": round(atr_pct, 2),
+            "volatility": "low",
+            "volatility_label": "🐌 تذبذب منخفض",
+            "volatility_color": "#4FC3F7",
+            "flow_lookback": 25,
+            "bounce_drop_threshold": -15,
+            "bounce_rise_threshold": 3,
+            "maturity_speed": 0.75,
+        }
+    elif atr_pct > 3.0:
+        # High volatility — fast mover (e.g., small caps, crypto)
+        return {
+            "atr_pct": round(atr_pct, 2),
+            "volatility": "high",
+            "volatility_label": "⚡ تذبذب عالي",
+            "volatility_color": "#FF9800",
+            "flow_lookback": 14,
+            "bounce_drop_threshold": -30,
+            "bounce_rise_threshold": 8,
+            "maturity_speed": 1.5,
+        }
+    else:
+        # Medium volatility — normal behavior (default)
+        return {
+            "atr_pct": round(atr_pct, 2),
+            "volatility": "medium",
+            "volatility_label": "",
+            "volatility_color": "#9ca3af",
+            "flow_lookback": 20,
+            "bounce_drop_threshold": -20,
+            "bounce_rise_threshold": 5,
+            "maturity_speed": 1.0,
+        }
+
+
+# ══════════════════════════════════════════════════════════════
+# VOLUME PROFILE + PIVOT POINTS — Price Context
+# ══════════════════════════════════════════════════════════════
+
+def compute_volume_profile(close: pd.Series, volume: pd.Series,
+                           bins: int = 20, lookback: int = 60) -> dict:
+    """
+    Volume Profile — find POC, HVN, LVN from last N days.
+
+    POC = Point of Control (price level with highest volume)
+    HVN = High Volume Nodes (top 3 price levels)
+    LVN = Low Volume Nodes (bottom 3 price levels — volume gaps)
+
+    Returns:
+        poc: float, hvn: list[float], lvn: list[float], vp_data: list[dict]
+    """
+    c = close.iloc[-lookback:] if len(close) >= lookback else close
+    v = volume.iloc[-lookback:] if len(volume) >= lookback else volume
+
+    if len(c) < 10:
+        return {"poc": float(c.iloc[-1]) if len(c) > 0 else 0,
+                "hvn": [], "lvn": [], "vp_data": []}
+
+    price_min = float(c.min())
+    price_max = float(c.max())
+    price_range = price_max - price_min
+
+    if price_range == 0:
+        return {"poc": float(c.iloc[-1]), "hvn": [], "lvn": [], "vp_data": []}
+
+    bin_size = price_range / bins
+    bin_volumes = np.zeros(bins)
+    bin_centers = np.zeros(bins)
+
+    for i in range(bins):
+        bin_low = price_min + i * bin_size
+        bin_high = bin_low + bin_size
+        bin_centers[i] = (bin_low + bin_high) / 2
+
+        # Sum volume for bars where close falls in this bin
+        mask = (c >= bin_low) & (c < bin_high)
+        bin_volumes[i] = float(v[mask].sum())
+
+    # Handle last bin boundary (include max value)
+    mask_last = c >= price_max
+    bin_volumes[-1] += float(v[mask_last].sum())
+
+    # POC
+    poc_idx = int(np.argmax(bin_volumes))
+    poc = float(bin_centers[poc_idx])
+
+    # Sort by volume
+    sorted_indices = np.argsort(bin_volumes)
+    # Top 3 volume nodes
+    hvn = [float(bin_centers[i]) for i in sorted_indices[-3:][::-1]]
+    # Bottom 3 volume nodes (excluding zero-volume bins)
+    non_zero = [i for i in sorted_indices if bin_volumes[i] > 0]
+    lvn = [float(bin_centers[i]) for i in non_zero[:3]]
+
+    vp_data = [
+        {"price": round(float(bin_centers[i]), 2), "volume": int(bin_volumes[i])}
+        for i in range(bins)
+    ]
+
+    return {
+        "poc": round(poc, 2),
+        "hvn": [round(h, 2) for h in hvn],
+        "lvn": [round(l, 2) for l in lvn],
+        "vp_data": vp_data,
+    }
+
+
+def compute_pivot_points(high: pd.Series, low: pd.Series,
+                         close: pd.Series) -> dict:
+    """
+    Classic Pivot Points from last complete trading day.
+
+    Returns: pivot, r1, r2, s1, s2
+    """
+    idx = -2 if len(close) >= 2 else -1
+    h = float(high.iloc[idx])
+    l = float(low.iloc[idx])
+    c = float(close.iloc[idx])
+
+    pivot = (h + l + c) / 3
+    r1 = 2 * pivot - l
+    s1 = 2 * pivot - h
+    r2 = pivot + (h - l)
+    s2 = pivot - (h - l)
+
+    return {
+        "pivot": round(pivot, 2),
+        "r1": round(r1, 2),
+        "r2": round(r2, 2),
+        "s1": round(s1, 2),
+        "s2": round(s2, 2),
+    }
+
+
+def classify_price_location(close_price: float, poc: float, hvn: list,
+                             lvn: list, pivot: float, s1: float,
+                             r1: float) -> dict:
+    """
+    Classify where the stock price is relative to volume profile and pivots.
+
+    Returns: vp_location, vp_location_label, vp_location_color
+    """
+    tol = close_price * 0.015  # 1.5% tolerance
+
+    # At POC
+    if abs(close_price - poc) <= tol:
+        return {"vp_location": "poc", "vp_location_label": "عند POC",
+                "vp_location_color": "#FFD700"}
+
+    # At volume support (HVN below price, close to it)
+    hvn_below = [h for h in hvn if h < close_price and close_price - h <= tol * 2]
+    if hvn_below:
+        return {"vp_location": "vol_support", "vp_location_label": "عند دعم حجمي",
+                "vp_location_color": "#00E676"}
+
+    # At volume resistance (HVN above price, close to it)
+    hvn_above = [h for h in hvn if h > close_price and h - close_price <= tol * 2]
+    if hvn_above:
+        return {"vp_location": "vol_resistance", "vp_location_label": "عند مقاومة حجمية",
+                "vp_location_color": "#FF5252"}
+
+    # In volume gap (near LVN)
+    for lv in lvn:
+        if abs(close_price - lv) <= tol * 2:
+            return {"vp_location": "vol_gap", "vp_location_label": "في فراغ حجمي",
+                    "vp_location_color": "#FF9800"}
+
+    # At pivot support/resistance
+    if abs(close_price - s1) <= tol:
+        return {"vp_location": "pivot_support", "vp_location_label": "عند دعم بيفوت",
+                "vp_location_color": "#4FC3F7"}
+
+    if abs(close_price - r1) <= tol:
+        return {"vp_location": "pivot_resistance", "vp_location_label": "عند مقاومة بيفوت",
+                "vp_location_color": "#FF8A80"}
+
+    return {"vp_location": "none", "vp_location_label": "",
+            "vp_location_color": "#808080"}

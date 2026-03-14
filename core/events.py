@@ -186,7 +186,7 @@ def _score_event(r: dict, event_type: str) -> tuple:
     factors.append({"name": "دعم المرحلة", "score": s, "max": max_w})
     total += s
 
-    # 4. Location Quality (max 10)
+    # 4. Location Quality (max 10) — enhanced with Volume Profile
     max_w = 10
     if event_type == "bounce":
         loc_scores = {"bottom": 10, "support": 8, "middle": 4, "resistance": 1, "above": 0}
@@ -195,6 +195,16 @@ def _score_event(r: dict, event_type: str) -> tuple:
     else:  # breakdown
         loc_scores = {"above": 10, "resistance": 8, "middle": 4, "support": 5, "bottom": 2}
     s = loc_scores.get(location, 4)
+
+    # Volume Profile bonus/penalty
+    vp_loc = r.get("vp_location", "none")
+    if event_type in ("bounce", "breakout") and vp_loc in ("vol_support", "poc", "pivot_support"):
+        s = min(s + 2, max_w)  # bonus for bouncing at volume support
+    elif event_type in ("bounce", "breakout") and vp_loc in ("vol_resistance", "pivot_resistance"):
+        s = max(s - 1, 0)  # penalty for bouncing into resistance
+    elif event_type == "breakdown" and vp_loc in ("vol_gap", "vol_resistance"):
+        s = min(s + 2, max_w)  # breakdown in volume gap = stronger
+
     factors.append({"name": "الموقع", "score": s, "max": max_w})
     total += s
 

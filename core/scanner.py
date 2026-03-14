@@ -10,7 +10,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from core.accumulation import detect_orderflow, compute_accumulation_maturity, compute_distribution_maturity
 from core.scorer import score_stock
-from core.indicators import compute_rolling_delta, compute_cdv, compute_rsi, compute_ma
+from core.indicators import (
+    compute_rolling_delta, compute_cdv, compute_rsi, compute_ma,
+    compute_adaptive_params, compute_volume_profile, compute_pivot_points,
+    classify_price_location,
+)
 from core.institutional import get_ownership_batch, interpret_ownership
 from data.markets import get_stock_name, get_sector
 
@@ -156,8 +160,22 @@ def scan_market(
             open_ = df["Open"]
             volume = df.get("Volume", pd.Series(0, index=close.index))
 
-            # Detect Order Flow + Wyckoff phase
-            orderflow = detect_orderflow(high, low, close, open_, volume)
+            # Compute adaptive parameters based on volatility
+            adaptive = compute_adaptive_params(high, low, close, 14)
+            _flow_lookback = adaptive["flow_lookback"]
+
+            # Detect Order Flow + Wyckoff phase (with adaptive lookback)
+            orderflow = detect_orderflow(high, low, close, open_, volume,
+                                         flow_lookback=_flow_lookback)
+
+            # Volume Profile + Pivot Points
+            last_close = float(close.iloc[-1])
+            vp = compute_volume_profile(close, volume, bins=20, lookback=60)
+            pivots = compute_pivot_points(high, low, close)
+            vp_loc = classify_price_location(
+                last_close, vp["poc"], vp["hvn"], vp["lvn"],
+                pivots["pivot"], pivots["s1"], pivots["r1"]
+            )
 
             # Get institutional data
             inst_data = ownership_data.get(tk)
@@ -322,8 +340,8 @@ def scan_market(
             _bounce_vol_ok = _vol_today >= _vol_avg * 0.8  # volume at least 80% of 20d avg
 
             _is_early_bounce = (
-                _drop_from_peak <= -20          # dropped 20%+ from peak
-                and _bounce_from_low >= 5       # bounced 5%+ from recent low
+                _drop_from_peak <= adaptive["bounce_drop_threshold"]   # adaptive: -15% / -20% / -30%
+                and _bounce_from_low >= adaptive["bounce_rise_threshold"]  # adaptive: 3% / 5% / 8%
                 and _bounce_vol_ok              # decent volume
                 and maturity["current_days"] <= 10  # accumulation is young or absent
                 and m_stage != "late"           # not already mature accumulation
@@ -441,6 +459,24 @@ def scan_market(
                 "dist_maturity_color": dist_maturity["stage_color"],
                 "dist_maturity_timeline": dist_maturity["timeline"],
                 "dist_maturity_days": dist_maturity["current_days"],
+                # Adaptive parameters (ATR-based)
+                "volatility": adaptive["volatility"],
+                "volatility_label": adaptive["volatility_label"],
+                "volatility_color": adaptive["volatility_color"],
+                "atr_pct": adaptive["atr_pct"],
+                # Volume Profile + Pivot Points
+                "vp_poc": vp["poc"],
+                "vp_hvn": vp["hvn"],
+                "vp_lvn": vp["lvn"],
+                "vp_data": vp["vp_data"],
+                "pivot": pivots["pivot"],
+                "pivot_r1": pivots["r1"],
+                "pivot_r2": pivots["r2"],
+                "pivot_s1": pivots["s1"],
+                "pivot_s2": pivots["s2"],
+                "vp_location": vp_loc["vp_location"],
+                "vp_location_label": vp_loc["vp_location_label"],
+                "vp_location_color": vp_loc["vp_location_color"],
             })
 
         except Exception:

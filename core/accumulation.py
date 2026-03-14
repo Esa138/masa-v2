@@ -111,6 +111,7 @@ def detect_orderflow(
     close: pd.Series,
     open_: pd.Series,
     volume: pd.Series,
+    flow_lookback: int = 20,
 ) -> dict:
     """
     Main Order Flow + Wyckoff detection engine.
@@ -146,16 +147,16 @@ def detect_orderflow(
     delta = compute_delta_volume(high, low, close, volume)
     cdv = compute_cdv(high, low, close, volume)
     cdv_slope = compute_cdv_slope(high, low, close, volume, 10)
-    rolling_delta = compute_rolling_delta(high, low, close, volume, 20)
-    absorption = compute_absorption(high, low, close, volume, 20)
-    abs_bias = compute_absorption_bias(high, low, close, open_, volume, 20)
-    agg_ratio = compute_aggressive_ratio(high, low, close, open_, volume, 20)
-    divergence = compute_divergence(close, cdv, 20)
+    rolling_delta = compute_rolling_delta(high, low, close, volume, flow_lookback)
+    absorption = compute_absorption(high, low, close, volume, flow_lookback)
+    abs_bias = compute_absorption_bias(high, low, close, open_, volume, flow_lookback)
+    agg_ratio = compute_aggressive_ratio(high, low, close, open_, volume, flow_lookback)
+    divergence = compute_divergence(close, cdv, flow_lookback)
 
     # Supporting
     rsi = compute_rsi(close, 14)
-    vol_ratio = compute_volume_ratio(volume, 20)
-    contraction = compute_range_contraction(high, low, 20)
+    vol_ratio = compute_volume_ratio(volume, flow_lookback)
+    contraction = compute_range_contraction(high, low, flow_lookback)
     ma50 = compute_ma(close, 50)
     ma200 = compute_ma(close, min(200, n - 1)) if n >= 50 else ma50
 

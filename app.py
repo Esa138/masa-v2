@@ -141,6 +141,50 @@ def _flow_bar_svg(flow_bias, width=240, height=16):
     )
 
 
+def compute_relative_flow(results):
+    """
+    Post-process scan results: compare each stock's flow_bias
+    against its sector average. Mutates results in-place.
+    """
+    from collections import defaultdict
+
+    # Step 1: Sector averages
+    sector_flows = defaultdict(list)
+    for r in results:
+        sector = r.get("sector", "أخرى")
+        fb = r.get("flow_bias", 0)
+        if fb is not None and fb == fb:  # NaN guard
+            sector_flows[sector].append(fb)
+
+    sector_avg = {}
+    for sector, flows in sector_flows.items():
+        sector_avg[sector] = sum(flows) / len(flows) if flows else 0
+
+    # Step 2: Relative flow per stock
+    for r in results:
+        sector = r.get("sector", "أخرى")
+        avg = sector_avg.get(sector, 0)
+        stock_fb = r.get("flow_bias", 0) or 0
+        rel = stock_fb - avg
+
+        # Classify
+        if rel > 20:
+            label, color = "ضد التيار", "#00E676"
+        elif rel > 10:
+            label, color = "يتفوق", "#4FC3F7"
+        elif rel >= -10:
+            label, color = "مع القطاع", "#9ca3af"
+        else:
+            label, color = "أضعف من القطاع", "#FF5252"
+
+        r["relative_flow"] = round(rel, 1)
+        r["relative_flow_label"] = label
+        r["relative_flow_color"] = color
+        r["sector_avg_flow"] = round(avg, 1)
+
+    return results
+
+
 def build_card_html(r):
     """Build Order Flow card HTML."""
     decision = r["decision"]
@@ -228,6 +272,56 @@ def build_card_html(r):
             'margin-right:4px">🏛 تصريف ↓</span>'
         )
 
+    # Relative flow badge — always show (with value)
+    rel_badge = ""
+    rel_label = r.get("relative_flow_label", "")
+    rel_color = r.get("relative_flow_color", "#9ca3af")
+    rel_val = r.get("relative_flow", 0)
+    if rel_label:
+        rel_badge = (
+            f'<span style="background:{rel_color}12;color:{rel_color};'
+            f'padding:2px 8px;border-radius:8px;font-size:0.70em;font-weight:600;'
+            f'border:1px solid {rel_color}25">📊 {rel_label} ({rel_val:+.0f})</span>'
+        )
+
+    # Volatility badge — always show ATR%
+    vol_badge = ""
+    atr_pct = r.get("atr_pct", 0)
+    vol_key = r.get("volatility", "medium")
+    vol_label_str = r.get("volatility_label", "")
+    vol_color_str = r.get("volatility_color", "#9ca3af")
+    if atr_pct > 0:
+        if vol_label_str:
+            vol_badge = (
+                f'<span style="background:{vol_color_str}12;color:{vol_color_str};'
+                f'padding:2px 8px;border-radius:8px;font-size:0.70em;font-weight:600;'
+                f'border:1px solid {vol_color_str}25">{vol_label_str} ({atr_pct:.1f}%)</span>'
+            )
+        else:
+            vol_badge = (
+                f'<span style="background:#9ca3af12;color:#9ca3af;'
+                f'padding:2px 8px;border-radius:8px;font-size:0.70em;font-weight:600;'
+                f'border:1px solid #9ca3af25">ATR {atr_pct:.1f}%</span>'
+            )
+
+    # Volume Profile location badge
+    vp_badge = ""
+    vp_label = r.get("vp_location_label", "")
+    vp_color = r.get("vp_location_color", "#808080")
+    vp_poc = r.get("vp_poc", 0)
+    if vp_label:
+        vp_badge = (
+            f'<span style="background:{vp_color}12;color:{vp_color};'
+            f'padding:2px 8px;border-radius:8px;font-size:0.70em;font-weight:600;'
+            f'border:1px solid {vp_color}25">{vp_label}</span>'
+        )
+    elif vp_poc > 0:
+        vp_badge = (
+            f'<span style="background:#AB47BC12;color:#AB47BC;'
+            f'padding:2px 8px;border-radius:8px;font-size:0.70em;font-weight:600;'
+            f'border:1px solid #AB47BC25">POC {vp_poc}</span>'
+        )
+
     # Trade info (enter only)
     trade_html = ""
     if decision == "enter":
@@ -280,6 +374,9 @@ def build_card_html(r):
 {f'<span style="background:{flow_type_color}15;color:{flow_type_color};font-size:0.72em;font-weight:600;padding:2px 8px;border-radius:8px;border:1px solid {flow_type_color}30">{flow_type_label}</span>' if flow_type_label else ''}
 {zr_badge}
 {inst_badge}
+{rel_badge}
+{vol_badge}
+{vp_badge}
 </div>
 <span style="color:#4b5563;font-size:0.72em">📍 {location_label} • {abs(days)} يوم</span>
 </div>
@@ -457,6 +554,35 @@ def build_detail_chart(r):
             annotation_text=f"هدف {r['target']}",
             annotation_position="top left",
             annotation_font=dict(size=10, color="#00E676"),
+        )
+
+    # ═══ Volume Profile + Pivot lines ═══
+    poc_val = r.get("vp_poc")
+    if poc_val and poc_val > 0:
+        fig.add_hline(
+            y=poc_val, line_dash="longdash", line_color="#AB47BC",
+            line_width=1, row=1, col=1,
+            annotation_text=f"POC {poc_val}",
+            annotation_position="top right",
+            annotation_font=dict(size=9, color="#AB47BC"),
+        )
+    s1_val = r.get("pivot_s1")
+    if s1_val and s1_val > 0:
+        fig.add_hline(
+            y=s1_val, line_dash="dot", line_color="#4FC3F7",
+            line_width=1, row=1, col=1,
+            annotation_text=f"S1 {s1_val}",
+            annotation_position="bottom left",
+            annotation_font=dict(size=9, color="#4FC3F7"),
+        )
+    r1_val = r.get("pivot_r1")
+    if r1_val and r1_val > 0:
+        fig.add_hline(
+            y=r1_val, line_dash="dot", line_color="#FF8A80",
+            line_width=1, row=1, col=1,
+            annotation_text=f"R1 {r1_val}",
+            annotation_position="top left",
+            annotation_font=dict(size=9, color="#FF8A80"),
         )
 
     # ═══ Row 2: Volume Bars ═══
@@ -948,6 +1074,55 @@ def build_event_card_html(r):
             f'border:1px solid {zr_status_color}25">{zr_status_label}</span>'
         )
 
+    # Relative flow badge (event card) — always show
+    ev_rel_badge = ""
+    ev_rel_label = r.get("relative_flow_label", "")
+    ev_rel_color = r.get("relative_flow_color", "#9ca3af")
+    ev_rel_val = r.get("relative_flow", 0)
+    if ev_rel_label:
+        ev_rel_badge = (
+            f'<span style="background:{ev_rel_color}12;color:{ev_rel_color};'
+            f'padding:2px 8px;border-radius:8px;font-size:0.70em;font-weight:600;'
+            f'border:1px solid {ev_rel_color}25">📊 {ev_rel_label} ({ev_rel_val:+.0f})</span>'
+        )
+
+    # Volatility badge (event card)
+    ev_vol_badge = ""
+    ev_atr_pct = r.get("atr_pct", 0)
+    ev_vol_label = r.get("volatility_label", "")
+    ev_vol_color = r.get("volatility_color", "#9ca3af")
+    if ev_atr_pct > 0:
+        if ev_vol_label:
+            ev_vol_badge = (
+                f'<span style="background:{ev_vol_color}12;color:{ev_vol_color};'
+                f'padding:2px 8px;border-radius:8px;font-size:0.70em;font-weight:600;'
+                f'border:1px solid {ev_vol_color}25">{ev_vol_label} ({ev_atr_pct:.1f}%)</span>'
+            )
+        else:
+            ev_vol_badge = (
+                f'<span style="background:#9ca3af12;color:#9ca3af;'
+                f'padding:2px 8px;border-radius:8px;font-size:0.70em;font-weight:600;'
+                f'border:1px solid #9ca3af25">ATR {ev_atr_pct:.1f}%</span>'
+            )
+
+    # Volume Profile location badge (event card)
+    ev_vp_badge = ""
+    ev_vp_label = r.get("vp_location_label", "")
+    ev_vp_color = r.get("vp_location_color", "#808080")
+    ev_vp_poc = r.get("vp_poc", 0)
+    if ev_vp_label:
+        ev_vp_badge = (
+            f'<span style="background:{ev_vp_color}12;color:{ev_vp_color};'
+            f'padding:2px 8px;border-radius:8px;font-size:0.70em;font-weight:600;'
+            f'border:1px solid {ev_vp_color}25">{ev_vp_label}</span>'
+        )
+    elif ev_vp_poc > 0:
+        ev_vp_badge = (
+            f'<span style="background:#AB47BC12;color:#AB47BC;'
+            f'padding:2px 8px;border-radius:8px;font-size:0.70em;font-weight:600;'
+            f'border:1px solid #AB47BC25">POC {ev_vp_poc}</span>'
+        )
+
     # Factors breakdown
     factors_html = ""
     for f in event_factors:
@@ -984,6 +1159,9 @@ def build_event_card_html(r):
 <span style="color:{phase_color};font-weight:600;font-size:0.80em">{phase_label}</span>
 {f'<span style="background:{flow_type_color}15;color:{flow_type_color};font-size:0.68em;font-weight:600;padding:2px 6px;border-radius:6px;border:1px solid {flow_type_color}30">{flow_type_label}</span>' if flow_type_label else ''}
 {zr_badge}
+{ev_rel_badge}
+{ev_vol_badge}
+{ev_vp_badge}
 </div>
 {strength_bar}
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:rgba(8,11,20,0.6);border-radius:10px;padding:8px 4px">
@@ -1104,7 +1282,7 @@ def show_events_page(results):
     ''', unsafe_allow_html=True)
 
     # Filters
-    fcol1, fcol2, fcol3, fcol4 = st.columns(4)
+    fcol1, fcol2, fcol3, fcol4, fcol5 = st.columns(5)
     with fcol1:
         type_filter = st.selectbox(
             "🏷️ النوع",
@@ -1121,6 +1299,15 @@ def show_events_page(results):
         ev_sectors = sorted(set(e["sector"] for e in all_events))
         ev_sector = st.selectbox("📂 القطاع", ["كل القطاعات"] + ev_sectors, key="ev_sector")
     with fcol4:
+        _ev_rel_map = {
+            "الكل": None,
+            "📊 ضد التيار": "ضد التيار",
+            "📊 يتفوق": "يتفوق",
+            "📊 أضعف من القطاع": "أضعف من القطاع",
+        }
+        ev_rel_label = st.selectbox("📊 قوة نسبية", list(_ev_rel_map.keys()), key="ev_rel")
+        ev_rel_val = _ev_rel_map[ev_rel_label]
+    with fcol5:
         ev_sort = st.selectbox(
             "📊 الترتيب",
             ["أقوى حدث", "أقوى أوردر فلو", "أعلى تغير ↑"],
@@ -1147,6 +1334,9 @@ def show_events_page(results):
     if ev_sector != "كل القطاعات":
         filtered = [e for e in filtered if e["sector"] == ev_sector]
 
+    if ev_rel_val:
+        filtered = [e for e in filtered if e.get("relative_flow_label") == ev_rel_val]
+
     if ev_sort == "أقوى أوردر فلو":
         filtered.sort(key=lambda x: abs(x["flow_bias"]), reverse=True)
     elif ev_sort == "أعلى تغير ↑":
@@ -1157,6 +1347,18 @@ def show_events_page(results):
     if not filtered:
         st.info("لا توجد أحداث مع هذا الفلتر.")
         return
+
+    # ── Composite Index Event Card ──
+    composite_ev = _detect_composite_event(results)
+    if composite_ev:
+        st.markdown(
+            '<div style="color:#B39DDB;font-size:0.85em;font-weight:700;margin:12px 0 6px 0">'
+            '📊 حالة مؤشر المنصة</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(build_composite_event_card_html(composite_ev), unsafe_allow_html=True)
+        st.markdown('<div style="border-bottom:1px solid #1a2035;margin:12px 0 16px 0"></div>',
+                    unsafe_allow_html=True)
 
     st.markdown(f'<div style="color:#4b5563;font-size:0.82em;margin-bottom:8px">'
                 f'عرض {len(filtered)} من {total_count} حدث</div>',
@@ -1175,6 +1377,294 @@ def show_events_page(results):
                 st.session_state.selected_ticker = ev["ticker"]
                 st.session_state.prev_page = "events"
                 st.rerun()
+
+
+# ══════════════════════════════════════════════════════════════
+# COMPOSITE INDEX EVENT DETECTION (مؤشر المنصة كحدث)
+# ══════════════════════════════════════════════════════════════
+
+def _detect_composite_event(results):
+    """
+    Detect if the composite market index itself has a bounce/breakout/breakdown.
+    Returns: event dict (like a stock result) or None.
+    """
+    dates, idx_vals, idx_highs, idx_lows = build_composite_index(results)
+    if len(idx_vals) < 15:
+        return None
+
+    # Also get PFI for flow context
+    pfi, acc_breadth, dist_breadth, _, interp = build_platform_flow_index(results)
+
+    # Current values
+    last_val = idx_vals[-1]
+    prev_val = idx_vals[-2] if len(idx_vals) >= 2 else last_val
+    change_pct = ((last_val - prev_val) / prev_val * 100) if prev_val > 0 else 0
+
+    # Recent peak & trough (20 days)
+    lookback = min(20, len(idx_vals))
+    recent_vals = idx_vals[-lookback:]
+    recent_lows_vals = idx_lows[-lookback:]
+    recent_highs = idx_highs[-lookback:]
+
+    peak_20 = max(recent_vals)
+    trough_20 = min(recent_lows_vals)
+
+    # Drop from peak
+    drop_from_peak = ((trough_20 - peak_20) / peak_20 * 100) if peak_20 > 0 else 0
+    # Bounce from trough
+    bounce_from_low = ((last_val - trough_20) / trough_20 * 100) if trough_20 > 0 else 0
+
+    # 5-day & 10-day momentum
+    val_5d = idx_vals[-6] if len(idx_vals) >= 6 else idx_vals[0]
+    val_10d = idx_vals[-11] if len(idx_vals) >= 11 else idx_vals[0]
+    mom_5d = ((last_val - val_5d) / val_5d * 100) if val_5d > 0 else 0
+    mom_10d = ((last_val - val_10d) / val_10d * 100) if val_10d > 0 else 0
+
+    # All-time high in this scan
+    all_high = max(idx_vals)
+    near_high = (last_val >= all_high * 0.98)
+
+    # ── Event Detection ──
+    event_type = None
+    event_label = ""
+
+    # 1. BOUNCE: dropped significantly and recovering
+    if drop_from_peak <= -3 and bounce_from_low >= 1.5 and mom_5d > 0:
+        event_type = "bounce"
+        if drop_from_peak <= -8 and bounce_from_low >= 4:
+            event_label = "⚡ ارتداد حاد — المؤشر هبط {:.1f}% وارتد {:.1f}%".format(
+                abs(drop_from_peak), bounce_from_low
+            )
+        elif pfi >= 55:
+            event_label = "ارتداد مدعوم بتدفق شرائي (PFI {:.0f})".format(pfi)
+        else:
+            event_label = "ارتداد أولي — المؤشر يتعافى من القاع"
+
+    # 2. BREAKOUT: at/near highs with momentum
+    elif near_high and mom_5d > 1 and pfi >= 55:
+        event_type = "breakout"
+        if pfi >= 65 and acc_breadth >= 50:
+            event_label = "🚀 اختراق سوقي مع تجميع واسع ({:.0f}% أسهم)".format(acc_breadth)
+        elif mom_5d > 2:
+            event_label = "اختراق قمة — زخم قوي {:.1f}%".format(mom_5d)
+        else:
+            event_label = "اختراق قمة المؤشر"
+
+    # 3. BREAKDOWN: declining with selling pressure
+    elif mom_5d < -1.5 and pfi <= 45:
+        event_type = "breakdown"
+        if pfi <= 35 and dist_breadth >= 50:
+            event_label = "📉 كسر سوقي مع تصريف واسع ({:.0f}% أسهم)".format(dist_breadth)
+        elif mom_10d < -3:
+            event_label = "كسر هابط — المؤشر خسر {:.1f}% في 10 أيام".format(abs(mom_10d))
+        else:
+            event_label = "كسر — ضغط بيعي على المؤشر"
+
+    if not event_type:
+        return None
+
+    # ── Build synthetic result dict ──
+    # Phase mapping from PFI
+    if pfi >= 60:
+        phase, phase_label, phase_color = "accumulation", "تجميع سوقي", "#00E676"
+    elif pfi <= 40:
+        phase, phase_label, phase_color = "distribution", "تصريف سوقي", "#FF5252"
+    elif pfi >= 50:
+        phase, phase_label, phase_color = "transition", "تحول إيجابي", "#FFD700"
+    else:
+        phase, phase_label, phase_color = "neutral", "حياد", "#9ca3af"
+
+    # Flow bias from PFI (convert 0-100 to -100..+100)
+    flow_bias = round((pfi - 50) * 2, 1)
+
+    # RSI-like: compute from index values
+    gains, losses = [], []
+    for i in range(max(1, len(idx_vals) - 14), len(idx_vals)):
+        diff = idx_vals[i] - idx_vals[i - 1]
+        if diff > 0:
+            gains.append(diff)
+        else:
+            losses.append(abs(diff))
+    avg_gain = np.mean(gains) if gains else 0
+    avg_loss = np.mean(losses) if losses else 0.001
+    rs = avg_gain / avg_loss if avg_loss > 0 else 100
+    rsi = round(100 - (100 / (1 + rs)), 1)
+
+    # Volume ratio: average of stock volume ratios
+    vol_ratios = [r.get("volume_ratio", 1.0) for r in results if r.get("volume_ratio")]
+    volume_ratio = round(np.mean(vol_ratios), 2) if vol_ratios else 1.0
+
+    synthetic = {
+        "ticker": "COMPOSITE_INDEX",
+        "name": "📊 مؤشر المنصة",
+        "sector": "مؤشر السوق",
+        "price": round(last_val, 2),
+        "change_pct": round(change_pct, 2),
+        "phase": phase,
+        "phase_label": phase_label,
+        "phase_color": phase_color,
+        "flow_bias": flow_bias,
+        "flow_type": "accumulation" if pfi >= 60 else "distribution" if pfi <= 40 else "neutral",
+        "flow_type_label": interp.split("—")[0].strip() if "—" in interp else interp,
+        "flow_type_color": "#00E676" if pfi >= 55 else "#FF5252" if pfi <= 45 else "#9ca3af",
+        "location": "above" if near_high else "bottom" if last_val <= trough_20 * 1.02 else "middle",
+        "zr_status": "normal",
+        "zr_status_label": "",
+        "zr_status_color": "#808080",
+        "volume_ratio": volume_ratio,
+        "rsi": rsi,
+        "divergence": 0,
+        "absorption_score": 0,
+        "absorption_bias": "neutral",
+        "aggressor": "buyers" if pfi >= 60 else "sellers" if pfi <= 40 else "neutral",
+        "cdv_trend": "rising" if pfi >= 55 else "falling" if pfi <= 45 else "flat",
+        "maturity_stage": "none",
+        "dist_maturity_stage": "none",
+        "early_bounce": False,
+        "early_bounce_label": "",
+        "chart_dates": list(dates),
+        "chart_close": list(idx_vals),
+        "chart_high": list(idx_highs),
+        "chart_low": list(idx_lows),
+        "chart_volume": [],
+        "chart_cdv": [],
+        # Extra PFI data
+        "_is_composite": True,
+        "_pfi": pfi,
+        "_acc_breadth": acc_breadth,
+        "_dist_breadth": dist_breadth,
+        "_mom_5d": round(mom_5d, 2),
+        "_mom_10d": round(mom_10d, 2),
+        "_interp": interp,
+    }
+
+    # Run through event classification
+    from core.events import classify_events as _classify
+    events = _classify([synthetic])
+    all_ev = events["bounces"] + events["breakouts"] + events["breakdowns"]
+
+    if all_ev:
+        ev = all_ev[0]
+        # Override the label with our more descriptive one
+        ev["event_label"] = event_label
+        ev["_is_composite"] = True
+        ev["_pfi"] = pfi
+        ev["_acc_breadth"] = acc_breadth
+        ev["_dist_breadth"] = dist_breadth
+        ev["_interp"] = interp
+        return ev
+
+    # If classify_events didn't pick it up, build manually
+    from core.events import _build_event
+    ev = _build_event(synthetic, event_type, event_label)
+    ev["_is_composite"] = True
+    ev["_pfi"] = pfi
+    ev["_acc_breadth"] = acc_breadth
+    ev["_dist_breadth"] = dist_breadth
+    ev["_interp"] = interp
+    return ev
+
+
+def build_composite_event_card_html(ev):
+    """Build a special HTML card for the composite index event."""
+    event_type = ev["event_type"]
+    event_type_display = ev["event_type_display"]
+    event_type_color = ev["event_type_color"]
+    event_label = ev["event_label"]
+    event_strength = ev["event_strength"]
+    event_grade_label = ev["event_grade_label"]
+    event_grade_color = ev["event_grade_color"]
+    event_date = ev["event_date"]
+    event_scan_time = ev.get("event_scan_time", "")
+    event_factors = ev["event_factors"]
+
+    price = ev["price"]
+    change = ev["change_pct"]
+    change_color = "#00E676" if change >= 0 else "#FF5252"
+    change_icon = "▲" if change >= 0 else "▼"
+
+    pfi = ev.get("_pfi", 50)
+    acc_breadth = ev.get("_acc_breadth", 0)
+    dist_breadth = ev.get("_dist_breadth", 0)
+    interp = ev.get("_interp", "")
+    mom_5d = ev.get("_mom_5d", 0)
+
+    pfi_color = "#00E676" if pfi >= 60 else "#FF5252" if pfi <= 40 else "#FFD700"
+
+    # Sparkline
+    close_vals = ev.get("chart_close", [])
+    sparkline = make_sparkline(close_vals, color=event_type_color, uid="composite_ev")
+
+    # Strength bar
+    bar_pct = min(event_strength, 100)
+    strength_bar = (
+        f'<div style="display:flex;align-items:center;gap:8px;margin:8px 0">'
+        f'<span style="color:#4b5563;font-size:0.68em;font-weight:600">القوة</span>'
+        f'<div style="flex:1;background:#080b14;border-radius:4px;height:6px;overflow:hidden">'
+        f'<div style="width:{bar_pct}%;height:100%;background:{event_grade_color};border-radius:4px"></div>'
+        f'</div>'
+        f'<span style="color:{event_grade_color};font-weight:700;font-size:0.80em">{event_strength}</span>'
+        f'</div>'
+    )
+
+    # Factors
+    factors_html = ""
+    for f in event_factors:
+        f_pct = round(f["score"] / f["max"] * 100) if f["max"] > 0 else 0
+        f_color = "#00E676" if f_pct >= 60 else "#FFD700" if f_pct >= 30 else "#4b5563"
+        factors_html += (
+            f'<div style="display:flex;justify-content:space-between;align-items:center;'
+            f'padding:2px 0;font-size:0.68em">'
+            f'<span style="color:#6b7280">{f["name"]}</span>'
+            f'<span style="color:{f_color};font-weight:600">{f["score"]}/{f["max"]}</span>'
+            f'</div>'
+        )
+
+    return f'''<div class="masa-card masa-card-{event_type}" style="border:2px solid {event_type_color}30;position:relative">
+<div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,{event_type_color},{event_type_color}40);border-radius:12px 12px 0 0"></div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+<span style="background:{event_type_color}18;color:{event_type_color};padding:4px 14px;border-radius:20px;font-weight:700;font-size:0.82em">{event_type_display}</span>
+<span style="background:{event_grade_color}18;color:{event_grade_color};padding:3px 10px;border-radius:12px;font-size:0.75em;font-weight:700">{event_grade_label} {event_strength}/100</span>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+<span style="background:#7C4DFF12;color:#7C4DFF;padding:2px 8px;border-radius:10px;font-size:0.68em;font-weight:500;border:1px solid #7C4DFF18">مؤشر السوق</span>
+<span style="color:{event_type_color};font-size:0.70em;font-weight:600">{event_label}</span>
+</div>
+<div style="margin-bottom:4px">
+<div style="font-size:1.15em;font-weight:800;color:#fff;line-height:1.3">📊 مؤشر المنصة</div>
+<div style="display:flex;align-items:baseline;gap:8px;margin-top:4px;flex-wrap:wrap">
+<span style="color:#fff;font-size:1.30em;font-weight:800">{price:.2f}</span>
+<span style="color:{change_color};font-weight:700;font-size:0.88em">{change_icon} {abs(change):.2f}%</span>
+<span style="color:#4b5563;font-size:0.72em">📅 {event_date} • 🕐 {event_scan_time}</span>
+</div>
+</div>
+{sparkline}
+{strength_bar}
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:rgba(8,11,20,0.6);border-radius:10px;padding:8px 4px">
+<div style="text-align:center">
+<div style="color:#374151;font-size:0.58em;margin-bottom:2px;font-weight:600">PFI</div>
+<div style="color:{pfi_color};font-weight:700;font-size:0.82em">{pfi:.0f}</div>
+</div>
+<div style="text-align:center;border-left:1px solid #151d30;border-right:1px solid #151d30">
+<div style="color:#374151;font-size:0.58em;margin-bottom:2px;font-weight:600">تجميع</div>
+<div style="color:#00E676;font-weight:700;font-size:0.78em">{acc_breadth:.0f}%</div>
+</div>
+<div style="text-align:center;border-right:1px solid #151d30">
+<div style="color:#374151;font-size:0.58em;margin-bottom:2px;font-weight:600">تصريف</div>
+<div style="color:#FF5252;font-weight:700;font-size:0.78em">{dist_breadth:.0f}%</div>
+</div>
+<div style="text-align:center">
+<div style="color:#374151;font-size:0.58em;margin-bottom:2px;font-weight:600">زخم 5 أيام</div>
+<div style="color:{"#00E676" if mom_5d > 0 else "#FF5252"};font-weight:700;font-size:0.78em">{mom_5d:+.1f}%</div>
+</div>
+</div>
+<div style="margin-top:6px;padding:4px 8px;background:rgba(124,77,255,0.06);border-radius:8px;border:1px solid rgba(124,77,255,0.12)">
+<div style="color:#B39DDB;font-size:0.75em;font-weight:600;text-align:center">{interp}</div>
+</div>
+<div style="margin-top:8px;padding:6px 8px;background:rgba(8,11,20,0.4);border-radius:8px">
+{factors_html}
+</div>
+</div>'''
 
 
 # ══════════════════════════════════════════════════════════════
@@ -2036,6 +2526,11 @@ def show_detail_panel(r):
         <div style="display:flex;gap:16px;margin-top:6px;flex-wrap:wrap;color:#4b5563;font-size:0.80em">
             <span>ZR سقف: <b style="color:#FFFFFF">{zr_h}</b></span>
             <span>ZR قاع: <b style="color:#FF9800">{zr_l}</b></span>
+            <span>قوة نسبية: <b style="color:{r.get('relative_flow_color','#9ca3af')}">{r.get('relative_flow',0):+.0f}</b> ({r.get('relative_flow_label','—')})</span>
+            <span>متوسط القطاع: <b>{r.get('sector_avg_flow',0):+.0f}</b></span>
+            <span>ATR%: <b style="color:{r.get('volatility_color','#9ca3af')}">{r.get('atr_pct',0):.1f}%</b></span>
+            <span>POC: <b style="color:#AB47BC">{r.get('vp_poc','—')}</b></span>
+            <span>S1: <b style="color:#4FC3F7">{r.get('pivot_s1','—')}</b> R1: <b style="color:#FF8A80">{r.get('pivot_r1','—')}</b></span>
         </div>
         {f'<div style="margin-top:10px;padding:8px 14px;background:rgba(255,152,0,0.08);border-radius:10px;border:1px solid rgba(255,152,0,0.15);color:#FF9800;font-weight:700;font-size:0.88em;text-align:center">{r.get("early_bounce_label","")}</div>' if r.get("early_bounce") else ''}
     </div>
@@ -2378,6 +2873,7 @@ if page == "🔬 Order Flow":
         else:
             health = 50.0
 
+        results = compute_relative_flow(results)
         st.session_state.scan_results = results
         st.session_state.market_health = health
         # Pre-compute composite index for breakout overlay
@@ -2485,7 +2981,7 @@ if page == "🔬 Order Flow":
     ''', unsafe_allow_html=True)
 
     # ── Filters ───────────────────────────────────────────
-    fcol1, fcol2, fcol3, fcol4 = st.columns(4)
+    fcol1, fcol2, fcol3, fcol4, fcol5 = st.columns(5)
     with fcol1:
         show_filter = st.selectbox(
             "🎯 التصنيف",
@@ -2510,6 +3006,15 @@ if page == "🔬 Order Flow":
         sectors = sorted(set(r["sector"] for r in results))
         selected_sector = st.selectbox("📂 القطاع", ["كل القطاعات"] + sectors)
     with fcol4:
+        _rel_map = {
+            "الكل": None,
+            "📊 ضد التيار": "ضد التيار",
+            "📊 يتفوق": "يتفوق",
+            "📊 أضعف من القطاع": "أضعف من القطاع",
+        }
+        selected_rel_label = st.selectbox("📊 قوة نسبية", list(_rel_map.keys()))
+        selected_rel = _rel_map[selected_rel_label]
+    with fcol5:
         sort_by = st.selectbox(
             "📊 الترتيب",
             ["أقوى أوردر فلو", "أكبر تغير ↑", "أعلى امتصاص", "أقوى دايفرجنس"],
@@ -2529,6 +3034,9 @@ if page == "🔬 Order Flow":
 
     if selected_sector != "كل القطاعات":
         filtered = [r for r in filtered if r["sector"] == selected_sector]
+
+    if selected_rel:
+        filtered = [r for r in filtered if r.get("relative_flow_label") == selected_rel]
 
     if sort_by == "أكبر تغير ↑":
         filtered.sort(key=lambda x: x["change_pct"], reverse=True)
