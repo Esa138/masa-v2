@@ -647,18 +647,28 @@ def build_detail_chart(r):
     arrow_color = "#00E676" if trend_up else "#FF5252"
 
     # Adjust x-axis for intraday vs daily
+    tf_label = r.get("timeframe_label", "")
     if is_intraday:
-        x4_tick = dict(showgrid=False, tickfont=dict(size=10, color="#6b7280"),
-                       tickformat="%d %b %H:%M")
-        tf_label = r.get("timeframe_label", "")
+        # Category axis = no gaps between trading sessions
+        x_type = "category"
+        x1_cfg = dict(showticklabels=False, showgrid=False,
+                       rangeslider=dict(visible=False), type=x_type)
+        x2_cfg = dict(showticklabels=False, showgrid=False, type=x_type)
+        x3_cfg = dict(showticklabels=False, showgrid=False, type=x_type)
+        x4_cfg = dict(showgrid=False, type=x_type, nticks=10,
+                       tickfont=dict(size=10, color="#6b7280"))
         title_text = f"شموع + MA20 · MA50 · MA200 + ZR  ⏱️ {tf_label}"
     else:
-        x4_tick = dict(showgrid=False, tickfont=dict(size=10, color="#6b7280"),
+        x1_cfg = dict(showticklabels=False, showgrid=False,
+                       rangeslider=dict(visible=False))
+        x2_cfg = dict(showticklabels=False, showgrid=False)
+        x3_cfg = dict(showticklabels=False, showgrid=False)
+        x4_cfg = dict(showgrid=False, tickfont=dict(size=10, color="#6b7280"),
                        dtick="M1", tickformat="%b %Y")
         title_text = "شموع + MA20 · MA50 · MA200 + ZR"
 
     fig.update_layout(
-        height=800,
+        height=850,
         margin=dict(l=0, r=0, t=30, b=0),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(20,24,36,0.8)",
@@ -673,10 +683,10 @@ def build_detail_chart(r):
             dict(text="RSI (14)", x=0.01, y=0.17, xref="paper", yref="paper",
                  showarrow=False, font=dict(size=10, color="#6b7280")),
         ],
-        xaxis=dict(showticklabels=False, showgrid=False, rangeslider=dict(visible=False)),
-        xaxis2=dict(showticklabels=False, showgrid=False),
-        xaxis3=dict(showticklabels=False, showgrid=False),
-        xaxis4=x4_tick,
+        xaxis=x1_cfg,
+        xaxis2=x2_cfg,
+        xaxis3=x3_cfg,
+        xaxis4=x4_cfg,
         yaxis=dict(showgrid=True, gridcolor="#151d30",
                    tickfont=dict(size=9, color="#4b5563")),
         yaxis2=dict(showgrid=False, tickfont=dict(size=8, color="#374151")),
