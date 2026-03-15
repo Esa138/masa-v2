@@ -439,6 +439,7 @@ def build_detail_chart(r):
     ma200_vals = r.get("chart_ma200", [])
     rsi_vals = r.get("chart_rsi", [])
     cdv_vals = r.get("chart_cdv", [])
+    is_intraday = r.get("timeframe", "1d") != "1d"
 
     if not dates or len(dates) < 20:
         return None
@@ -479,7 +480,7 @@ def build_detail_chart(r):
     fig = make_subplots(
         rows=4, cols=1,
         shared_xaxes=True,
-        row_heights=[0.45, 0.15, 0.22, 0.18],
+        row_heights=[0.50, 0.13, 0.20, 0.17],
         vertical_spacing=0.03,
     )
 
@@ -527,7 +528,9 @@ def build_detail_chart(r):
         x=dates,
         open=open_vals, high=high_vals, low=low_vals, close=close_vals,
         increasing_line_color="#00E676", increasing_fillcolor="#00E676",
+        increasing_line_width=1.5,
         decreasing_line_color="#FF5252", decreasing_fillcolor="#FF5252",
+        decreasing_line_width=1.5,
         name="السعر",
     ), row=1, col=1)
 
@@ -643,14 +646,25 @@ def build_detail_chart(r):
     phase_label = r["phase_label"]
     arrow_color = "#00E676" if trend_up else "#FF5252"
 
+    # Adjust x-axis for intraday vs daily
+    if is_intraday:
+        x4_tick = dict(showgrid=False, tickfont=dict(size=10, color="#6b7280"),
+                       tickformat="%d %b %H:%M")
+        tf_label = r.get("timeframe_label", "")
+        title_text = f"شموع + MA20 · MA50 · MA200 + ZR  ⏱️ {tf_label}"
+    else:
+        x4_tick = dict(showgrid=False, tickfont=dict(size=10, color="#6b7280"),
+                       dtick="M1", tickformat="%b %Y")
+        title_text = "شموع + MA20 · MA50 · MA200 + ZR"
+
     fig.update_layout(
-        height=700,
+        height=800,
         margin=dict(l=0, r=0, t=30, b=0),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(20,24,36,0.8)",
         showlegend=False,
         annotations=[
-            dict(text="شموع + MA20 · MA50 · MA200 + ZR", x=0.01, y=1.02,
+            dict(text=title_text, x=0.01, y=1.02,
                  xref="paper", yref="paper", showarrow=False,
                  font=dict(size=11, color="#6b7280")),
             dict(text=f"CDV — <span style='color:{arrow_color}'>{phase_label}</span>",
@@ -662,8 +676,7 @@ def build_detail_chart(r):
         xaxis=dict(showticklabels=False, showgrid=False, rangeslider=dict(visible=False)),
         xaxis2=dict(showticklabels=False, showgrid=False),
         xaxis3=dict(showticklabels=False, showgrid=False),
-        xaxis4=dict(showgrid=False, tickfont=dict(size=10, color="#6b7280"),
-                    dtick="M1", tickformat="%b %Y"),
+        xaxis4=x4_tick,
         yaxis=dict(showgrid=True, gridcolor="#151d30",
                    tickfont=dict(size=9, color="#4b5563")),
         yaxis2=dict(showgrid=False, tickfont=dict(size=8, color="#374151")),
