@@ -3337,6 +3337,49 @@ elif page == "🗺️ خريطة القطاعات":
         st.markdown('<h2 style="text-align:center;margin-bottom:4px">🗺️ خريطة القطاعات</h2>', unsafe_allow_html=True)
         st.caption("القطاعات مرتبة من أقوى تجميع لأقوى تصريف — الأسهم داخل كل قطاع مرتبة بنفس المنطق")
 
+        # ══ Top Chart: Platform Composite vs Market Benchmark ══
+        _comp_dates, _comp_vals, _, _ = build_composite_index(results)
+        if len(_comp_dates) >= 15:
+            _bench_norm, _, _, _bench_name, _bench_color = _fetch_benchmark_normalized(
+                _comp_dates, market_key=market_key, start_val=_comp_vals[0]
+            )
+            import plotly.graph_objects as go
+            _top_fig = go.Figure()
+            # Platform composite line
+            _top_fig.add_trace(go.Scatter(
+                x=_comp_dates, y=_comp_vals,
+                mode="lines", name="المؤشر المركب",
+                line=dict(color="#00E676", width=2.5),
+            ))
+            # Benchmark line
+            if _bench_norm:
+                _b_dates = [d for d in _comp_dates if d in _bench_norm]
+                _b_vals = [_bench_norm[d] for d in _b_dates]
+                _top_fig.add_trace(go.Scatter(
+                    x=_b_dates, y=_b_vals,
+                    mode="lines", name=_bench_name,
+                    line=dict(color="#FFD700", width=2, dash="dot"),
+                ))
+            _top_fig.add_hline(y=_comp_vals[0], line_dash="dash", line_color="#374151", line_width=1)
+            _comp_ret = round((_comp_vals[-1] - _comp_vals[0]) / _comp_vals[0] * 100, 2)
+            _comp_ret_c = "#00E676" if _comp_ret >= 0 else "#FF5252"
+            _top_fig.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                height=280, margin=dict(l=40, r=20, t=10, b=30),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
+                            font=dict(family="Tajawal", size=12)),
+                yaxis=dict(title=None, gridcolor="#192035", tickfont=dict(size=10, color="#4b5563")),
+                xaxis=dict(gridcolor="#192035", tickfont=dict(size=10, color="#4b5563")),
+                font=dict(family="Tajawal"),
+            )
+            st.plotly_chart(_top_fig, use_container_width=True, config={"displayModeBar": False})
+            st.markdown(
+                f'<div style="text-align:center;color:#6b7280;font-size:0.82em;margin:-10px 0 10px">'
+                f'عائد المؤشر المركب: <b style="color:{_comp_ret_c}">{_comp_ret:+.2f}%</b></div>',
+                unsafe_allow_html=True
+            )
+
         # ── Phase classification ──
         _accum_phases = {"accumulation", "markup", "spring"}
         _dist_phases = {"distribution", "markdown", "upthrust"}
@@ -3421,6 +3464,16 @@ elif page == "🗺️ خريطة القطاعات":
 
         st.divider()
 
+        # ── Pre-compute sector composites ──
+        _sector_composites = {}
+        for sd in sector_data:
+            _sec_dates, _sec_vals, _, _ = build_composite_index(sd["stocks"])
+            if len(_sec_dates) >= 5 and len(_sec_vals) >= 5:
+                _sec_ret = round((_sec_vals[-1] - _sec_vals[0]) / _sec_vals[0] * 100, 2)
+                _sector_composites[sd["name"]] = {
+                    "dates": _sec_dates, "vals": _sec_vals, "ret": _sec_ret,
+                }
+
         # ── Render sector cards ──
         for sd in sector_data:
             sector_color = SECTOR_COLORS.get(sd["name"], "#607D8B")
@@ -3491,11 +3544,26 @@ elif page == "🗺️ خريطة القطاعات":
                     <div class="smap-fb">{fb_bar}<div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:#374151"></div></div>
                 </div>'''
 
+            # Sector composite return badge
+            _sec_comp = _sector_composites.get(sd["name"])
+            _sec_ret_badge = ""
+            if _sec_comp:
+                _sr = _sec_comp["ret"]
+                _src = "#00E676" if _sr >= 0 else "#FF5252"
+                _sec_ret_badge = (
+                    f'<span style="color:{_src};font-weight:800;font-size:0.88em;'
+                    f'background:{_src}12;padding:2px 8px;border-radius:8px">'
+                    f'{"+" if _sr >= 0 else ""}{_sr:.1f}%</span>'
+                )
+
             card_html = f'''
             <div class="smap-card" style="border-top:3px solid {sector_color}">
                 <div class="smap-header">
                     <div class="smap-header-name" style="color:{sector_color}">{sd["name"]}</div>
-                    <div class="smap-health" style="color:{h_color}">{h_sign}{health}</div>
+                    <div style="display:flex;align-items:center;gap:10px">
+                        {_sec_ret_badge}
+                        <div class="smap-health" style="color:{h_color}">{h_sign}{health}</div>
+                    </div>
                 </div>
                 <div class="smap-counts">
                     <span>🟢 {sd["n_accum"]} تجميع</span>
@@ -3508,10 +3576,37 @@ elif page == "🗺️ خريطة القطاعات":
                     <div class="smap-bar-n" style="width:{n_pct}%"></div>
                     <div class="smap-bar-r" style="width:{r_pct}%"></div>
                 </div>
-                <div class="smap-rows">{rows_html}</div>
             </div>'''
 
             st.markdown(card_html, unsafe_allow_html=True)
+
+            # Sector sparkline chart
+            if _sec_comp and len(_sec_comp["dates"]) >= 5:
+                _sr = _sec_comp["ret"]
+                _slc = "#00E676" if _sr >= 0 else "#FF5252"
+                _sfill = "rgba(0,230,118,0.06)" if _sr >= 0 else "rgba(255,82,82,0.06)"
+                _sfig = go.Figure()
+                _sfig.add_trace(go.Scatter(
+                    x=_sec_comp["dates"], y=_sec_comp["vals"],
+                    mode="lines", showlegend=False,
+                    line=dict(color=_slc, width=1.5),
+                    fill="tozeroy", fillcolor=_sfill,
+                ))
+                _sfig.add_hline(y=_sec_comp["vals"][0], line_dash="dot",
+                                line_color="#374151", line_width=1)
+                _sfig.update_layout(
+                    template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    height=90, margin=dict(l=0, r=0, t=0, b=0),
+                    xaxis=dict(visible=False), yaxis=dict(visible=False),
+                    font=dict(family="Tajawal"),
+                )
+                st.plotly_chart(_sfig, use_container_width=True, config={"displayModeBar": False})
+
+            # Stock rows
+            if rows_html:
+                st.markdown(f'<div class="smap-rows" style="margin-top:-10px">{rows_html}</div>',
+                            unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════
