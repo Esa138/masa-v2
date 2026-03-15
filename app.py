@@ -2883,7 +2883,7 @@ with st.sidebar:
 
     page = st.radio(
         "الصفحة",
-        ["🔬 Order Flow", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "📊 أداء النظام"],
+        ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "📊 أداء النظام"],
         label_visibility="collapsed",
     )
 
@@ -3232,6 +3232,188 @@ if page == "🔬 Order Flow":
             st.toast(f"📊 تم تحديث نتائج {result['updated']} إشارة سابقة", icon="✅")
     except Exception:
         pass  # لا نوقف المنصة لو فشل التحديث
+
+
+# ══════════════════════════════════════════════════════════════
+# PAGE: Sector Map — Accumulation & Distribution Heatmap
+# ══════════════════════════════════════════════════════════════
+
+elif page == "🗺️ خريطة القطاعات":
+    results = st.session_state.scan_results
+    if results is None:
+        st.markdown('''
+        <div style="text-align:center;padding:80px 20px;color:#4b5563">
+            <div style="font-size:4em;margin-bottom:20px;opacity:0.4">🗺️</div>
+            <div style="font-size:1.3em;color:#6b7280;margin-bottom:10px">
+                اضغط <b style="color:#00E676">ابدأ المسح</b> أولاً في صفحة Order Flow
+            </div>
+            <div style="font-size:0.88em">لعرض خريطة التجميع والتصريف حسب القطاعات</div>
+        </div>
+        ''', unsafe_allow_html=True)
+    else:
+        st.markdown('<h2 style="text-align:center;margin-bottom:4px">🗺️ خريطة القطاعات</h2>', unsafe_allow_html=True)
+        st.caption("القطاعات مرتبة من أقوى تجميع لأقوى تصريف — الأسهم داخل كل قطاع مرتبة بنفس المنطق")
+
+        # ── Phase classification ──
+        _accum_phases = {"accumulation", "markup", "spring"}
+        _dist_phases = {"distribution", "markdown", "upthrust"}
+        _phase_rank = {
+            "accumulation": 1, "markup": 2, "spring": 2.5,
+            "transition": 5, "neutral": 5,
+            "upthrust": 7, "markdown": 7.5, "distribution": 8,
+        }
+
+        # ── Group by sector ──
+        from collections import defaultdict
+        sector_stocks = defaultdict(list)
+        for r in results:
+            sector_stocks[r["sector"]].append(r)
+
+        # ── Compute sector health ──
+        sector_data = []
+        for sector_name, stocks in sector_stocks.items():
+            n = len(stocks)
+            if n == 0:
+                continue
+
+            # 1. Phase balance (40%)
+            phase_scores = []
+            for s in stocks:
+                p = s["phase"]
+                if p in _accum_phases:
+                    phase_scores.append(1.0)
+                elif p in _dist_phases:
+                    phase_scores.append(-1.0)
+                else:
+                    phase_scores.append(0.0)
+            phase_balance = (sum(phase_scores) / n) * 100
+
+            # 2. Average flow_bias (30%)
+            avg_flow = sum(s["flow_bias"] for s in stocks) / n
+
+            # 3. Decision ratio (30%)
+            enters = sum(1 for s in stocks if s["decision"] == "enter")
+            avoids = sum(1 for s in stocks if s["decision"] == "avoid")
+            decision_ratio = ((enters - avoids) / n) * 100
+
+            health = round(phase_balance * 0.4 + avg_flow * 0.3 + decision_ratio * 0.3, 1)
+
+            # Count categories
+            n_accum = sum(1 for s in stocks if s["phase"] in _accum_phases)
+            n_dist = sum(1 for s in stocks if s["phase"] in _dist_phases)
+            n_neutral = n - n_accum - n_dist
+
+            # Sort stocks within sector
+            stocks_sorted = sorted(stocks, key=lambda s: (
+                _phase_rank.get(s["phase"], 5),
+                -s["flow_bias"],
+                -s.get("maturity_days", 0),
+            ))
+
+            sector_data.append({
+                "name": sector_name,
+                "health": health,
+                "stocks": stocks_sorted,
+                "n": n,
+                "n_accum": n_accum,
+                "n_dist": n_dist,
+                "n_neutral": n_neutral,
+                "avg_flow": round(avg_flow, 1),
+            })
+
+        # Sort sectors by health (most accumulation first)
+        sector_data.sort(key=lambda x: -x["health"])
+
+        # ── Summary metrics ──
+        green_sectors = sum(1 for s in sector_data if s["health"] > 20)
+        red_sectors = sum(1 for s in sector_data if s["health"] < -20)
+        neutral_sectors = len(sector_data) - green_sectors - red_sectors
+        best_sector = sector_data[0]["name"] if sector_data else "—"
+
+        sc1, sc2, sc3, sc4 = st.columns(4)
+        sc1.metric("قطاعات تجميع 🟢", green_sectors)
+        sc2.metric("قطاعات تصريف 🔴", red_sectors)
+        sc3.metric("قطاعات محايدة ⚪", neutral_sectors)
+        sc4.metric("أقوى قطاع", best_sector)
+
+        st.divider()
+
+        # ── Render sector cards ──
+        for sd in sector_data:
+            sector_color = SECTOR_COLORS.get(sd["name"], "#607D8B")
+            health = sd["health"]
+            h_color = "#00E676" if health > 20 else "#FF5252" if health < -20 else "#9ca3af"
+            h_sign = "+" if health > 0 else ""
+
+            # Proportions for bar
+            total = sd["n"]
+            g_pct = round(sd["n_accum"] / total * 100) if total else 0
+            r_pct = round(sd["n_dist"] / total * 100) if total else 0
+            n_pct = 100 - g_pct - r_pct
+
+            # Build stock rows HTML
+            rows_html = ""
+            for s in sd["stocks"]:
+                p = s["phase"]
+                p_label = s.get("phase_label", "—")
+                p_color = s.get("phase_color", "#808080")
+                fb = s["flow_bias"]
+
+                # Maturity info
+                if p in _accum_phases:
+                    m_days = s.get("maturity_days", 0)
+                    m_label = f"{m_days} يوم" if m_days > 0 else ""
+                elif p in _dist_phases:
+                    m_days = s.get("dist_maturity_days", 0)
+                    m_label = f"{m_days} يوم" if m_days > 0 else ""
+                else:
+                    m_label = ""
+
+                # Flow bias bar
+                fb_abs = min(abs(fb), 100)
+                fb_pct = fb_abs / 2  # scale to 50% max width
+                fb_color = "#00E676" if fb > 0 else "#FF5252"
+                if fb >= 0:
+                    fb_bar = f'<div class="smap-fb-fill" style="right:50%;width:{fb_pct}%;background:{fb_color}"></div>'
+                else:
+                    fb_bar = f'<div class="smap-fb-fill" style="left:50%;width:{fb_pct}%;background:{fb_color}"></div>'
+
+                chg = s.get("change_pct", 0)
+                chg_color = "#00E676" if chg > 0 else "#FF5252" if chg < 0 else "#9ca3af"
+                chg_str = f"{chg:+.1f}%"
+                tk_short = s["ticker"].replace(".SR", "")
+
+                rows_html += f'''
+                <div class="smap-row">
+                    <div class="smap-row-name">{s["name"]}</div>
+                    <div class="smap-row-tk">{tk_short}</div>
+                    <div class="smap-row-price">{s["price"]:.2f} <span style="color:{chg_color};font-size:0.82em">{chg_str}</span></div>
+                    <div class="smap-phase" style="background:{p_color}18;color:{p_color};border:1px solid {p_color}30">{p_label}</div>
+                    <div class="smap-days">{m_label}</div>
+                    <div class="smap-fb">{fb_bar}<div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:#374151"></div></div>
+                </div>'''
+
+            card_html = f'''
+            <div class="smap-card" style="border-top:3px solid {sector_color}">
+                <div class="smap-header">
+                    <div class="smap-header-name" style="color:{sector_color}">{sd["name"]}</div>
+                    <div class="smap-health" style="color:{h_color}">{h_sign}{health}</div>
+                </div>
+                <div class="smap-counts">
+                    <span>🟢 {sd["n_accum"]} تجميع</span>
+                    <span>🔴 {sd["n_dist"]} تصريف</span>
+                    <span>⚪ {sd["n_neutral"]} محايد</span>
+                    <span style="margin-right:auto;color:#4b5563">({sd["n"]} سهم)</span>
+                </div>
+                <div class="smap-bar-wrap">
+                    <div class="smap-bar-g" style="width:{g_pct}%"></div>
+                    <div class="smap-bar-n" style="width:{n_pct}%"></div>
+                    <div class="smap-bar-r" style="width:{r_pct}%"></div>
+                </div>
+                <div class="smap-rows">{rows_html}</div>
+            </div>'''
+
+            st.markdown(card_html, unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════

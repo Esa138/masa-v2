@@ -219,6 +219,57 @@ h1, h2, h3 { color: #ffffff !important; }
 ::-webkit-scrollbar-track { background: #080b14; }
 ::-webkit-scrollbar-thumb { background: #1e2540; border-radius: 3px; }
 
+/* ── Sector Map ── */
+.smap-card {
+    background: linear-gradient(135deg, rgba(13,19,33,0.95), rgba(10,15,26,0.98));
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+.smap-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px 10px;
+}
+.smap-header-name {
+    font-size: 1.15em; font-weight: 700; color: #e0e0e0;
+}
+.smap-counts {
+    display: flex; gap: 12px; padding: 0 20px 12px;
+    font-size: 0.78em; color: #9ca3af;
+}
+.smap-counts span { display: flex; align-items: center; gap: 3px; }
+.smap-bar-wrap {
+    display: flex; height: 6px; margin: 0 20px 14px;
+    border-radius: 3px; overflow: hidden; background: #1a1f2e;
+}
+.smap-bar-g { background: #00E676; }
+.smap-bar-n { background: #4b5563; }
+.smap-bar-r { background: #FF5252; }
+.smap-rows { padding: 0 12px 12px; }
+.smap-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 10px;
+    background: rgba(255,255,255,0.02);
+    margin-bottom: 4px; font-size: 0.82em;
+}
+.smap-row:hover { background: rgba(255,255,255,0.05); }
+.smap-row-name { flex: 1; font-weight: 600; color: #e0e0e0; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smap-row-tk { color: #6b7280; font-size: 0.88em; width: 58px; text-align: center; }
+.smap-row-price { color: #9ca3af; width: 70px; text-align: left; direction: ltr; }
+.smap-phase {
+    padding: 2px 8px; border-radius: 8px; font-size: 0.78em;
+    font-weight: 500; white-space: nowrap;
+}
+.smap-days { color: #6b7280; font-size: 0.76em; width: 55px; text-align: center; }
+.smap-fb { width: 60px; height: 6px; border-radius: 3px; background: #1a1f2e;
+    position: relative; overflow: hidden; }
+.smap-fb-fill { height: 100%; border-radius: 3px; position: absolute; }
+.smap-health {
+    font-size: 1.3em; font-weight: 800; direction: ltr;
+}
+
 /* ── Hide Streamlit Branding ── */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
