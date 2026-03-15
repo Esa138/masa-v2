@@ -4,23 +4,29 @@ Professional dark theme with glassmorphism cards.
 """
 
 SECTOR_COLORS = {
-    # Saudi Market
-    "المصارف": "#4FC3F7",
-    "البتروكيماويات": "#FF7043",
-    "الأسمنت": "#78909C",
-    "التجزئة والصحة": "#AB47BC",
-    "النقل والخدمات": "#26A69A",
-    "التجزئة": "#EC407A",
-    "العقار": "#FFA726",
-    "الزراعة والغذاء": "#66BB6A",
-    "الاتصالات": "#42A5F5",
-    "التقنية": "#7E57C2",
-    "التأمين": "#FFCA28",
-    "المواد": "#8D6E63",
-    "الطاقة": "#EF5350",
-    "المرافق": "#5C6BC0",
-    "الصناعة": "#78909C",
-    # US Market
+    # ── Saudi Market — Tadawul GICS Sectors ──
+    "البنوك": "#4FC3F7",                # Light Blue
+    "الخدمات المالية": "#29B6F6",       # Blue
+    "التأمين": "#FFCA28",              # Yellow
+    "الطاقة": "#EF5350",              # Red
+    "المواد الأساسية": "#8D6E63",      # Brown
+    "السلع الرأسمالية": "#78909C",     # Gray-Blue
+    "الخدمات التجارية": "#90A4AE",     # Light Gray
+    "النقل": "#26A69A",               # Teal
+    "السلع الكمالية": "#AB47BC",       # Purple
+    "الخدمات الاستهلاكية": "#FF7043",  # Orange
+    "الإعلام والترفيه": "#EC407A",     # Pink
+    "التجزئة": "#E91E63",             # Hot Pink
+    "تجزئة الأغذية": "#66BB6A",       # Green
+    "إنتاج الأغذية": "#4CAF50",       # Dark Green
+    "الرعاية الصحية": "#CE93D8",       # Light Purple
+    "الأدوية": "#BA68C8",             # Medium Purple
+    "الاتصالات": "#42A5F5",           # Blue
+    "التقنية": "#7E57C2",             # Deep Purple
+    "المرافق العامة": "#5C6BC0",      # Indigo
+    "العقارات": "#FFA726",            # Orange-Yellow
+    "التعليم": "#00BCD4",             # Cyan
+    # ── US Market ──
     "Technology": "#7E57C2",
     "Consumer": "#EC407A",
     "Fintech": "#4FC3F7",
