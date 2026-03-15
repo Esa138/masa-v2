@@ -2844,6 +2844,28 @@ with st.sidebar:
     </div>
     ''', unsafe_allow_html=True)
 
+    # ── Live Clock: 24h + Gregorian + Hijri ──
+    st.html('''
+    <div style="text-align:center;padding:10px 8px;background:rgba(0,210,255,0.03);border:1px solid rgba(0,210,255,0.08);border-radius:10px;margin:4px 0 8px 0">
+        <div id="mk-time" style="font-size:1.8em;font-weight:800;color:#00d2ff;letter-spacing:3px;font-family:'Courier New',monospace;text-shadow:0 0 12px rgba(0,210,255,0.3)"></div>
+        <div id="mk-greg" style="font-size:0.80em;color:#9ca3af;margin-top:4px;font-family:Tajawal,sans-serif"></div>
+        <div id="mk-hijr" style="font-size:0.80em;color:#FFD700;margin-top:2px;font-family:Tajawal,sans-serif"></div>
+    </div>
+    <script>
+    function _mkClock(){
+        const n=new Date();
+        const tz={timeZone:'Asia/Riyadh'};
+        document.getElementById('mk-time').textContent=
+            n.toLocaleTimeString('en-GB',{...tz,hour12:false});
+        document.getElementById('mk-greg').textContent=
+            n.toLocaleDateString('ar-SA',{...tz,weekday:'long',year:'numeric',month:'long',day:'numeric',calendar:'gregory'});
+        document.getElementById('mk-hijr').textContent=
+            '☪ '+n.toLocaleDateString('ar-SA',{...tz,day:'numeric',month:'long',year:'numeric',calendar:'islamic-umalqura'});
+    }
+    _mkClock();setInterval(_mkClock,1000);
+    </script>
+    ''')
+
     st.divider()
 
     market_options = list(MARKETS.keys())
