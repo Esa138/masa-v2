@@ -19,12 +19,12 @@ import pandas as pd
 DB_FILE = "masa_v2.db"
 
 
-def update_signal_outcomes(lookback_days: int = 30) -> dict:
+def update_signal_outcomes() -> dict:
     """
     Check and update outcomes for signals that need tracking.
 
     Logic:
-    - Find signals where outcome_5d/10d/20d is NULL
+    - Find ALL signals where outcome_5d/10d/20d is NULL
     - If enough days have passed since date_logged, fetch current price
     - Compare with entry_price → compute return
     - Win = return > 0%, Loss = return <= 0%
@@ -43,17 +43,16 @@ def update_signal_outcomes(lookback_days: int = 30) -> dict:
         with sqlite3.connect(DB_FILE) as conn:
             conn.row_factory = sqlite3.Row
 
-            # Get signals that need outcome tracking
+            # Get ALL signals that need outcome tracking (no date limit)
             today = datetime.date.today()
             rows = conn.execute("""
                 SELECT id, date_logged, ticker, entry_price, stop_loss, target,
                        outcome_5d, outcome_10d, outcome_20d
                 FROM signals
                 WHERE decision = 'enter'
-                AND date_logged >= date('now', ?)
                 AND (outcome_5d IS NULL OR outcome_10d IS NULL OR outcome_20d IS NULL)
                 ORDER BY date_logged ASC
-            """, (f"-{lookback_days} days",)).fetchall()
+            """).fetchall()
 
             if not rows:
                 return {"updated": 0, "errors": 0, "details": ["لا توجد إشارات تحتاج تحديث"]}
@@ -71,7 +70,7 @@ def update_signal_outcomes(lookback_days: int = 30) -> dict:
                 try:
                     # Fetch enough history to cover all pending checks
                     t = yf.Ticker(tk)
-                    hist = t.history(period="2mo", interval="1d")
+                    hist = t.history(period="6mo", interval="1d")
                     if hist is None or hist.empty:
                         errors += 1
                         continue
@@ -182,13 +181,18 @@ def _get_price_on_or_before(
     closes: pd.Series, target_date: datetime.date, lookback: int = 3
 ) -> float:
     """Get closing price on target_date or nearest prior trading day."""
+    # Normalize index to naive dates for comparison
+    date_map = {}
+    for idx in closes.index:
+        d = idx.date() if hasattr(idx, "date") else idx
+        if isinstance(d, datetime.datetime):
+            d = d.date()
+        date_map[d] = idx
+
     for i in range(lookback + 1):
         check = target_date - datetime.timedelta(days=i)
-        # Find matching date in index
-        for idx in closes.index:
-            idx_date = idx.date() if hasattr(idx, "date") else idx
-            if idx_date == check:
-                return float(closes[idx])
+        if check in date_map:
+            return float(closes[date_map[check]])
     return None
 
 
@@ -201,8 +205,10 @@ def _check_stop_hit(
         return False
 
     for idx, low_val in lows.items():
-        idx_date = idx.date() if hasattr(idx, "date") else idx
-        if start_date < idx_date <= end_date:
+        d = idx.date() if hasattr(idx, "date") else idx
+        if isinstance(d, datetime.datetime):
+            d = d.date()
+        if start_date < d <= end_date:
             if float(low_val) <= stop_loss:
                 return True
     return False

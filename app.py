@@ -3225,6 +3225,14 @@ if page == "🔬 Order Flow":
                 "reasons_against": r["reasons_against"],
             })
 
+    # ── Auto-update signal outcomes after every scan ────────
+    try:
+        result = update_signal_outcomes()
+        if result["updated"] > 0:
+            st.toast(f"📊 تم تحديث نتائج {result['updated']} إشارة سابقة", icon="✅")
+    except Exception:
+        pass  # لا نوقف المنصة لو فشل التحديث
+
 
 # ══════════════════════════════════════════════════════════════
 # PAGE: Market Breakout Index
@@ -3275,7 +3283,7 @@ elif page == "📊 أداء النظام":
 
     if pending > 0:
         with st.spinner(f"📡 تحديث نتائج {pending} إشارة..."):
-            result = update_signal_outcomes(lookback_days=60)
+            result = update_signal_outcomes()
         if result["updated"] > 0:
             st.success(f"تم تحديث {result['updated']} إشارة")
             with st.expander("تفاصيل التحديث"):
@@ -3311,7 +3319,12 @@ elif page == "📊 أداء النظام":
         wr = perf["win_rate"]
         wr_color = "normal" if wr >= 55 else "inverse" if wr < 45 else "off"
         c3.metric("نسبة النجاح (10 أيام)", f"{wr:.1f}%", delta_color=wr_color)
-        c4.metric("متوسط العائد", f"{perf['avg_return']:+.1f}%")
+        c4.metric("متوسط العائد (10 أيام)", f"{perf['avg_return']:+.1f}%")
+    elif perf.get("win_rate_5d", 0) > 0:
+        wr5 = perf["win_rate_5d"]
+        wr5_color = "normal" if wr5 >= 55 else "inverse" if wr5 < 45 else "off"
+        c3.metric("نسبة النجاح (5 أيام)", f"{wr5:.1f}%", delta_color=wr5_color)
+        c4.metric("متوسط العائد (5 أيام)", f"{perf.get('avg_return_5d', 0):+.1f}%")
     else:
         c3.metric("نسبة النجاح", "⏳ انتظار")
         c4.metric("متوسط العائد", "⏳ انتظار")
@@ -3320,13 +3333,31 @@ elif page == "📊 أداء النظام":
     st.subheader("📡 حالة التتبع")
     t1, t2, t3, t4 = st.columns(4)
     t1.metric("إشارات دخول", tracking["total_enter"])
-    t2.metric("مكتملة", tracking["completed"])
-    t3.metric("قيد التتبع", pending)
-    t4.metric(
-        "تغطية",
-        f"{tracking['completed'] / tracking['total_enter'] * 100:.0f}%"
-        if tracking["total_enter"] > 0 else "—"
-    )
+    # Show 5d completion if 10d not ready yet
+    completed_label = tracking["completed"]
+    if tracking["completed"] == 0 and perf.get("completed_5d", 0) > 0:
+        completed_label = f"{perf['completed_5d']} (5 أيام)"
+    t2.metric("مكتملة", completed_label)
+    # Show pending with breakdown
+    if pending > 0:
+        t3.metric("قيد التتبع", pending)
+    elif tracking["total_enter"] > 0 and tracking["completed"] == 0:
+        # Signals exist but too new for any tracking
+        t3.metric("قيد التتبع", f"⏳ تنتظر 5+ أيام")
+    else:
+        t3.metric("قيد التتبع", pending)
+    # Coverage
+    total_e = tracking["total_enter"]
+    if total_e > 0:
+        if tracking["completed"] > 0:
+            coverage = f"{tracking['completed'] / total_e * 100:.0f}%"
+        elif perf.get("completed_5d", 0) > 0:
+            coverage = f"{perf['completed_5d'] / total_e * 100:.0f}% (5 أيام)"
+        else:
+            coverage = "0%"
+    else:
+        coverage = "—"
+    t4.metric("تغطية", coverage)
 
     st.divider()
 

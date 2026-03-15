@@ -152,7 +152,10 @@ def get_total_performance() -> dict:
                     SUM(CASE WHEN decision = 'enter' THEN 1 ELSE 0 END) as enter_count,
                     SUM(CASE WHEN decision = 'enter' AND outcome_10d = 'win' THEN 1 ELSE 0 END) as enter_wins,
                     SUM(CASE WHEN decision = 'enter' AND outcome_10d IS NOT NULL THEN 1 ELSE 0 END) as enter_completed,
-                    AVG(CASE WHEN decision = 'enter' THEN return_10d END) as avg_return
+                    AVG(CASE WHEN decision = 'enter' AND return_10d IS NOT NULL THEN return_10d END) as avg_return,
+                    SUM(CASE WHEN decision = 'enter' AND outcome_5d = 'win' THEN 1 ELSE 0 END) as wins_5d,
+                    SUM(CASE WHEN decision = 'enter' AND outcome_5d IS NOT NULL THEN 1 ELSE 0 END) as completed_5d,
+                    AVG(CASE WHEN decision = 'enter' AND return_5d IS NOT NULL THEN return_5d END) as avg_return_5d
                 FROM signals
             """).fetchone()
 
@@ -161,6 +164,8 @@ def get_total_performance() -> dict:
 
             completed = row["enter_completed"] or 0
             wins = row["enter_wins"] or 0
+            completed_5d = row["completed_5d"] or 0
+            wins_5d = row["wins_5d"] or 0
 
             return {
                 "total": row["total"] or 0,
@@ -169,6 +174,10 @@ def get_total_performance() -> dict:
                 "enter_wins": wins,
                 "win_rate": round(wins / completed * 100, 1) if completed > 0 else 0,
                 "avg_return": round(row["avg_return"] or 0, 2),
+                "completed_5d": completed_5d,
+                "wins_5d": wins_5d,
+                "win_rate_5d": round(wins_5d / completed_5d * 100, 1) if completed_5d > 0 else 0,
+                "avg_return_5d": round(row["avg_return_5d"] or 0, 2),
             }
     except Exception:
         return {"total": 0, "enter_count": 0, "win_rate": 0, "avg_return": 0}
