@@ -222,7 +222,8 @@ def scan_market(
             _abs_s = _abs(high, low, close, volume, 20)
             _rc_s = _rc(high, low, 20)
             _rsi_s = _rsi2(close, 14)
-            _all_dates = [d.strftime("%Y-%m-%d") for d in close.index]
+            _intra_fmt = "%Y-%m-%d %H:%M" if interval != "1d" else "%Y-%m-%d"
+            _all_dates = [d.strftime(_intra_fmt) for d in close.index]
             maturity = compute_accumulation_maturity(
                 _all_dates, close, _rolling, _cdv_s, _abs_s, _rc_s, _rsi_s, volume
             )

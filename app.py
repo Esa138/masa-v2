@@ -88,6 +88,8 @@ def make_sparkline(values, color="#4FC3F7", uid="x"):
 def _maturity_mini(r):
     """Build mini maturity badge for card: stage + days + start date."""
     parts = []
+    _is_intra = r.get("timeframe", "1d") != "1d"
+    _unit = "شمعة" if _is_intra else "يوم"
     # Accumulation maturity
     m_stage = r.get("maturity_stage", "none")
     if m_stage != "none":
@@ -99,7 +101,7 @@ def _maturity_mini(r):
         parts.append(
             f'<span style="background:{m_color}12;color:{m_color};font-size:0.68em;'
             f'font-weight:600;padding:2px 8px;border-radius:8px;border:1px solid {m_color}25">'
-            f'📦 {m_label} • {m_days} يوم'
+            f'📦 {m_label} • {m_days} {_unit}'
             f'{f" • من {start}" if start else ""}</span>'
         )
     # Distribution maturity
@@ -113,7 +115,7 @@ def _maturity_mini(r):
         parts.append(
             f'<span style="background:{dm_color}12;color:{dm_color};font-size:0.68em;'
             f'font-weight:600;padding:2px 8px;border-radius:8px;border:1px solid {dm_color}25">'
-            f'🔻 {dm_label} • {dm_days} يوم'
+            f'🔻 {dm_label} • {dm_days} {_unit}'
             f'{f" • من {start}" if start else ""}</span>'
         )
     return "".join(parts)
@@ -2584,6 +2586,8 @@ def show_detail_panel(r):
     ''')
 
     # ── Accumulation Maturity Timeline ──
+    _detail_intra = r.get("timeframe", "1d") != "1d"
+    _detail_unit = "شمعة" if _detail_intra else "يوم"
     m_stage = r.get("maturity_stage", "none")
     m_timeline = r.get("maturity_timeline", [])
     if m_stage != "none" and m_timeline:
@@ -2618,7 +2622,7 @@ def show_detail_panel(r):
                     border:1px solid {m_color}25;border-radius:12px;padding:14px 18px;margin:8px 0;direction:rtl">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
                 <span style="color:{m_color};font-weight:700;font-size:0.92em">{m_label}</span>
-                <span style="color:#4b5563;font-size:0.78em">تجميع مستمر: <b style="color:#fff">{m_days} يوم</b></span>
+                <span style="color:#4b5563;font-size:0.78em">تجميع مستمر: <b style="color:#fff">{m_days} {_detail_unit}</b></span>
             </div>
             <div style="display:flex;flex-direction:column;gap:4px">
                 {steps_html}
@@ -2663,7 +2667,7 @@ def show_detail_panel(r):
                     border:1px solid {dm_color}25;border-radius:12px;padding:14px 18px;margin:8px 0;direction:rtl">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
                 <span style="color:{dm_color};font-weight:700;font-size:0.92em">{dm_label}</span>
-                <span style="color:#4b5563;font-size:0.78em">تصريف مستمر: <b style="color:#fff">{dm_days} يوم</b></span>
+                <span style="color:#4b5563;font-size:0.78em">تصريف مستمر: <b style="color:#fff">{dm_days} {_detail_unit}</b></span>
             </div>
             <div style="display:flex;flex-direction:column;gap:4px">
                 {dm_steps_html}
