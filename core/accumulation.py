@@ -611,7 +611,27 @@ def compute_accumulation_maturity(
 
     if streak == 0:
         return {"stage": "none", "stage_label": "لا يوجد تجميع نشط",
-                "stage_color": "#808080", "timeline": [], "current_days": 0}
+                "stage_color": "#808080", "timeline": [], "current_days": 0,
+                "counter_flow_events": 0, "counter_flow_days": 0,
+                "conviction": 100.0}
+
+    # ── Counter-flow: count distribution pulses during accumulation ──
+    _accum_window = daily_signals[-streak:]
+    _cf_events = 0
+    _cf_days = 0
+    _in_cf = False
+    for sig in _accum_window:
+        rd = sig.get("rd", 0)
+        cdv_5d = sig.get("cdv_5d", 0)
+        is_dist_pulse = rd < 0 and cdv_5d < 0
+        if is_dist_pulse:
+            _cf_days += 1
+            if not _in_cf:
+                _cf_events += 1
+                _in_cf = True
+        else:
+            _in_cf = False
+    _conviction = round(max(0, 100 - (_cf_days / streak * 100)), 1) if streak > 0 else 100.0
 
     # ── Signal intensity (current values) ──
     last_sig = daily_signals[-1]
@@ -719,6 +739,9 @@ def compute_accumulation_maturity(
         "stage_color": stage_color,
         "timeline": timeline,
         "current_days": streak,
+        "counter_flow_events": _cf_events,
+        "counter_flow_days": _cf_days,
+        "conviction": _conviction,
     }
 
 
@@ -775,7 +798,27 @@ def compute_distribution_maturity(
 
     if streak == 0:
         return {"stage": "none", "stage_label": "لا يوجد تصريف نشط",
-                "stage_color": "#808080", "timeline": [], "current_days": 0}
+                "stage_color": "#808080", "timeline": [], "current_days": 0,
+                "counter_flow_events": 0, "counter_flow_days": 0,
+                "conviction": 100.0}
+
+    # ── Counter-flow: count accumulation pulses during distribution ──
+    _dist_window = daily_signals[-streak:]
+    _cf_events = 0
+    _cf_days = 0
+    _in_cf = False
+    for sig in _dist_window:
+        rd = sig.get("rd", 0)
+        cdv_5d = sig.get("cdv_5d", 0)
+        is_accum_pulse = rd > 0 and cdv_5d > 0
+        if is_accum_pulse:
+            _cf_days += 1
+            if not _in_cf:
+                _cf_events += 1
+                _in_cf = True
+        else:
+            _in_cf = False
+    _conviction = round(max(0, 100 - (_cf_days / streak * 100)), 1) if streak > 0 else 100.0
 
     # Signal intensity
     last_sig = daily_signals[-1]
@@ -859,6 +902,9 @@ def compute_distribution_maturity(
         "stage_color": stage_color,
         "timeline": timeline,
         "current_days": streak,
+        "counter_flow_events": _cf_events,
+        "counter_flow_days": _cf_days,
+        "conviction": _conviction,
     }
 
 

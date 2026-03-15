@@ -478,12 +478,18 @@ def scan_market(
                 "maturity_color": maturity["stage_color"],
                 "maturity_timeline": maturity["timeline"],
                 "maturity_days": maturity["current_days"],
+                "maturity_cf_events": maturity.get("counter_flow_events", 0),
+                "maturity_cf_days": maturity.get("counter_flow_days", 0),
+                "maturity_conviction": maturity.get("conviction", 100.0),
                 # Distribution maturity
                 "dist_maturity_stage": dist_maturity["stage"],
                 "dist_maturity_label": dist_maturity["stage_label"],
                 "dist_maturity_color": dist_maturity["stage_color"],
                 "dist_maturity_timeline": dist_maturity["timeline"],
                 "dist_maturity_days": dist_maturity["current_days"],
+                "dist_cf_events": dist_maturity.get("counter_flow_events", 0),
+                "dist_cf_days": dist_maturity.get("counter_flow_days", 0),
+                "dist_conviction": dist_maturity.get("conviction", 100.0),
                 # Adaptive parameters (ATR-based)
                 "volatility": adaptive["volatility"],
                 "volatility_label": adaptive["volatility_label"],

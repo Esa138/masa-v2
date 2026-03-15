@@ -99,11 +99,25 @@ def _maturity_mini(r):
         m_days = r.get("maturity_days", 0)
         m_timeline = r.get("maturity_timeline", [])
         start = m_timeline[0]["date"] if m_timeline else ""
+        _cf_ev = r.get("maturity_cf_events", 0)
+        _cf_d = r.get("maturity_cf_days", 0)
+        _conv = r.get("maturity_conviction", 100.0)
+        _conv_txt = ""
+        if m_days >= 5:
+            if _conv >= 85:
+                _cc = "#00E676"
+            elif _conv >= 65:
+                _cc = "#FFD700"
+            else:
+                _cc = "#FF5252"
+            _pulse_txt = f" • {_cf_ev} نبضة تصريف" if _cf_ev > 0 else ""
+            _conv_txt = (f' <span style="color:{_cc};font-weight:700">'
+                         f'⟨{_conv:.0f}%⟩</span>{_pulse_txt}')
         parts.append(
             f'<span style="background:{m_color}12;color:{m_color};font-size:0.68em;'
             f'font-weight:600;padding:2px 8px;border-radius:8px;border:1px solid {m_color}25">'
             f'📦 {m_label} • {m_days} {_unit}'
-            f'{f" • من {start}" if start else ""}</span>'
+            f'{f" • من {start}" if start else ""}{_conv_txt}</span>'
         )
     # Distribution maturity
     dm_stage = r.get("dist_maturity_stage", "none")
@@ -113,11 +127,25 @@ def _maturity_mini(r):
         dm_days = r.get("dist_maturity_days", 0)
         dm_timeline = r.get("dist_maturity_timeline", [])
         start = dm_timeline[0]["date"] if dm_timeline else ""
+        _dcf_ev = r.get("dist_cf_events", 0)
+        _dcf_d = r.get("dist_cf_days", 0)
+        _dconv = r.get("dist_conviction", 100.0)
+        _dconv_txt = ""
+        if dm_days >= 5:
+            if _dconv >= 85:
+                _dcc = "#FF5252"
+            elif _dconv >= 65:
+                _dcc = "#FFD700"
+            else:
+                _dcc = "#00E676"
+            _dpulse_txt = f" • {_dcf_ev} نبضة تجميع" if _dcf_ev > 0 else ""
+            _dconv_txt = (f' <span style="color:{_dcc};font-weight:700">'
+                          f'⟨{_dconv:.0f}%⟩</span>{_dpulse_txt}')
         parts.append(
             f'<span style="background:{dm_color}12;color:{dm_color};font-size:0.68em;'
             f'font-weight:600;padding:2px 8px;border-radius:8px;border:1px solid {dm_color}25">'
             f'🔻 {dm_label} • {dm_days} {_unit}'
-            f'{f" • من {start}" if start else ""}</span>'
+            f'{f" • من {start}" if start else ""}{_dconv_txt}</span>'
         )
     return "".join(parts)
 
@@ -2618,13 +2646,36 @@ def show_detail_panel(r):
             if i < len(m_timeline) - 1:
                 steps_html += '<div style="width:2px;height:16px;background:#374151;margin-right:5px"></div>'
 
+        _m_cf_ev = r.get("maturity_cf_events", 0)
+        _m_cf_d = r.get("maturity_cf_days", 0)
+        _m_conv = r.get("maturity_conviction", 100.0)
+        _m_conv_html = ""
+        if m_days >= 5:
+            if _m_conv >= 85:
+                _mc = "#00E676"; _ml = "اقتناع قوي"
+            elif _m_conv >= 65:
+                _mc = "#FFD700"; _ml = "اقتناع متوسط"
+            else:
+                _mc = "#FF5252"; _ml = "اقتناع ضعيف"
+            _m_pulse_info = f"{_m_cf_ev} نبضة تصريف ({_m_cf_d} يوم)" if _m_cf_ev > 0 else "لا يوجد تدفق عكسي"
+            _m_conv_html = (
+                f'<div style="display:flex;justify-content:space-between;align-items:center;'
+                f'padding:8px 12px;margin:8px 0;background:rgba(255,255,255,0.03);border-radius:8px;'
+                f'border:1px solid {_mc}30">'
+                f'<span style="color:#9ca3af;font-size:0.82em">{_ml}</span>'
+                f'<span style="color:{_mc};font-weight:800;font-size:1.1em">{_m_conv:.0f}%</span>'
+                f'<span style="color:#6b7280;font-size:0.78em">{_m_pulse_info}</span>'
+                f'</div>'
+            )
+
         st.html(f'''
         <div style="font-family:Tajawal,sans-serif;background:linear-gradient(135deg,rgba({int(m_color[1:3],16)},{int(m_color[3:5],16)},{int(m_color[5:7],16)},0.05),#0e1424);
                     border:1px solid {m_color}25;border-radius:12px;padding:14px 18px;margin:8px 0;direction:rtl">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
                 <span style="color:{m_color};font-weight:700;font-size:0.92em">{m_label}</span>
                 <span style="color:#4b5563;font-size:0.78em">تجميع مستمر: <b style="color:#fff">{m_days} {_detail_unit}</b></span>
             </div>
+            {_m_conv_html}
             <div style="display:flex;flex-direction:column;gap:4px">
                 {steps_html}
             </div>
@@ -2660,16 +2711,40 @@ def show_detail_panel(r):
             if i < len(dm_timeline) - 1:
                 dm_steps_html += '<div style="width:2px;height:16px;background:#374151;margin-right:5px"></div>'
 
+        _d_cf_ev = r.get("dist_cf_events", 0)
+        _d_cf_d = r.get("dist_cf_days", 0)
+        _d_conv = r.get("dist_conviction", 100.0)
+        _d_conv_html = ""
+        if dm_days >= 5:
+            # For distribution: high conviction = strong selling (red), low = weak selling (green)
+            if _d_conv >= 85:
+                _dc = "#FF5252"; _dl = "تصريف مقتنع"
+            elif _d_conv >= 65:
+                _dc = "#FFD700"; _dl = "تصريف متوسط"
+            else:
+                _dc = "#00E676"; _dl = "تصريف ضعيف"
+            _d_pulse_info = f"{_d_cf_ev} نبضة تجميع ({_d_cf_d} يوم)" if _d_cf_ev > 0 else "لا يوجد تدفق عكسي"
+            _d_conv_html = (
+                f'<div style="display:flex;justify-content:space-between;align-items:center;'
+                f'padding:8px 12px;margin:8px 0;background:rgba(255,255,255,0.03);border-radius:8px;'
+                f'border:1px solid {_dc}30">'
+                f'<span style="color:#9ca3af;font-size:0.82em">{_dl}</span>'
+                f'<span style="color:{_dc};font-weight:800;font-size:1.1em">{_d_conv:.0f}%</span>'
+                f'<span style="color:#6b7280;font-size:0.78em">{_d_pulse_info}</span>'
+                f'</div>'
+            )
+
         r_hex = int(dm_color[1:3], 16)
         g_hex = int(dm_color[3:5], 16)
         b_hex = int(dm_color[5:7], 16)
         st.html(f'''
         <div style="font-family:Tajawal,sans-serif;background:linear-gradient(135deg,rgba({r_hex},{g_hex},{b_hex},0.05),#0e1424);
                     border:1px solid {dm_color}25;border-radius:12px;padding:14px 18px;margin:8px 0;direction:rtl">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
                 <span style="color:{dm_color};font-weight:700;font-size:0.92em">{dm_label}</span>
                 <span style="color:#4b5563;font-size:0.78em">تصريف مستمر: <b style="color:#fff">{dm_days} {_detail_unit}</b></span>
             </div>
+            {_d_conv_html}
             <div style="display:flex;flex-direction:column;gap:4px">
                 {dm_steps_html}
             </div>
@@ -3359,15 +3434,30 @@ elif page == "🗺️ خريطة القطاعات":
                 p_color = s.get("phase_color", "#808080")
                 fb = s["flow_bias"]
 
-                # Maturity info
+                # Maturity info + conviction
                 if p in _accum_phases:
                     m_days = s.get("maturity_days", 0)
+                    _conv = s.get("maturity_conviction", 100.0)
+                    _cf_ev = s.get("maturity_cf_events", 0)
                     m_label = f"{m_days} يوم" if m_days > 0 else ""
                 elif p in _dist_phases:
                     m_days = s.get("dist_maturity_days", 0)
+                    _conv = s.get("dist_conviction", 100.0)
+                    _cf_ev = s.get("dist_cf_events", 0)
                     m_label = f"{m_days} يوم" if m_days > 0 else ""
                 else:
                     m_label = ""
+                    _conv = 100.0
+                    _cf_ev = 0
+
+                # Conviction badge
+                _conv_badge = ""
+                if p in _accum_phases and s.get("maturity_days", 0) >= 5:
+                    _cc = "#00E676" if _conv >= 85 else "#FFD700" if _conv >= 65 else "#FF5252"
+                    _conv_badge = f'<span style="color:{_cc};font-size:0.75em;font-weight:700">⟨{_conv:.0f}%⟩</span>'
+                elif p in _dist_phases and s.get("dist_maturity_days", 0) >= 5:
+                    _cc = "#FF5252" if _conv >= 85 else "#FFD700" if _conv >= 65 else "#00E676"
+                    _conv_badge = f'<span style="color:{_cc};font-size:0.75em;font-weight:700">⟨{_conv:.0f}%⟩</span>'
 
                 # Flow bias bar
                 fb_abs = min(abs(fb), 100)
@@ -3389,7 +3479,7 @@ elif page == "🗺️ خريطة القطاعات":
                     <div class="smap-row-tk">{tk_short}</div>
                     <div class="smap-row-price">{s["price"]:.2f} <span style="color:{chg_color};font-size:0.82em">{chg_str}</span></div>
                     <div class="smap-phase" style="background:{p_color}18;color:{p_color};border:1px solid {p_color}30">{p_label}</div>
-                    <div class="smap-days">{m_label}</div>
+                    <div class="smap-days">{m_label} {_conv_badge}</div>
                     <div class="smap-fb">{fb_bar}<div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:#374151"></div></div>
                 </div>'''
 
