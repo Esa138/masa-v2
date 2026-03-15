@@ -3337,50 +3337,7 @@ elif page == "🗺️ خريطة القطاعات":
         st.markdown('<h2 style="text-align:center;margin-bottom:4px">🗺️ خريطة القطاعات</h2>', unsafe_allow_html=True)
         st.caption("القطاعات مرتبة من أقوى تجميع لأقوى تصريف — الأسهم داخل كل قطاع مرتبة بنفس المنطق")
 
-        # ══ Top Chart: Platform Composite vs Market Benchmark ══
-        _comp_dates, _comp_vals, _, _ = build_composite_index(results)
-        if len(_comp_dates) >= 15:
-            _bench_norm, _, _, _bench_name, _bench_color = _fetch_benchmark_normalized(
-                _comp_dates, market_key=market_key, start_val=_comp_vals[0]
-            )
-            import plotly.graph_objects as go
-            _top_fig = go.Figure()
-            # Platform composite line
-            _top_fig.add_trace(go.Scatter(
-                x=_comp_dates, y=_comp_vals,
-                mode="lines", name="المؤشر المركب",
-                line=dict(color="#00E676", width=2.5),
-            ))
-            # Benchmark line
-            if _bench_norm:
-                _b_dates = [d for d in _comp_dates if d in _bench_norm]
-                _b_vals = [_bench_norm[d] for d in _b_dates]
-                _top_fig.add_trace(go.Scatter(
-                    x=_b_dates, y=_b_vals,
-                    mode="lines", name=_bench_name,
-                    line=dict(color="#FFD700", width=2, dash="dot"),
-                ))
-            _top_fig.add_hline(y=_comp_vals[0], line_dash="dash", line_color="#374151", line_width=1)
-            _comp_ret = round((_comp_vals[-1] - _comp_vals[0]) / _comp_vals[0] * 100, 2)
-            _comp_ret_c = "#00E676" if _comp_ret >= 0 else "#FF5252"
-            _top_fig.update_layout(
-                template="plotly_dark",
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                height=280, margin=dict(l=40, r=20, t=10, b=30),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
-                            font=dict(family="Tajawal", size=12)),
-                yaxis=dict(title=None, gridcolor="#192035", tickfont=dict(size=10, color="#4b5563")),
-                xaxis=dict(gridcolor="#192035", tickfont=dict(size=10, color="#4b5563")),
-                font=dict(family="Tajawal"),
-            )
-            st.plotly_chart(_top_fig, use_container_width=True, config={"displayModeBar": False})
-            st.markdown(
-                f'<div style="text-align:center;color:#6b7280;font-size:0.82em;margin:-10px 0 10px">'
-                f'عائد المؤشر المركب: <b style="color:{_comp_ret_c}">{_comp_ret:+.2f}%</b></div>',
-                unsafe_allow_html=True
-            )
-
-        # ── Phase classification ──
+        # ── Phase classification (needed early for sector grouping) ──
         _accum_phases = {"accumulation", "markup", "spring"}
         _dist_phases = {"distribution", "markdown", "upthrust"}
         _phase_rank = {
@@ -3473,6 +3430,82 @@ elif page == "🗺️ خريطة القطاعات":
                 _sector_composites[sd["name"]] = {
                     "dates": _sec_dates, "vals": _sec_vals, "ret": _sec_ret,
                 }
+
+        # ══ Master Chart: Platform + Benchmark + All Sectors ══
+        _comp_dates, _comp_vals, _, _ = build_composite_index(results)
+        if len(_comp_dates) >= 15:
+            _bench_norm, _, _, _bench_name, _bench_color = _fetch_benchmark_normalized(
+                _comp_dates, market_key=market_key, start_val=_comp_vals[0]
+            )
+            import plotly.graph_objects as go
+
+            # Sector selection checkboxes
+            _sec_names = [sd["name"] for sd in sector_data if sd["name"] in _sector_composites]
+            _show_sectors = set()
+            if _sec_names:
+                st.markdown(
+                    '<div style="color:#6b7280;font-size:0.82em;margin-bottom:4px">اختر القطاعات للعرض:</div>',
+                    unsafe_allow_html=True
+                )
+                _n_cols = min(len(_sec_names), 7)
+                _ck_cols = st.columns(_n_cols)
+                for _ci, _sn in enumerate(_sec_names):
+                    _sc = SECTOR_COLORS.get(_sn, "#607D8B")
+                    with _ck_cols[_ci % _n_cols]:
+                        if st.checkbox(_sn, value=(_ci < 3), key=f"sec_ck_{_sn}"):
+                            _show_sectors.add(_sn)
+
+            _top_fig = go.Figure()
+
+            # 1. Platform composite (thick green)
+            _top_fig.add_trace(go.Scatter(
+                x=_comp_dates, y=_comp_vals,
+                mode="lines", name="المؤشر المركب",
+                line=dict(color="#00E676", width=3),
+            ))
+
+            # 2. Benchmark (gold dotted)
+            if _bench_norm:
+                _b_dates = [d for d in _comp_dates if d in _bench_norm]
+                _b_vals = [_bench_norm[d] for d in _b_dates]
+                _top_fig.add_trace(go.Scatter(
+                    x=_b_dates, y=_b_vals,
+                    mode="lines", name=_bench_name,
+                    line=dict(color="#FFD700", width=2, dash="dot"),
+                ))
+
+            # 3. Selected sector lines
+            for _sn in _show_sectors:
+                _sc_data = _sector_composites[_sn]
+                _sc_color = SECTOR_COLORS.get(_sn, "#607D8B")
+                _top_fig.add_trace(go.Scatter(
+                    x=_sc_data["dates"], y=_sc_data["vals"],
+                    mode="lines", name=f"{_sn} ({_sc_data['ret']:+.1f}%)",
+                    line=dict(color=_sc_color, width=1.5),
+                    opacity=0.8,
+                ))
+
+            _top_fig.add_hline(y=_comp_vals[0], line_dash="dash", line_color="#374151", line_width=1)
+            _top_fig.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                height=400, margin=dict(l=40, r=20, t=10, b=30),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
+                            font=dict(family="Tajawal", size=11)),
+                yaxis=dict(title=None, gridcolor="#192035", tickfont=dict(size=10, color="#4b5563")),
+                xaxis=dict(gridcolor="#192035", tickfont=dict(size=10, color="#4b5563")),
+                font=dict(family="Tajawal"),
+                hovermode="x unified",
+            )
+            st.plotly_chart(_top_fig, use_container_width=True, config={"displayModeBar": False})
+
+            _comp_ret = round((_comp_vals[-1] - _comp_vals[0]) / _comp_vals[0] * 100, 2)
+            _comp_ret_c = "#00E676" if _comp_ret >= 0 else "#FF5252"
+            st.markdown(
+                f'<div style="text-align:center;color:#6b7280;font-size:0.82em;margin:-10px 0 10px">'
+                f'عائد المؤشر المركب: <b style="color:{_comp_ret_c}">{_comp_ret:+.2f}%</b></div>',
+                unsafe_allow_html=True
+            )
 
         # ── Render sector cards ──
         for sd in sector_data:
@@ -3580,32 +3613,9 @@ elif page == "🗺️ خريطة القطاعات":
 
             st.markdown(card_html, unsafe_allow_html=True)
 
-            # Sector sparkline chart
-            if _sec_comp and len(_sec_comp["dates"]) >= 5:
-                _sr = _sec_comp["ret"]
-                _slc = "#00E676" if _sr >= 0 else "#FF5252"
-                _sfill = "rgba(0,230,118,0.06)" if _sr >= 0 else "rgba(255,82,82,0.06)"
-                _sfig = go.Figure()
-                _sfig.add_trace(go.Scatter(
-                    x=_sec_comp["dates"], y=_sec_comp["vals"],
-                    mode="lines", showlegend=False,
-                    line=dict(color=_slc, width=1.5),
-                    fill="tozeroy", fillcolor=_sfill,
-                ))
-                _sfig.add_hline(y=_sec_comp["vals"][0], line_dash="dot",
-                                line_color="#374151", line_width=1)
-                _sfig.update_layout(
-                    template="plotly_dark",
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    height=90, margin=dict(l=0, r=0, t=0, b=0),
-                    xaxis=dict(visible=False), yaxis=dict(visible=False),
-                    font=dict(family="Tajawal"),
-                )
-                st.plotly_chart(_sfig, use_container_width=True, config={"displayModeBar": False})
-
             # Stock rows
             if rows_html:
-                st.markdown(f'<div class="smap-rows" style="margin-top:-10px">{rows_html}</div>',
+                st.markdown(f'<div class="smap-rows">{rows_html}</div>',
                             unsafe_allow_html=True)
 
 
