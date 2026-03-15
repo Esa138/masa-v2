@@ -540,7 +540,7 @@ def build_detail_chart(r):
     if zr_high and zr_high > 0:
         fig.add_hline(
             y=zr_high, line_dash="dashdot", line_color="#FFFFFF",
-            line_width=1.5, row=1, col=1,
+            line_width=2.5, row=1, col=1,
             annotation_text=f"ZR سقف {zr_high}",
             annotation_position="top right",
             annotation_font=dict(size=10, color="#FFFFFF"),
@@ -548,7 +548,7 @@ def build_detail_chart(r):
     if zr_low and zr_low > 0:
         fig.add_hline(
             y=zr_low, line_dash="dashdot", line_color="#FF9800",
-            line_width=1.5, row=1, col=1,
+            line_width=2.5, row=1, col=1,
             annotation_text=f"ZR قاع {zr_low}",
             annotation_position="bottom right",
             annotation_font=dict(size=10, color="#FF9800"),
