@@ -100,19 +100,13 @@ def _maturity_mini(r):
         m_timeline = r.get("maturity_timeline", [])
         start = m_timeline[0]["date"] if m_timeline else ""
         _cf_ev = r.get("maturity_cf_events", 0)
-        _cf_d = r.get("maturity_cf_days", 0)
         _conv = r.get("maturity_conviction", 100.0)
         _conv_txt = ""
         if m_days >= 5:
-            if _conv >= 85:
-                _cc = "#00E676"
-            elif _conv >= 65:
-                _cc = "#FFD700"
-            else:
-                _cc = "#FF5252"
-            _pulse_txt = f" • {_cf_ev} نبضة تصريف" if _cf_ev > 0 else ""
-            _conv_txt = (f' <span style="color:{_cc};font-weight:700">'
-                         f'⟨{_conv:.0f}%⟩</span>{_pulse_txt}')
+            _cc = "#00E676" if _conv >= 85 else "#FFD700" if _conv >= 65 else "#FF5252"
+            _conv_txt = f' • <span style="color:{_cc};font-weight:700">نقاء {_conv:.0f}%</span>'
+            if _cf_ev > 0:
+                _conv_txt += f' <span style="color:#FF5252;font-size:0.9em">({_cf_ev}🔴)</span>'
         parts.append(
             f'<span style="background:{m_color}12;color:{m_color};font-size:0.68em;'
             f'font-weight:600;padding:2px 8px;border-radius:8px;border:1px solid {m_color}25">'
@@ -128,19 +122,13 @@ def _maturity_mini(r):
         dm_timeline = r.get("dist_maturity_timeline", [])
         start = dm_timeline[0]["date"] if dm_timeline else ""
         _dcf_ev = r.get("dist_cf_events", 0)
-        _dcf_d = r.get("dist_cf_days", 0)
         _dconv = r.get("dist_conviction", 100.0)
         _dconv_txt = ""
         if dm_days >= 5:
-            if _dconv >= 85:
-                _dcc = "#FF5252"
-            elif _dconv >= 65:
-                _dcc = "#FFD700"
-            else:
-                _dcc = "#00E676"
-            _dpulse_txt = f" • {_dcf_ev} نبضة تجميع" if _dcf_ev > 0 else ""
-            _dconv_txt = (f' <span style="color:{_dcc};font-weight:700">'
-                          f'⟨{_dconv:.0f}%⟩</span>{_dpulse_txt}')
+            _dcc = "#FF5252" if _dconv >= 85 else "#FFD700" if _dconv >= 65 else "#00E676"
+            _dconv_txt = f' • <span style="color:{_dcc};font-weight:700">نقاء {_dconv:.0f}%</span>'
+            if _dcf_ev > 0:
+                _dconv_txt += f' <span style="color:#00E676;font-size:0.9em">({_dcf_ev}🟢)</span>'
         parts.append(
             f'<span style="background:{dm_color}12;color:{dm_color};font-size:0.68em;'
             f'font-weight:600;padding:2px 8px;border-radius:8px;border:1px solid {dm_color}25">'
@@ -2649,22 +2637,32 @@ def show_detail_panel(r):
         _m_cf_ev = r.get("maturity_cf_events", 0)
         _m_cf_d = r.get("maturity_cf_days", 0)
         _m_conv = r.get("maturity_conviction", 100.0)
+        _m_clean_d = m_days - _m_cf_d
         _m_conv_html = ""
         if m_days >= 5:
             if _m_conv >= 85:
-                _mc = "#00E676"; _ml = "اقتناع قوي"
+                _mc = "#00E676"
             elif _m_conv >= 65:
-                _mc = "#FFD700"; _ml = "اقتناع متوسط"
+                _mc = "#FFD700"
             else:
-                _mc = "#FF5252"; _ml = "اقتناع ضعيف"
-            _m_pulse_info = f"{_m_cf_ev} نبضة تصريف ({_m_cf_d} يوم)" if _m_cf_ev > 0 else "لا يوجد تدفق عكسي"
+                _mc = "#FF5252"
+            _g_pct = round(_m_clean_d / m_days * 100) if m_days > 0 else 100
+            _r_pct = 100 - _g_pct
             _m_conv_html = (
-                f'<div style="display:flex;justify-content:space-between;align-items:center;'
-                f'padding:8px 12px;margin:8px 0;background:rgba(255,255,255,0.03);border-radius:8px;'
-                f'border:1px solid {_mc}30">'
-                f'<span style="color:#9ca3af;font-size:0.82em">{_ml}</span>'
-                f'<span style="color:{_mc};font-weight:800;font-size:1.1em">{_m_conv:.0f}%</span>'
-                f'<span style="color:#6b7280;font-size:0.78em">{_m_pulse_info}</span>'
+                f'<div style="margin:10px 0 8px;padding:10px 14px;background:#0a0f1c;border-radius:10px;'
+                f'border:1px solid #192035">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+                f'<span style="color:#fff;font-weight:700;font-size:0.9em">نقاء المرحلة</span>'
+                f'<span style="color:{_mc};font-weight:800;font-size:1.3em">{_m_conv:.0f}%</span>'
+                f'</div>'
+                f'<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;background:#1a1f30">'
+                f'<div style="width:{_g_pct}%;background:#00E676;border-radius:6px 0 0 6px"></div>'
+                f'<div style="width:{_r_pct}%;background:#FF5252;border-radius:0 6px 6px 0"></div>'
+                f'</div>'
+                f'<div style="display:flex;justify-content:space-between;margin-top:8px;font-size:0.78em">'
+                f'<span style="color:#00E676">🟢 {_m_clean_d} يوم تجميع</span>'
+                f'<span style="color:#FF5252">🔴 {_m_cf_d} يوم تصريف ({_m_cf_ev} نبضة)</span>'
+                f'</div>'
                 f'</div>'
             )
 
@@ -2714,23 +2712,33 @@ def show_detail_panel(r):
         _d_cf_ev = r.get("dist_cf_events", 0)
         _d_cf_d = r.get("dist_cf_days", 0)
         _d_conv = r.get("dist_conviction", 100.0)
+        _d_clean_d = dm_days - _d_cf_d
         _d_conv_html = ""
         if dm_days >= 5:
-            # For distribution: high conviction = strong selling (red), low = weak selling (green)
+            # For distribution: high conviction = strong selling (red/bad), low = weak (green/good)
             if _d_conv >= 85:
-                _dc = "#FF5252"; _dl = "تصريف مقتنع"
+                _dc = "#FF5252"
             elif _d_conv >= 65:
-                _dc = "#FFD700"; _dl = "تصريف متوسط"
+                _dc = "#FFD700"
             else:
-                _dc = "#00E676"; _dl = "تصريف ضعيف"
-            _d_pulse_info = f"{_d_cf_ev} نبضة تجميع ({_d_cf_d} يوم)" if _d_cf_ev > 0 else "لا يوجد تدفق عكسي"
+                _dc = "#00E676"
+            _dg_pct = round(_d_clean_d / dm_days * 100) if dm_days > 0 else 100
+            _dr_pct = 100 - _dg_pct
             _d_conv_html = (
-                f'<div style="display:flex;justify-content:space-between;align-items:center;'
-                f'padding:8px 12px;margin:8px 0;background:rgba(255,255,255,0.03);border-radius:8px;'
-                f'border:1px solid {_dc}30">'
-                f'<span style="color:#9ca3af;font-size:0.82em">{_dl}</span>'
-                f'<span style="color:{_dc};font-weight:800;font-size:1.1em">{_d_conv:.0f}%</span>'
-                f'<span style="color:#6b7280;font-size:0.78em">{_d_pulse_info}</span>'
+                f'<div style="margin:10px 0 8px;padding:10px 14px;background:#0a0f1c;border-radius:10px;'
+                f'border:1px solid #192035">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+                f'<span style="color:#fff;font-weight:700;font-size:0.9em">نقاء المرحلة</span>'
+                f'<span style="color:{_dc};font-weight:800;font-size:1.3em">{_d_conv:.0f}%</span>'
+                f'</div>'
+                f'<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;background:#1a1f30">'
+                f'<div style="width:{_dg_pct}%;background:#FF5252;border-radius:6px 0 0 6px"></div>'
+                f'<div style="width:{_dr_pct}%;background:#00E676;border-radius:0 6px 6px 0"></div>'
+                f'</div>'
+                f'<div style="display:flex;justify-content:space-between;margin-top:8px;font-size:0.78em">'
+                f'<span style="color:#FF5252">🔴 {_d_clean_d} يوم تصريف</span>'
+                f'<span style="color:#00E676">🟢 {_d_cf_d} يوم تجميع ({_d_cf_ev} نبضة)</span>'
+                f'</div>'
                 f'</div>'
             )
 
