@@ -3553,14 +3553,19 @@ elif page == "🗺️ خريطة القطاعات":
         _smap_intra = _smap_tf != "1d"
 
         def _filter_session(dates, vals):
-            """For intraday: keep only last trading session (last date's data)."""
+            """For intraday: keep only the last trading session."""
             if not _smap_intra or not dates or not vals:
                 return dates, vals
-            # dates format: "YYYY-MM-DD HH:MM" for intraday
-            last_day = dates[-1][:10]  # extract "YYYY-MM-DD"
-            filtered = [(d, v) for d, v in zip(dates, vals) if d[:10] == last_day]
-            if len(filtered) < 3:
-                return dates, vals  # fallback if too little data
+            # Extract unique trading days
+            unique_days = sorted(set(d[:10] for d in dates))
+            # Try last day first; if too few bars, use previous day
+            for offset in range(len(unique_days)):
+                target_day = unique_days[-(1 + offset)]
+                filtered = [(d, v) for d, v in zip(dates, vals) if d[:10] == target_day]
+                if len(filtered) >= 2:
+                    break
+            else:
+                return dates, vals  # absolute fallback
             fd, fv = zip(*filtered)
             # Re-normalize to start at 100
             start = fv[0]
@@ -3657,7 +3662,7 @@ elif page == "🗺️ خريطة القطاعات":
             _comp_ret_c = "#00E676" if _comp_ret >= 0 else "#FF5252"
             _tf_labels = {"1d": "يومي", "1h": "ساعة", "15m": "15 دقيقة", "5m": "5 دقائق"}
             _tf_txt = _tf_labels.get(_smap_tf, "")
-            _session_txt = " — جلسة اليوم" if _smap_intra else ""
+            _session_txt = " — آخر جلسة" if _smap_intra else ""
             st.markdown(
                 f'<div style="text-align:center;color:#6b7280;font-size:0.82em;margin:-10px 0 10px">'
                 f'⏱️ فريم {_tf_txt}{_session_txt} • '
