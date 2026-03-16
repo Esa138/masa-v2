@@ -19,6 +19,7 @@ SECTOR_COLORS = {
     "الإعلام والترفيه": "#EC407A",     # Pink
     "التجزئة": "#E91E63",             # Hot Pink
     "السلع الاستهلاكية": "#66BB6A",     # Green
+    "تجزئة السلع الاستهلاكية": "#43A047", # Dark Green
     "الرعاية الصحية": "#CE93D8",       # Light Purple
     "الأدوية": "#BA68C8",             # Medium Purple
     "الاتصالات": "#42A5F5",           # Blue
