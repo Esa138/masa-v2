@@ -3421,22 +3421,49 @@ elif page == "🗺️ خريطة القطاعات":
 
         st.divider()
 
+        # ── Detect intraday mode ──
+        _smap_tf = results[0].get("timeframe", "1d") if results else "1d"
+        _smap_intra = _smap_tf != "1d"
+
+        def _filter_session(dates, vals):
+            """For intraday: keep only last trading session (last date's data)."""
+            if not _smap_intra or not dates or not vals:
+                return dates, vals
+            # dates format: "YYYY-MM-DD HH:MM" for intraday
+            last_day = dates[-1][:10]  # extract "YYYY-MM-DD"
+            filtered = [(d, v) for d, v in zip(dates, vals) if d[:10] == last_day]
+            if len(filtered) < 3:
+                return dates, vals  # fallback if too little data
+            fd, fv = zip(*filtered)
+            # Re-normalize to start at 100
+            start = fv[0]
+            if start and start > 0:
+                fv = [round(v / start * 100, 2) for v in fv]
+            return list(fd), list(fv)
+
         # ── Pre-compute sector composites ──
         _sector_composites = {}
         for sd in sector_data:
             _sec_dates, _sec_vals, _, _ = build_composite_index(sd["stocks"])
-            if len(_sec_dates) >= 5 and len(_sec_vals) >= 5:
-                _sec_ret = round((_sec_vals[-1] - _sec_vals[0]) / _sec_vals[0] * 100, 2)
+            _sec_dates, _sec_vals = _filter_session(_sec_dates, _sec_vals)
+            if len(_sec_dates) >= 3 and len(_sec_vals) >= 3:
+                _sec_ret = round((_sec_vals[-1] - _sec_vals[0]) / _sec_vals[0] * 100, 2) if _sec_vals[0] > 0 else 0
                 _sector_composites[sd["name"]] = {
                     "dates": _sec_dates, "vals": _sec_vals, "ret": _sec_ret,
                 }
 
         # ══ Master Chart: Platform + Benchmark + All Sectors ══
         _comp_dates, _comp_vals, _, _ = build_composite_index(results)
-        if len(_comp_dates) >= 15:
-            _bench_norm, _, _, _bench_name, _bench_color = _fetch_benchmark_normalized(
-                _comp_dates, market_key=market_key, start_val=_comp_vals[0]
-            )
+        _comp_dates, _comp_vals = _filter_session(_comp_dates, _comp_vals)
+        _min_bars = 3 if _smap_intra else 15
+        if len(_comp_dates) >= _min_bars:
+            # Benchmark only for daily (intraday has no matching benchmark data)
+            if not _smap_intra:
+                _bench_norm, _, _, _bench_name, _bench_color = _fetch_benchmark_normalized(
+                    _comp_dates, market_key=market_key, start_val=_comp_vals[0]
+                )
+            else:
+                _bench_norm, _bench_name, _bench_color = {}, "", ""
             import plotly.graph_objects as go
 
             # Sector selection checkboxes
@@ -3501,8 +3528,12 @@ elif page == "🗺️ خريطة القطاعات":
 
             _comp_ret = round((_comp_vals[-1] - _comp_vals[0]) / _comp_vals[0] * 100, 2)
             _comp_ret_c = "#00E676" if _comp_ret >= 0 else "#FF5252"
+            _tf_labels = {"1d": "يومي", "1h": "ساعة", "15m": "15 دقيقة", "5m": "5 دقائق"}
+            _tf_txt = _tf_labels.get(_smap_tf, "")
+            _session_txt = " — جلسة اليوم" if _smap_intra else ""
             st.markdown(
                 f'<div style="text-align:center;color:#6b7280;font-size:0.82em;margin:-10px 0 10px">'
+                f'⏱️ فريم {_tf_txt}{_session_txt} • '
                 f'عائد المؤشر المركب: <b style="color:{_comp_ret_c}">{_comp_ret:+.2f}%</b></div>',
                 unsafe_allow_html=True
             )
