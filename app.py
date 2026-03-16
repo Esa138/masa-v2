@@ -3337,6 +3337,65 @@ elif page == "🗺️ خريطة القطاعات":
         st.markdown('<h2 style="text-align:center;margin-bottom:4px">🗺️ خريطة القطاعات</h2>', unsafe_allow_html=True)
         st.caption("القطاعات مرتبة من أقوى تجميع لأقوى تصريف — الأسهم داخل كل قطاع مرتبة بنفس المنطق")
 
+        # ── Compute Market Breadth (MA50 / MA200) ──────────────
+        def _compute_breadth(scan_results):
+            """
+            For each stock, compare current price with last MA50 and MA200 values.
+            Returns overall + per-sector breadth stats.
+            """
+            total = 0
+            above_ma50 = 0
+            above_ma200 = 0
+            sector_breadth = {}  # sector_name -> {total, above_ma50, above_ma200}
+
+            for r in scan_results:
+                price = r.get("price", 0)
+                ma50_arr = r.get("chart_ma50", [])
+                ma200_arr = r.get("chart_ma200", [])
+                sector = r.get("sector", "أخرى")
+
+                # Get last valid MA value
+                ma50_val = None
+                for v in reversed(ma50_arr):
+                    if v is not None and v > 0:
+                        ma50_val = v
+                        break
+
+                ma200_val = None
+                for v in reversed(ma200_arr):
+                    if v is not None and v > 0:
+                        ma200_val = v
+                        break
+
+                if not price or price <= 0:
+                    continue
+
+                total += 1
+                _a50 = 1 if (ma50_val and price > ma50_val) else 0
+                _a200 = 1 if (ma200_val and price > ma200_val) else 0
+                above_ma50 += _a50
+                above_ma200 += _a200
+
+                if sector not in sector_breadth:
+                    sector_breadth[sector] = {"total": 0, "above_ma50": 0, "above_ma200": 0}
+                sector_breadth[sector]["total"] += 1
+                sector_breadth[sector]["above_ma50"] += _a50
+                sector_breadth[sector]["above_ma200"] += _a200
+
+            pct_ma50 = round(above_ma50 / total * 100, 1) if total else 0
+            pct_ma200 = round(above_ma200 / total * 100, 1) if total else 0
+
+            return {
+                "total": total,
+                "above_ma50": above_ma50,
+                "above_ma200": above_ma200,
+                "pct_ma50": pct_ma50,
+                "pct_ma200": pct_ma200,
+                "sector_breadth": sector_breadth,
+            }
+
+        _breadth = _compute_breadth(results)
+
         # ── Phase classification (needed early for sector grouping) ──
         _accum_phases = {"accumulation", "markup", "spring"}
         _dist_phases = {"distribution", "markdown", "upthrust"}
@@ -3418,6 +3477,90 @@ elif page == "🗺️ خريطة القطاعات":
         sc2.metric("قطاعات تصريف 🔴", red_sectors)
         sc3.metric("قطاعات محايدة ⚪", neutral_sectors)
         sc4.metric("أقوى قطاع", best_sector)
+
+        # ── Market Breadth Panel ───────────────────────────────
+        if _breadth["total"] > 0:
+            _b50 = _breadth["pct_ma50"]
+            _b200 = _breadth["pct_ma200"]
+            _b50_c = "#00E676" if _b50 >= 70 else "#FFD700" if _b50 >= 40 else "#FF5252"
+            _b200_c = "#00E676" if _b200 >= 70 else "#FFD700" if _b200 >= 40 else "#FF5252"
+            _b50_bg = f"{_b50_c}15"
+            _b200_bg = f"{_b200_c}15"
+
+            # Divergence detection
+            _divergence_html = ""
+            _comp_dates_pre, _comp_vals_pre, _, _ = build_composite_index(results)
+            if len(_comp_vals_pre) >= 5:
+                _comp_ret_pre = (_comp_vals_pre[-1] - _comp_vals_pre[0]) / _comp_vals_pre[0] * 100
+                if _comp_ret_pre > 0 and _b50 < 50:
+                    _divergence_html = '''
+                    <div style="margin-top:10px;padding:8px 14px;background:rgba(255,215,0,0.08);
+                                border:1px solid rgba(255,215,0,0.20);border-radius:10px;
+                                text-align:center;direction:rtl">
+                        <span style="font-size:1.1em">⚠️</span>
+                        <span style="color:#FFD700;font-size:0.85em;font-weight:600">
+                            انحراف: المؤشر صاعد لكن أقل من نصف الأسهم فوق متوسط 50 يوم — صعود هش
+                        </span>
+                    </div>'''
+                elif _comp_ret_pre < 0 and _b50 > 70:
+                    _divergence_html = '''
+                    <div style="margin-top:10px;padding:8px 14px;background:rgba(0,230,118,0.08);
+                                border:1px solid rgba(0,230,118,0.20);border-radius:10px;
+                                text-align:center;direction:rtl">
+                        <span style="font-size:1.1em">💡</span>
+                        <span style="color:#00E676;font-size:0.85em;font-weight:600">
+                            انحراف إيجابي: المؤشر هابط لكن أغلب الأسهم فوق متوسط 50 يوم — قوة كامنة
+                        </span>
+                    </div>'''
+
+            st.markdown(f'''
+            <div style="background:linear-gradient(145deg, #131a2e 0%, #0e1424 100%);
+                        border:1px solid #192035;border-radius:16px;padding:20px;
+                        margin:12px 0;direction:rtl">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+                    <span style="font-size:1.2em">📊</span>
+                    <span style="color:#fff;font-size:1.05em;font-weight:700">اتساع السوق</span>
+                    <span style="color:#4b5563;font-size:0.78em;margin-right:auto">
+                        {_breadth["total"]} سهم
+                    </span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                    <!-- MA50 -->
+                    <div style="background:rgba(8,11,20,0.5);border-radius:12px;padding:14px">
+                        <div style="color:#6b7280;font-size:0.82em;margin-bottom:6px">
+                            فوق متوسط 50 يوم
+                        </div>
+                        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
+                            <span style="color:{_b50_c};font-size:1.8em;font-weight:800">{_b50:.0f}%</span>
+                            <span style="color:#4b5563;font-size:0.78em">
+                                {_breadth["above_ma50"]} من {_breadth["total"]}
+                            </span>
+                        </div>
+                        <div style="height:8px;background:#1a1f2e;border-radius:4px;overflow:hidden">
+                            <div style="width:{_b50}%;height:100%;background:{_b50_c};
+                                        border-radius:4px;transition:width 0.5s ease"></div>
+                        </div>
+                    </div>
+                    <!-- MA200 -->
+                    <div style="background:rgba(8,11,20,0.5);border-radius:12px;padding:14px">
+                        <div style="color:#6b7280;font-size:0.82em;margin-bottom:6px">
+                            فوق متوسط 200 يوم
+                        </div>
+                        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
+                            <span style="color:{_b200_c};font-size:1.8em;font-weight:800">{_b200:.0f}%</span>
+                            <span style="color:#4b5563;font-size:0.78em">
+                                {_breadth["above_ma200"]} من {_breadth["total"]}
+                            </span>
+                        </div>
+                        <div style="height:8px;background:#1a1f2e;border-radius:4px;overflow:hidden">
+                            <div style="width:{_b200}%;height:100%;background:{_b200_c};
+                                        border-radius:4px;transition:width 0.5s ease"></div>
+                        </div>
+                    </div>
+                </div>
+                {_divergence_html}
+            </div>
+            ''', unsafe_allow_html=True)
 
         st.divider()
 
@@ -3620,11 +3763,25 @@ elif page == "🗺️ خريطة القطاعات":
                     f'{"+" if _sr >= 0 else ""}{_sr:.1f}%</span>'
                 )
 
+            # Per-sector breadth badge
+            _sb = _breadth["sector_breadth"].get(sd["name"], {})
+            _sb_total = _sb.get("total", 0)
+            _sb_ma50 = _sb.get("above_ma50", 0)
+            _sb_ma50_pct = round(_sb_ma50 / _sb_total * 100) if _sb_total else 0
+            _sb_c = "#00E676" if _sb_ma50_pct >= 70 else "#FFD700" if _sb_ma50_pct >= 40 else "#FF5252"
+            _sb_badge = (
+                f'<span style="color:{_sb_c};font-size:0.75em;font-weight:600;'
+                f'background:{_sb_c}10;padding:2px 8px;border-radius:6px;'
+                f'border:1px solid {_sb_c}25">'
+                f'MA50: {_sb_ma50}/{_sb_total}</span>'
+            ) if _sb_total else ""
+
             card_html = f'''
             <div class="smap-card" style="border-top:3px solid {sector_color}">
                 <div class="smap-header">
                     <div class="smap-header-name" style="color:{sector_color}">{sd["name"]}</div>
                     <div style="display:flex;align-items:center;gap:10px">
+                        {_sb_badge}
                         {_sec_ret_badge}
                         <div class="smap-health" style="color:{h_color}">{h_sign}{health}</div>
                     </div>
