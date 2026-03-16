@@ -26,18 +26,10 @@ SECTOR_COLORS = {
     "التقنية": "#7C4DFF",             # Blue-Violet
     "المرافق العامة": "#26A69A",      # Teal
     "العقارات": "#FFAB00",            # Amber
-    # ── US Market ──
-    "Technology": "#7C4DFF",
-    "Consumer": "#F50057",
-    "Fintech": "#00E5FF",
-    "Healthcare": "#AA00FF",
-    "Energy": "#FF1744",
-    "Industrials": "#78909C",
-    "Consumer Staples": "#00C853",
-    "Communications": "#29B6F6",
-    "Utilities": "#26A69A",
-    "Real Estate": "#FFAB00",
-    "Materials": "#BCAAA4",
+    # ── US Market (shared Arabic names reuse Saudi colors above) ──
+    "السلع الاستهلاكية": "#F50057",        # Hot Pink
+    "التقنية المالية": "#00E5FF",          # Bright Cyan
+    "السلع الاستهلاكية الأساسية": "#00C853", # Emerald Green
     # Default
     "أخرى": "#607D8B",
 }

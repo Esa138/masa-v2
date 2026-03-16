@@ -893,62 +893,62 @@ SAUDI_SECTORS = {
 
 # Sector mapping for US stocks
 US_SECTORS = {
-    # Technology
-    **{t: "Technology" for t in [
+    # التقنية
+    **{t: "التقنية" for t in [
         "AAPL", "MSFT", "NVDA", "GOOG", "GOOGL", "META", "AVGO", "ORCL", "CRM",
         "CSCO", "ADBE", "ACN", "IBM", "INTC", "TXN", "QCOM", "AMAT", "NOW",
         "INTU", "AMD", "PANW", "MU", "LRCX", "ADI", "KLAC", "SNPS", "CDNS",
         "CRWD", "MRVL", "FTNT", "MSI", "NXPI", "ROP", "ADSK", "WDAY", "TEAM",
         "MCHP", "ON", "HPE", "HPQ", "DELL",
     ]},
-    # Consumer
-    **{t: "Consumer" for t in [
+    # السلع الاستهلاكية
+    **{t: "السلع الاستهلاكية" for t in [
         "AMZN", "TSLA", "HD", "COST", "NKE", "MCD", "SBUX", "TGT", "LOW",
         "TJX", "BKNG", "MAR", "CMG", "ORLY", "AZO", "ROST", "DHI", "LEN",
         "YUM", "DG", "DLTR", "EBAY", "ABNB", "DASH", "GM", "F", "RIVN",
     ]},
-    # Fintech
-    **{t: "Fintech" for t in [
+    # التقنية المالية
+    **{t: "التقنية المالية" for t in [
         "V", "MA", "PYPL", "SQ", "SPGI", "ICE", "CME", "MCO",
     ]},
-    # Healthcare
-    **{t: "Healthcare" for t in [
+    # الرعاية الصحية
+    **{t: "الرعاية الصحية" for t in [
         "UNH", "JNJ", "LLY", "PFE", "ABBV", "MRK", "TMO", "ABT", "DHR",
         "AMGN", "BMY", "MDT", "ISRG", "GILD", "VRTX", "REGN", "SYK", "ZTS",
         "BSX", "BDX", "EW", "CI", "HCA", "ELV", "HUM", "DXCM", "IDXX", "A",
         "BIIB", "MRNA",
     ]},
-    # Energy
-    **{t: "Energy" for t in [
+    # الطاقة
+    **{t: "الطاقة" for t in [
         "XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "VLO", "PXD",
         "OXY", "WMB", "KMI", "HAL", "DVN", "BKR",
     ]},
-    # Industrials
-    **{t: "Industrials" for t in [
+    # القطاع الصناعي
+    **{t: "القطاع الصناعي" for t in [
         "CAT", "GE", "HON", "UNP", "DE", "UPS", "MMM",
         "ITW", "EMR", "ETN", "FDX", "CSX", "NSC", "WM", "JCI",
         "CARR", "FAST", "IR", "PCAR", "CMI", "ROK", "UBER",
     ]},
-    # Consumer Staples
-    **{t: "Consumer Staples" for t in [
+    # السلع الاستهلاكية الأساسية
+    **{t: "السلع الاستهلاكية الأساسية" for t in [
         "PG", "KO", "PEP", "WMT", "CL", "MDLZ", "GIS", "KDP",
         "KHC", "SYY", "HSY", "KR", "ADM", "EL",
     ]},
-    # Communications
-    **{t: "Communications" for t in [
+    # الاتصالات
+    **{t: "الاتصالات" for t in [
         "NFLX", "DIS", "CMCSA", "T", "VZ", "TMUS", "CHTR", "EA", "TTWO",
         "WBD", "SPOT",
     ]},
-    # Utilities
-    **{t: "Utilities" for t in [
+    # المرافق العامة
+    **{t: "المرافق العامة" for t in [
         "NEE", "DUK", "SO", "D", "AEP", "SRE", "EXC", "XEL", "WEC", "ED",
     ]},
-    # Real Estate
-    **{t: "Real Estate" for t in [
+    # العقارات
+    **{t: "العقارات" for t in [
         "AMT", "PLD", "CCI", "EQIX", "PSA", "SPG", "O", "WELL", "DLR",
     ]},
-    # Materials
-    **{t: "Materials" for t in [
+    # المواد الأساسية
+    **{t: "المواد الأساسية" for t in [
         "LIN", "APD", "ECL", "SHW", "NEM", "FCX", "NUE", "DOW", "DD", "PPG",
     ]},
 }
