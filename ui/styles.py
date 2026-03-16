@@ -14,6 +14,7 @@ SECTOR_COLORS = {
     "الخدمات التجارية": "#90A4AE",     # Light Gray
     "النقل": "#26A69A",               # Teal
     "السلع الكمالية": "#AB47BC",       # Purple
+    "السلع طويلة الأجل": "#9575CD",    # Light Deep Purple
     "الخدمات الاستهلاكية": "#FF7043",  # Orange
     "الإعلام والترفيه": "#EC407A",     # Pink
     "التجزئة": "#E91E63",             # Hot Pink
