@@ -4,40 +4,40 @@ Professional dark theme with glassmorphism cards.
 """
 
 SECTOR_COLORS = {
-    # ── Saudi Market — Tadawul GICS Sectors ──
-    "البنوك": "#4FC3F7",                # Light Blue
-    "الخدمات المالية": "#29B6F6",       # Blue
-    "التأمين": "#FFCA28",              # Yellow
-    "الطاقة": "#EF5350",              # Red
-    "المواد الأساسية": "#8D6E63",      # Brown
-    "القطاع الصناعي": "#78909C",        # Gray-Blue
-    "الخدمات التجارية": "#90A4AE",     # Light Gray
-    "النقل": "#26A69A",               # Teal
-    "السلع الكمالية": "#AB47BC",       # Purple
-    "السلع طويلة الأجل": "#9575CD",    # Light Deep Purple
-    "الخدمات الاستهلاكية": "#FF7043",  # Orange
-    "الإعلام والترفيه": "#EC407A",     # Pink
-    "المنتجات المنزلية والشخصية": "#F48FB1", # Light Pink
-    "إنتاج الأغذية": "#66BB6A",          # Green
-    "تجزئة السلع الاستهلاكية": "#43A047", # Dark Green
-    "الرعاية الصحية": "#CE93D8",       # Light Purple
-    "الأدوية": "#BA68C8",             # Medium Purple
-    "الاتصالات": "#42A5F5",           # Blue
-    "التقنية": "#7E57C2",             # Deep Purple
-    "المرافق العامة": "#5C6BC0",      # Indigo
-    "العقارات": "#FFA726",            # Orange-Yellow
+    # ── Saudi Market — Maximum Contrast Palette ──
+    "البنوك": "#00E5FF",                # Bright Cyan
+    "الخدمات المالية": "#1565C0",       # Dark Blue
+    "التأمين": "#FFD600",              # Bright Yellow
+    "الطاقة": "#FF1744",              # Bright Red
+    "المواد الأساسية": "#BCAAA4",      # Warm Tan
+    "القطاع الصناعي": "#78909C",        # Steel Gray
+    "الخدمات التجارية": "#B0BEC5",     # Silver
+    "النقل": "#1DE9B6",               # Mint Green
+    "السلع الكمالية": "#AA00FF",       # Vivid Purple
+    "السلع طويلة الأجل": "#F50057",    # Hot Pink
+    "الخدمات الاستهلاكية": "#FF6D00",  # Deep Orange
+    "الإعلام والترفيه": "#FF80AB",     # Pastel Pink
+    "المنتجات المنزلية والشخصية": "#C6FF00", # Chartreuse
+    "إنتاج الأغذية": "#00C853",          # Emerald Green
+    "تجزئة السلع الاستهلاكية": "#76FF03", # Lime
+    "الرعاية الصحية": "#EA80FC",       # Lavender
+    "الأدوية": "#651FFF",             # Deep Violet
+    "الاتصالات": "#29B6F6",           # Sky Blue
+    "التقنية": "#7C4DFF",             # Blue-Violet
+    "المرافق العامة": "#26A69A",      # Teal
+    "العقارات": "#FFAB00",            # Amber
     # ── US Market ──
-    "Technology": "#7E57C2",
-    "Consumer": "#EC407A",
-    "Fintech": "#4FC3F7",
-    "Healthcare": "#AB47BC",
-    "Energy": "#EF5350",
+    "Technology": "#7C4DFF",
+    "Consumer": "#F50057",
+    "Fintech": "#00E5FF",
+    "Healthcare": "#AA00FF",
+    "Energy": "#FF1744",
     "Industrials": "#78909C",
-    "Consumer Staples": "#66BB6A",
-    "Communications": "#42A5F5",
-    "Utilities": "#5C6BC0",
-    "Real Estate": "#FFA726",
-    "Materials": "#8D6E63",
+    "Consumer Staples": "#00C853",
+    "Communications": "#29B6F6",
+    "Utilities": "#26A69A",
+    "Real Estate": "#FFAB00",
+    "Materials": "#BCAAA4",
     # Default
     "أخرى": "#607D8B",
 }
