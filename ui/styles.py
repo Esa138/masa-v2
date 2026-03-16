@@ -25,7 +25,6 @@ SECTOR_COLORS = {
     "التقنية": "#7E57C2",             # Deep Purple
     "المرافق العامة": "#5C6BC0",      # Indigo
     "العقارات": "#FFA726",            # Orange-Yellow
-    "التعليم": "#00BCD4",             # Cyan
     # ── US Market ──
     "Technology": "#7E57C2",
     "Consumer": "#EC407A",
