@@ -3493,25 +3493,9 @@ elif page == "🗺️ خريطة القطاعات":
             if len(_comp_vals_pre) >= 5:
                 _comp_ret_pre = (_comp_vals_pre[-1] - _comp_vals_pre[0]) / _comp_vals_pre[0] * 100
                 if _comp_ret_pre > 0 and _b50 < 50:
-                    _divergence_html = '''
-                    <div style="margin-top:10px;padding:8px 14px;background:rgba(255,215,0,0.08);
-                                border:1px solid rgba(255,215,0,0.20);border-radius:10px;
-                                text-align:center;direction:rtl">
-                        <span style="font-size:1.1em">⚠️</span>
-                        <span style="color:#FFD700;font-size:0.85em;font-weight:600">
-                            انحراف: المؤشر صاعد لكن أقل من نصف الأسهم فوق متوسط 50 يوم — صعود هش
-                        </span>
-                    </div>'''
+                    _divergence_html = '<div style="margin-top:10px;padding:8px 14px;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.20);border-radius:10px;text-align:center;direction:rtl"><span style="font-size:1.1em">⚠️</span> <span style="color:#FFD700;font-size:0.85em;font-weight:600">انحراف: المؤشر صاعد لكن أقل من نصف الأسهم فوق متوسط 50 يوم — صعود هش</span></div>'
                 elif _comp_ret_pre < 0 and _b50 > 70:
-                    _divergence_html = '''
-                    <div style="margin-top:10px;padding:8px 14px;background:rgba(0,230,118,0.08);
-                                border:1px solid rgba(0,230,118,0.20);border-radius:10px;
-                                text-align:center;direction:rtl">
-                        <span style="font-size:1.1em">💡</span>
-                        <span style="color:#00E676;font-size:0.85em;font-weight:600">
-                            انحراف إيجابي: المؤشر هابط لكن أغلب الأسهم فوق متوسط 50 يوم — قوة كامنة
-                        </span>
-                    </div>'''
+                    _divergence_html = '<div style="margin-top:10px;padding:8px 14px;background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.20);border-radius:10px;text-align:center;direction:rtl"><span style="font-size:1.1em">💡</span> <span style="color:#00E676;font-size:0.85em;font-weight:600">انحراف إيجابي: المؤشر هابط لكن أغلب الأسهم فوق متوسط 50 يوم — قوة كامنة</span></div>'
 
             st.markdown(f'''
             <div style="background:linear-gradient(145deg, #131a2e 0%, #0e1424 100%);
