@@ -4112,8 +4112,8 @@ elif page == "🔍 تحليل شركة":
                     unsafe_allow_html=True)
         st.caption("أداء السنة الحالية مقارنة بمتوسط السنوات السابقة وأقرب سنة تشابهاً")
 
-        # Date range selector
-        _dr_c1, _dr_c2, _dr_spacer = st.columns([1, 1, 2])
+        # Date range + years selector
+        _dr_c1, _dr_c2, _dr_c3 = st.columns([1, 1, 1])
         _this_year = datetime.date.today().year
         with _dr_c1:
             _date_from = st.date_input("من تاريخ", value=datetime.date(_this_year, 1, 1),
@@ -4125,6 +4125,9 @@ elif page == "🔍 تحليل شركة":
                                      min_value=datetime.date(_this_year, 1, 1),
                                      max_value=datetime.date(_this_year, 12, 31),
                                      key="season_to")
+        with _dr_c3:
+            _n_years = st.selectbox("عدد السنوات", [1, 2, 3, 5, 7, 10],
+                                    index=2, key="season_nyears")
         _doy_from = _date_from.timetuple().tm_yday
         _doy_to = _date_to.timetuple().tm_yday
         if _doy_from >= _doy_to:
@@ -4179,7 +4182,8 @@ elif page == "🔍 تحليل شركة":
         _yearly = _build_yearly_curves(_c_df)
         if _yearly and len(_yearly) >= 2:
             _current_year = datetime.date.today().year
-            _past_years = sorted([y for y in _yearly if y != _current_year], reverse=True)
+            _all_past = sorted([y for y in _yearly if y != _current_year], reverse=True)
+            _past_years = _all_past[:_n_years]  # Limit to selected number of years
 
             if _current_year in _yearly and _past_years:
                 # Apply date range filter to all curves
