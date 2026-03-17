@@ -2966,7 +2966,7 @@ with st.sidebar:
 
     page = st.radio(
         "الصفحة",
-        ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "📊 أداء النظام"],
+        ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🔍 تحليل شركة", "📊 أداء النظام"],
         label_visibility="collapsed",
     )
 
@@ -3829,6 +3829,283 @@ elif page == "🚀 مؤشر الاختراقات":
         ''', unsafe_allow_html=True)
     else:
         show_breakout_index(results, market_key=market_key)
+
+
+# ══════════════════════════════════════════════════════════════
+# PAGE: Company Analysis — تحليل شركة
+# ══════════════════════════════════════════════════════════════
+
+elif page == "🔍 تحليل شركة":
+
+    # ── Helper: Fetch company data (cached 5 min) ──
+    @st.cache_data(ttl=300, show_spinner=False)
+    def _fetch_company(ticker, period="5y"):
+        t = yf.Ticker(ticker)
+        df = t.history(period=period, interval="1d")
+        if df is not None and not df.empty:
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+        info = {}
+        try:
+            info = t.info or {}
+        except Exception:
+            pass
+        return df, info
+
+    # ── Helper: Compute seasonality ──
+    def _compute_seasonality(df):
+        if df is None or df.empty:
+            return None
+        monthly = {}  # {(year, month): return_pct}
+        df_copy = df.copy()
+        df_copy.index = pd.to_datetime(df_copy.index)
+        for (year, month), grp in df_copy.groupby([df_copy.index.year, df_copy.index.month]):
+            if len(grp) < 2:
+                continue
+            first_close = grp["Close"].iloc[0]
+            last_close = grp["Close"].iloc[-1]
+            if first_close and first_close > 0:
+                ret = round((last_close - first_close) / first_close * 100, 2)
+                monthly[(year, month)] = ret
+
+        if not monthly:
+            return None
+
+        years = sorted(set(y for y, m in monthly.keys()), reverse=True)
+        months = list(range(1, 13))
+        month_names = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                       "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
+
+        # Probability and average per month
+        prob = {}
+        avg = {}
+        for m in months:
+            vals = [monthly[(y, m)] for y in years if (y, m) in monthly]
+            if vals:
+                prob[m] = round(sum(1 for v in vals if v > 0) / len(vals) * 100)
+                avg[m] = round(sum(vals) / len(vals), 2)
+            else:
+                prob[m] = 0
+                avg[m] = 0
+
+        return {
+            "monthly": monthly,
+            "years": years,
+            "months": months,
+            "month_names": month_names,
+            "prob": prob,
+            "avg": avg,
+        }
+
+    st.markdown('<h2 style="text-align:center;margin-bottom:4px">🔍 تحليل شركة</h2>', unsafe_allow_html=True)
+    st.caption("بحث وتحليل مفصل لأي شركة — نظرة عامة + موسمية الأداء")
+
+    # ── Stock selector ──
+    from data.markets import SAUDI_STOCKS, US_STOCKS, get_sector
+    _stocks_dict = US_STOCKS if market_key == "us" else SAUDI_STOCKS
+    _stock_options = {tk: f"{name} ({tk.replace('.SR', '')})" for tk, name in _stocks_dict.items()}
+    _stock_list = list(_stock_options.keys())
+    _stock_labels = list(_stock_options.values())
+
+    _selected_label = st.selectbox(
+        "اختر الشركة",
+        _stock_labels,
+        index=0,
+        key="company_select",
+    )
+    _selected_tk = _stock_list[_stock_labels.index(_selected_label)]
+    _selected_name = _stocks_dict[_selected_tk]
+    _selected_sector = get_sector(_selected_tk)
+
+    # ── Fetch data ──
+    with st.spinner(f"📡 جاري تحميل بيانات {_selected_name}..."):
+        _c_df, _c_info = _fetch_company(_selected_tk, period="7y")
+
+    if _c_df is None or _c_df.empty:
+        st.error(f"❌ لا توجد بيانات لـ {_selected_name}")
+    else:
+        # ── Company Header ──
+        _cur_price = round(float(_c_df["Close"].iloc[-1]), 2)
+        _prev_price = float(_c_df["Close"].iloc[-2]) if len(_c_df) >= 2 else _cur_price
+        _change_pct = round((_cur_price - _prev_price) / _prev_price * 100, 2) if _prev_price else 0
+        _chg_color = "#00E676" if _change_pct >= 0 else "#FF5252"
+        _chg_icon = "▲" if _change_pct >= 0 else "▼"
+
+        _mcap = _c_info.get("marketCap", 0)
+        _mcap_str = ""
+        if _mcap:
+            if _mcap >= 1e12:
+                _mcap_str = f"{_mcap/1e12:.1f}T"
+            elif _mcap >= 1e9:
+                _mcap_str = f"{_mcap/1e9:.1f}B"
+            elif _mcap >= 1e6:
+                _mcap_str = f"{_mcap/1e6:.0f}M"
+
+        _pe = _c_info.get("trailingPE", 0)
+        _pe_str = f"{_pe:.1f}" if _pe else "—"
+        _high52 = _c_info.get("fiftyTwoWeekHigh", 0)
+        _low52 = _c_info.get("fiftyTwoWeekLow", 0)
+        _sector_color = SECTOR_COLORS.get(_selected_sector, "#607D8B")
+
+        st.markdown(f'''
+        <div style="background:linear-gradient(145deg, #131a2e 0%, #0e1424 100%);
+                    border:1px solid #192035;border-radius:16px;padding:20px;margin:10px 0;direction:rtl">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <div style="flex:1">
+                    <div style="color:#fff;font-size:1.5em;font-weight:800">{_selected_name}</div>
+                    <div style="display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap">
+                        <span style="color:#6b7280;font-size:0.9em">{_selected_tk.replace(".SR", "")}</span>
+                        <span style="background:{_sector_color}18;color:{_sector_color};padding:2px 10px;
+                                     border-radius:8px;font-size:0.78em;border:1px solid {_sector_color}30">
+                            {_selected_sector}</span>
+                    </div>
+                </div>
+                <div style="text-align:left">
+                    <div style="color:#fff;font-size:2em;font-weight:800">{_cur_price}</div>
+                    <div style="color:{_chg_color};font-weight:700;font-size:0.95em">{_chg_icon} {abs(_change_pct):.2f}%</div>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px;
+                        background:rgba(8,11,20,0.5);border-radius:10px;padding:10px">
+                <div style="text-align:center">
+                    <div style="color:#4b5563;font-size:0.72em">القيمة السوقية</div>
+                    <div style="color:#fff;font-weight:700;font-size:0.95em">{_mcap_str or "—"}</div>
+                </div>
+                <div style="text-align:center;border-right:1px solid #192035;border-left:1px solid #192035">
+                    <div style="color:#4b5563;font-size:0.72em">مكرر الأرباح</div>
+                    <div style="color:#fff;font-weight:700;font-size:0.95em">{_pe_str}</div>
+                </div>
+                <div style="text-align:center;border-left:1px solid #192035">
+                    <div style="color:#4b5563;font-size:0.72em">أعلى 52 أسبوع</div>
+                    <div style="color:#00E676;font-weight:700;font-size:0.95em">{_high52:.2f}</div>
+                </div>
+                <div style="text-align:center">
+                    <div style="color:#4b5563;font-size:0.72em">أدنى 52 أسبوع</div>
+                    <div style="color:#FF5252;font-weight:700;font-size:0.95em">{_low52:.2f}</div>
+                </div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+
+        # ── Price Chart with period selector ──
+        _period_opts = {"3 أشهر": 63, "6 أشهر": 126, "سنة": 252, "سنتين": 504, "5 سنوات": None}
+        _p_cols = st.columns(len(_period_opts))
+        if "chart_period" not in st.session_state:
+            st.session_state.chart_period = "سنة"
+        for _pi, _pk in enumerate(_period_opts.keys()):
+            with _p_cols[_pi]:
+                if st.button(_pk, key=f"cp_{_pk}", use_container_width=True,
+                             type="primary" if st.session_state.chart_period == _pk else "secondary"):
+                    st.session_state.chart_period = _pk
+
+        _period_bars = _period_opts[st.session_state.chart_period]
+        _chart_df = _c_df.iloc[-_period_bars:] if _period_bars else _c_df
+
+        # Build candlestick chart
+        _c_fig = go.Figure()
+
+        _c_fig.add_trace(go.Candlestick(
+            x=_chart_df.index,
+            open=_chart_df["Open"], high=_chart_df["High"],
+            low=_chart_df["Low"], close=_chart_df["Close"],
+            increasing_line_color="#00E676", decreasing_line_color="#FF5252",
+            increasing_fillcolor="#00E676", decreasing_fillcolor="#FF5252",
+            name="السعر",
+        ))
+
+        # MA50
+        if len(_chart_df) >= 50:
+            _ma50 = _chart_df["Close"].rolling(50).mean()
+            _c_fig.add_trace(go.Scatter(
+                x=_chart_df.index, y=_ma50, mode="lines",
+                name="MA50", line=dict(color="#00BCD4", width=1.5),
+            ))
+
+        # MA200
+        if len(_chart_df) >= 200:
+            _ma200 = _chart_df["Close"].rolling(200).mean()
+            _c_fig.add_trace(go.Scatter(
+                x=_chart_df.index, y=_ma200, mode="lines",
+                name="MA200", line=dict(color="#E040FB", width=1.5),
+            ))
+
+        _c_fig.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(20,24,36,0.8)",
+            height=500, margin=dict(l=40, r=20, t=10, b=30),
+            xaxis_rangeslider_visible=False,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
+                        font=dict(family="Tajawal", size=11)),
+            yaxis=dict(title=None, gridcolor="#192035", tickfont=dict(size=10, color="#4b5563")),
+            xaxis=dict(gridcolor="#192035", tickfont=dict(size=10, color="#4b5563")),
+            font=dict(family="Tajawal"),
+        )
+        st.plotly_chart(_c_fig, use_container_width=True, config={"displayModeBar": False})
+
+        # ── Seasonality Table ──
+        st.markdown('<h3 style="text-align:center;margin:20px 0 8px">📅 الموسمية — أداء شهري تاريخي</h3>',
+                    unsafe_allow_html=True)
+
+        _seas = _compute_seasonality(_c_df)
+        if _seas:
+            # Build HTML table
+            _mnames = _seas["month_names"]
+            _th_cells = "".join(f'<th style="padding:8px 6px;color:#9ca3af;font-size:0.78em;font-weight:600">{m}</th>' for m in _mnames)
+
+            # Probability row
+            _prob_cells = ""
+            for m in _seas["months"]:
+                p = _seas["prob"][m]
+                pc = "#00E676" if p >= 60 else "#FF5252" if p <= 40 else "#FFD700"
+                arrow = "▲" if p >= 50 else "▼"
+                _prob_cells += f'<td style="text-align:center;padding:6px;color:{pc};font-weight:700;font-size:0.85em">{arrow} {p}%</td>'
+
+            # Average row
+            _avg_cells = ""
+            for m in _seas["months"]:
+                a = _seas["avg"][m]
+                ac = "#00E676" if a > 0 else "#FF5252" if a < 0 else "#9ca3af"
+                _avg_cells += f'<td style="text-align:center;padding:6px;color:{ac};font-weight:600;font-size:0.82em">{a:+.2f}%</td>'
+
+            # Year rows
+            _year_rows = ""
+            for y in _seas["years"]:
+                cells = ""
+                for m in _seas["months"]:
+                    val = _seas["monthly"].get((y, m))
+                    if val is not None:
+                        vc = "#00E676" if val > 0 else "#FF5252" if val < 0 else "#9ca3af"
+                        bg = f"{vc}08"
+                        cells += f'<td style="text-align:center;padding:6px;color:{vc};background:{bg};font-size:0.82em">{val:+.2f}%</td>'
+                    else:
+                        cells += '<td style="text-align:center;padding:6px;color:#374151;font-size:0.82em">—</td>'
+                _year_rows += f'<tr><td style="padding:8px;color:#fff;font-weight:700;font-size:0.88em;white-space:nowrap">{y}</td>{cells}</tr>'
+
+            _table_html = f'''
+            <div style="overflow-x:auto;border-radius:12px;border:1px solid #192035;margin:8px 0">
+                <table style="width:100%;border-collapse:collapse;background:#0e1424;direction:ltr">
+                    <thead>
+                        <tr style="border-bottom:2px solid #192035">
+                            <th style="padding:8px;color:#6b7280;font-size:0.78em">السنة</th>
+                            {_th_cells}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom:2px solid #192035;background:rgba(124,77,255,0.05)">
+                            <td style="padding:8px;color:#B39DDB;font-weight:700;font-size:0.82em;white-space:nowrap">الاحتمال %</td>
+                            {_prob_cells}
+                        </tr>
+                        <tr style="border-bottom:2px solid #192035;background:rgba(0,230,118,0.03)">
+                            <td style="padding:8px;color:#6b7280;font-weight:600;font-size:0.82em;white-space:nowrap">المتوسط %</td>
+                            {_avg_cells}
+                        </tr>
+                        {_year_rows}
+                    </tbody>
+                </table>
+            </div>'''
+            st.markdown(_table_html, unsafe_allow_html=True)
+        else:
+            st.info("لا توجد بيانات كافية لحساب الموسمية")
 
 
 # ══════════════════════════════════════════════════════════════
