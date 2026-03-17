@@ -3840,17 +3840,26 @@ elif page == "🔍 تحليل شركة":
     # ── Helper: Fetch company data (cached 5 min) ──
     @st.cache_data(ttl=300, show_spinner=False)
     def _fetch_company(ticker, period="10y"):
-        t = yf.Ticker(ticker)
-        df = t.history(period=period, interval="1d")
-        if df is not None and not df.empty:
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-        info = {}
-        try:
-            info = t.info or {}
-        except Exception:
-            pass
-        return df, info
+        import time
+        for _attempt in range(3):
+            try:
+                t = yf.Ticker(ticker)
+                df = t.history(period=period, interval="1d")
+                if df is not None and not df.empty:
+                    if isinstance(df.columns, pd.MultiIndex):
+                        df.columns = df.columns.get_level_values(0)
+                info = {}
+                try:
+                    info = t.info or {}
+                except Exception:
+                    pass
+                return df, info
+            except Exception as e:
+                if "RateLimit" in str(type(e).__name__) or "429" in str(e):
+                    time.sleep(2 * (_attempt + 1))
+                    continue
+                raise
+        return pd.DataFrame(), {}
 
     # ── Helper: Compute seasonality ──
     def _compute_seasonality(df):
@@ -3930,8 +3939,13 @@ elif page == "🔍 تحليل شركة":
     _selected_sector = get_sector(_selected_tk)
 
     # ── Fetch data ──
-    with st.spinner(f"📡 جاري تحميل بيانات {_selected_name}..."):
-        _c_df, _c_info = _fetch_company(_selected_tk)
+    try:
+        with st.spinner(f"📡 جاري تحميل بيانات {_selected_name}..."):
+            _c_df, _c_info = _fetch_company(_selected_tk)
+    except Exception as _fetch_err:
+        st.error(f"⚠️ خطأ في تحميل البيانات: {type(_fetch_err).__name__}")
+        st.info("💡 حاول مرة ثانية بعد دقيقة — قد يكون السبب تجاوز حد الطلبات من Yahoo Finance")
+        _c_df, _c_info = pd.DataFrame(), {}
 
     if _c_df is None or _c_df.empty:
         st.error(f"❌ لا توجد بيانات لـ {_selected_name}")
