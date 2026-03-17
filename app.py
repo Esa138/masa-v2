@@ -3919,7 +3919,7 @@ elif page == "🔍 تحليل شركة":
 
     # ── Fetch data ──
     with st.spinner(f"📡 جاري تحميل بيانات {_selected_name}..."):
-        _c_df, _c_info = _fetch_company(_selected_tk, period="7y")
+        _c_df, _c_info = _fetch_company(_selected_tk)
 
     if _c_df is None or _c_df.empty:
         st.error(f"❌ لا توجد بيانات لـ {_selected_name}")
