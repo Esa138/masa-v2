@@ -3901,9 +3901,21 @@ elif page == "🔍 تحليل شركة":
     st.caption("بحث وتحليل مفصل لأي شركة — نظرة عامة + موسمية الأداء")
 
     # ── Stock selector ──
-    from data.markets import SAUDI_STOCKS, US_STOCKS, get_sector
-    _stocks_dict = US_STOCKS if market_key == "us" else SAUDI_STOCKS
-    _stock_options = {tk: f"{name} ({tk.replace('.SR', '')})" for tk, name in _stocks_dict.items()}
+    from data.markets import SAUDI_STOCKS, US_STOCKS, FOREX_STOCKS, CRYPTO_STOCKS, get_sector
+    if market_key == "us":
+        _stocks_dict = US_STOCKS
+    elif market_key == "forex":
+        _stocks_dict = FOREX_STOCKS
+    elif market_key == "crypto":
+        _stocks_dict = CRYPTO_STOCKS
+    else:
+        _stocks_dict = SAUDI_STOCKS
+
+    def _fmt_label(tk, name):
+        clean = tk.replace(".SR", "").replace("=X", "").replace("-USD", "")
+        return f"{name} ({clean})"
+
+    _stock_options = {tk: _fmt_label(tk, name) for tk, name in _stocks_dict.items()}
     _stock_list = list(_stock_options.keys())
     _stock_labels = list(_stock_options.values())
 
@@ -3954,7 +3966,7 @@ elif page == "🔍 تحليل شركة":
                 <div style="flex:1">
                     <div style="color:#fff;font-size:1.5em;font-weight:800">{_selected_name}</div>
                     <div style="display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap">
-                        <span style="color:#6b7280;font-size:0.9em">{_selected_tk.replace(".SR", "")}</span>
+                        <span style="color:#6b7280;font-size:0.9em">{_selected_tk.replace(".SR", "").replace("=X", "").replace("-USD", "")}</span>
                         <span style="background:{_sector_color}18;color:{_sector_color};padding:2px 10px;
                                      border-radius:8px;font-size:0.78em;border:1px solid {_sector_color}30">
                             {_selected_sector}</span>

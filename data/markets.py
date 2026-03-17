@@ -1,6 +1,6 @@
 """
 MASA V2 — Market Stock Data
-Saudi Market (TASI) + US Market (S&P 500 Top Stocks)
+Saudi Market (TASI) + US Market (S&P 500) + Forex (20 pairs) + Crypto (10 coins)
 """
 
 SAUDI_STOCKS = {
@@ -525,6 +525,57 @@ US_STOCKS = {
     "PPG": "PPG Industries",
 }
 
+
+# ══════════════════════════════════════════════════════════════
+# Forex Market — 20 Currency Pairs
+# ══════════════════════════════════════════════════════════════
+
+FOREX_STOCKS = {
+    # ── أزواج رئيسية (Major Pairs) ──
+    "EURUSD=X": "يورو / دولار",
+    "GBPUSD=X": "جنيه / دولار",
+    "USDJPY=X": "دولار / ين",
+    "USDCHF=X": "دولار / فرنك",
+    "AUDUSD=X": "أسترالي / دولار",
+    "USDCAD=X": "دولار / كندي",
+    "NZDUSD=X": "نيوزلندي / دولار",
+    # ── أزواج تقاطعية (Cross Pairs) ──
+    "EURGBP=X": "يورو / جنيه",
+    "EURJPY=X": "يورو / ين",
+    "GBPJPY=X": "جنيه / ين",
+    "AUDJPY=X": "أسترالي / ين",
+    "EURAUD=X": "يورو / أسترالي",
+    "EURCHF=X": "يورو / فرنك",
+    "GBPCHF=X": "جنيه / فرنك",
+    "GBPAUD=X": "جنيه / أسترالي",
+    "EURCAD=X": "يورو / كندي",
+    "AUDCAD=X": "أسترالي / كندي",
+    "AUDNZD=X": "أسترالي / نيوزلندي",
+    "CADJPY=X": "كندي / ين",
+    "CHFJPY=X": "فرنك / ين",
+}
+
+
+# ══════════════════════════════════════════════════════════════
+# Crypto Market — Top 10 Cryptocurrencies
+# ══════════════════════════════════════════════════════════════
+
+CRYPTO_STOCKS = {
+    # ── عملات رقمية كبرى ──
+    "BTC-USD": "بيتكوين",
+    "ETH-USD": "إيثيريوم",
+    "BNB-USD": "بي إن بي",
+    "SOL-USD": "سولانا",
+    "XRP-USD": "ريبل",
+    # ── عملات رقمية بديلة ──
+    "ADA-USD": "كاردانو",
+    "DOGE-USD": "دوجكوين",
+    "AVAX-USD": "أفالانش",
+    "DOT-USD": "بولكادوت",
+    "LINK-USD": "تشين لينك",
+}
+
+
 # ══════════════════════════════════════════════════════════════
 # Saudi Sector Mapping — Based on Tadawul GICS Classification
 # Source: Saudi Exchange official sector indices
@@ -954,6 +1005,35 @@ US_SECTORS = {
 }
 
 
+# Sector mapping for Forex pairs
+FOREX_SECTORS = {
+    # أزواج رئيسية (Major Pairs — contain USD)
+    **{t: "أزواج رئيسية" for t in [
+        "EURUSD=X", "GBPUSD=X", "USDJPY=X", "USDCHF=X",
+        "AUDUSD=X", "USDCAD=X", "NZDUSD=X",
+    ]},
+    # أزواج تقاطعية (Cross Pairs — no USD)
+    **{t: "أزواج تقاطعية" for t in [
+        "EURGBP=X", "EURJPY=X", "GBPJPY=X", "AUDJPY=X",
+        "EURAUD=X", "EURCHF=X", "GBPCHF=X", "GBPAUD=X",
+        "EURCAD=X", "AUDCAD=X", "AUDNZD=X", "CADJPY=X", "CHFJPY=X",
+    ]},
+}
+
+
+# Sector mapping for Crypto
+CRYPTO_SECTORS = {
+    # عملات رقمية كبرى (Large Cap)
+    **{t: "عملات رقمية كبرى" for t in [
+        "BTC-USD", "ETH-USD", "BNB-USD", "SOL-USD", "XRP-USD",
+    ]},
+    # عملات رقمية بديلة (Altcoins)
+    **{t: "عملات رقمية بديلة" for t in [
+        "ADA-USD", "DOGE-USD", "AVAX-USD", "DOT-USD", "LINK-USD",
+    ]},
+}
+
+
 # ══════════════════════════════════════════════════════════════
 # MARKET CONFIGS
 # ══════════════════════════════════════════════════════════════
@@ -969,6 +1049,16 @@ MARKETS = {
         "stocks": US_STOCKS,
         "label": "السوق الأمريكي",
     },
+    "💱 الفوركس (Forex)": {
+        "key": "forex",
+        "stocks": FOREX_STOCKS,
+        "label": "الفوركس",
+    },
+    "₿ العملات الرقمية (Crypto)": {
+        "key": "crypto",
+        "stocks": CRYPTO_STOCKS,
+        "label": "العملات الرقمية",
+    },
 }
 
 
@@ -976,22 +1066,34 @@ def get_all_tickers(market: str = "saudi") -> list:
     """Get all tickers for a market."""
     if market == "us":
         return list(US_STOCKS.keys())
+    if market == "forex":
+        return list(FOREX_STOCKS.keys())
+    if market == "crypto":
+        return list(CRYPTO_STOCKS.keys())
     return list(SAUDI_STOCKS.keys())
 
 
 def get_stock_name(ticker: str) -> str:
-    """Get company name for a ticker (Saudi or US)."""
+    """Get company name for a ticker (Saudi, US, Forex, or Crypto)."""
     if ticker in SAUDI_STOCKS:
         return SAUDI_STOCKS[ticker]
     if ticker in US_STOCKS:
         return US_STOCKS[ticker]
-    return ticker.replace(".SR", "")
+    if ticker in FOREX_STOCKS:
+        return FOREX_STOCKS[ticker]
+    if ticker in CRYPTO_STOCKS:
+        return CRYPTO_STOCKS[ticker]
+    return ticker.replace(".SR", "").replace("=X", "").replace("-USD", "")
 
 
 def get_sector(ticker: str) -> str:
-    """Get sector for a ticker based on Tadawul GICS classification."""
+    """Get sector for a ticker."""
     if ticker in SAUDI_SECTORS:
         return SAUDI_SECTORS[ticker]
     if ticker in US_SECTORS:
         return US_SECTORS[ticker]
+    if ticker in FOREX_SECTORS:
+        return FOREX_SECTORS[ticker]
+    if ticker in CRYPTO_SECTORS:
+        return CRYPTO_SECTORS[ticker]
     return "أخرى"

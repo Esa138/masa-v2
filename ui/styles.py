@@ -30,6 +30,12 @@ SECTOR_COLORS = {
     "السلع الاستهلاكية": "#F50057",        # Hot Pink
     "التقنية المالية": "#00E5FF",          # Bright Cyan
     "السلع الاستهلاكية الأساسية": "#00C853", # Emerald Green
+    # ── Forex Market ──
+    "أزواج رئيسية": "#00BFA5",            # Teal Accent
+    "أزواج تقاطعية": "#64FFDA",           # Light Teal
+    # ── Crypto Market ──
+    "عملات رقمية كبرى": "#FF9100",        # Deep Orange
+    "عملات رقمية بديلة": "#FFAB40",       # Orange Accent
     # Default
     "أخرى": "#607D8B",
 }
