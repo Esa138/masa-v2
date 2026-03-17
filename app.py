@@ -4305,6 +4305,68 @@ elif page == "🔍 تحليل شركة":
         else:
             st.info("لا توجد بيانات كافية لشارت الموسمية")
 
+        # ── Trades Statistics ────────────────────────────────────
+        st.markdown('<h3 style="text-align:center;margin:30px 0 8px">📊 إحصائيات الصفقات</h3>',
+                    unsafe_allow_html=True)
+        _from_mmdd = f"{_date_from.month:02d}/{_date_from.day:02d}"
+        _to_mmdd = f"{_date_to.month:02d}/{_date_to.day:02d}"
+        st.caption(f"لو اشتريت {_from_mmdd} وبعت {_to_mmdd} كل سنة — كم كان العائد؟")
+
+        if _c_df is not None and not _c_df.empty:
+            _tdf = _c_df.copy()
+            _tdf.index = pd.to_datetime(_tdf.index)
+            _trades = []
+            for _yr in sorted(_tdf.index.year.unique(), reverse=True):
+                if _yr == datetime.date.today().year:
+                    continue
+                # Find open: first trading day on or after from_date in that year
+                _open_target = datetime.date(_yr, _date_from.month, _date_from.day)
+                _close_target = datetime.date(_yr, _date_to.month, _date_to.day)
+                _yr_data = _tdf[(_tdf.index.date >= _open_target) & (_tdf.index.date <= _close_target)]
+                if _yr_data.empty or len(_yr_data) < 3:
+                    continue
+                _open_price = _yr_data["Close"].iloc[0]
+                _close_price = _yr_data["Close"].iloc[-1]
+                _open_dt = _yr_data.index[0].strftime("%Y/%m/%d")
+                _close_dt = _yr_data.index[-1].strftime("%Y/%m/%d")
+                _ret = (_close_price - _open_price) / _open_price * 100
+                # Max drop and max rise during period
+                _min_price = _yr_data["Low"].min() if "Low" in _yr_data.columns else _yr_data["Close"].min()
+                _max_price = _yr_data["High"].max() if "High" in _yr_data.columns else _yr_data["Close"].max()
+                _max_drop = (_min_price - _open_price) / _open_price * 100
+                _max_rise = (_max_price - _open_price) / _open_price * 100
+                _trades.append({
+                    "open_dt": _open_dt, "close_dt": _close_dt,
+                    "open_p": _open_price, "close_p": _close_price,
+                    "ret": _ret, "drop": _max_drop, "rise": _max_rise
+                })
+
+            if _trades:
+                _wins = sum(1 for t in _trades if t["ret"] > 0)
+                _total = len(_trades)
+                _win_rate = _wins / _total * 100
+                _avg_ret = sum(t["ret"] for t in _trades) / _total
+
+                # Summary cards
+                _wr_color = "#00E676" if _win_rate >= 60 else "#FFD700" if _win_rate >= 40 else "#FF5252"
+                _ar_color = "#00E676" if _avg_ret > 0 else "#FF5252"
+                _sc1, _sc2, _sc3 = st.columns(3)
+                with _sc1:
+                    st.markdown(f'<div style="background:#131a2e;border:1px solid #192035;border-radius:12px;padding:16px;text-align:center"><div style="color:#6b7280;font-size:0.78em;margin-bottom:4px">نسبة النجاح</div><div style="color:{_wr_color};font-size:1.8em;font-weight:800">{_win_rate:.0f}%</div><div style="color:#374151;font-size:0.75em">{_wins}/{_total} سنوات</div></div>', unsafe_allow_html=True)
+                with _sc2:
+                    st.markdown(f'<div style="background:#131a2e;border:1px solid #192035;border-radius:12px;padding:16px;text-align:center"><div style="color:#6b7280;font-size:0.78em;margin-bottom:4px">متوسط العائد</div><div style="color:{_ar_color};font-size:1.8em;font-weight:800">{_avg_ret:+.2f}%</div></div>', unsafe_allow_html=True)
+                with _sc3:
+                    _avg_drop = sum(t["drop"] for t in _trades) / _total
+                    st.markdown(f'<div style="background:#131a2e;border:1px solid #192035;border-radius:12px;padding:16px;text-align:center"><div style="color:#6b7280;font-size:0.78em;margin-bottom:4px">متوسط أقصى انخفاض</div><div style="color:#FF5252;font-size:1.8em;font-weight:800">{_avg_drop:.2f}%</div></div>', unsafe_allow_html=True)
+
+                # Trades table
+                _t_header = '<tr><th style="padding:10px 12px;color:#6b7280;font-size:0.8em;border-bottom:1px solid #192035">تاريخ الشراء</th><th style="padding:10px 12px;color:#6b7280;font-size:0.8em;border-bottom:1px solid #192035">تاريخ البيع</th><th style="padding:10px 12px;color:#6b7280;font-size:0.8em;border-bottom:1px solid #192035">سعر الشراء</th><th style="padding:10px 12px;color:#6b7280;font-size:0.8em;border-bottom:1px solid #192035">سعر البيع</th><th style="padding:10px 12px;color:#6b7280;font-size:0.8em;border-bottom:1px solid #192035">العائد %</th><th style="padding:10px 12px;color:#6b7280;font-size:0.8em;border-bottom:1px solid #192035">أقصى انخفاض %</th><th style="padding:10px 12px;color:#6b7280;font-size:0.8em;border-bottom:1px solid #192035">أقصى ارتفاع %</th></tr>'
+                _t_rows = ""
+                for _t in _trades:
+                    _rc = "#00E676" if _t["ret"] > 0 else "#FF5252"
+                    _t_rows += f'<tr><td style="padding:8px 12px;border-bottom:1px solid #0d1117;color:#9ca3af;font-size:0.85em">{_t["open_dt"]}</td><td style="padding:8px 12px;border-bottom:1px solid #0d1117;color:#9ca3af;font-size:0.85em">{_t["close_dt"]}</td><td style="padding:8px 12px;border-bottom:1px solid #0d1117;color:#e5e7eb;font-size:0.85em">{_t["open_p"]:.2f}</td><td style="padding:8px 12px;border-bottom:1px solid #0d1117;color:#e5e7eb;font-size:0.85em">{_t["close_p"]:.2f}</td><td style="padding:8px 12px;border-bottom:1px solid #0d1117;color:{_rc};font-weight:700;font-size:0.85em">{_t["ret"]:+.2f}%</td><td style="padding:8px 12px;border-bottom:1px solid #0d1117;color:#FF5252;font-size:0.85em">{_t["drop"]:.2f}%</td><td style="padding:8px 12px;border-bottom:1px solid #0d1117;color:#00E676;font-size:0.85em">+{_t["rise"]:.2f}%</td></tr>'
+                st.markdown(f'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;background:#131a2e;border-radius:12px;overflow:hidden;margin-top:12px"><thead>{_t_header}</thead><tbody>{_t_rows}</tbody></table></div>', unsafe_allow_html=True)
+
 
 # ══════════════════════════════════════════════════════════════
 # PAGE: Performance
