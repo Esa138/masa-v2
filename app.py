@@ -4112,6 +4112,32 @@ elif page == "🔍 تحليل شركة":
                     unsafe_allow_html=True)
         st.caption("أداء السنة الحالية مقارنة بمتوسط السنوات السابقة وأقرب سنة تشابهاً")
 
+        # Date range selector
+        _dr_c1, _dr_c2, _dr_spacer = st.columns([1, 1, 2])
+        _this_year = datetime.date.today().year
+        with _dr_c1:
+            _date_from = st.date_input("من تاريخ", value=datetime.date(_this_year, 1, 1),
+                                       min_value=datetime.date(_this_year, 1, 1),
+                                       max_value=datetime.date(_this_year, 12, 31),
+                                       key="season_from")
+        with _dr_c2:
+            _date_to = st.date_input("إلى تاريخ", value=datetime.date.today(),
+                                     min_value=datetime.date(_this_year, 1, 1),
+                                     max_value=datetime.date(_this_year, 12, 31),
+                                     key="season_to")
+        _doy_from = _date_from.timetuple().tm_yday
+        _doy_to = _date_to.timetuple().tm_yday
+        if _doy_from >= _doy_to:
+            _doy_from, _doy_to = 1, datetime.date.today().timetuple().tm_yday
+
+        def _filter_curve(curve, doy_from, doy_to):
+            """Filter curve to day-of-year range and re-normalize to 0% at start."""
+            filtered = [(d, v) for d, v in curve if doy_from <= d <= doy_to]
+            if not filtered:
+                return []
+            base = filtered[0][1]
+            return [(d, round(v - base, 2)) for d, v in filtered]
+
         def _build_yearly_curves(df):
             """Build normalized daily curves for each year (Jan 1 = 0%)."""
             if df is None or df.empty:
@@ -4152,100 +4178,107 @@ elif page == "🔍 تحليل شركة":
 
         _yearly = _build_yearly_curves(_c_df)
         if _yearly and len(_yearly) >= 2:
-            import datetime as _dt
-            _current_year = _dt.date.today().year
+            _current_year = datetime.date.today().year
             _past_years = sorted([y for y in _yearly if y != _current_year], reverse=True)
 
             if _current_year in _yearly and _past_years:
-                _cur_curve = _yearly[_current_year]
+                # Apply date range filter to all curves
+                _cur_curve = _filter_curve(_yearly[_current_year], _doy_from, _doy_to)
+                _filtered_yearly = {y: _filter_curve(_yearly[y], _doy_from, _doy_to) for y in _past_years}
+                _filtered_yearly = {y: c for y, c in _filtered_yearly.items() if len(c) >= 5}
 
-                # Average curve from past years
-                _all_days = sorted(set(d for y in _past_years for d, _ in _yearly[y]))
-                _avg_curve = []
-                for day in _all_days:
-                    vals = [dict(_yearly[y]).get(day) for y in _past_years if dict(_yearly[y]).get(day) is not None]
-                    if vals:
-                        _avg_curve.append((day, round(sum(vals) / len(vals), 2)))
+                if _cur_curve and _filtered_yearly:
+                    # Average curve from past years (filtered)
+                    _all_days = sorted(set(d for y in _filtered_yearly for d, _ in _filtered_yearly[y]))
+                    _avg_curve = []
+                    for day in _all_days:
+                        vals = [dict(_filtered_yearly[y]).get(day) for y in _filtered_yearly
+                                if dict(_filtered_yearly[y]).get(day) is not None]
+                        if vals:
+                            _avg_curve.append((day, round(sum(vals) / len(vals), 2)))
 
-                # Find most correlated year
-                _best_year = _past_years[0]
-                _best_corr = 0
-                _correlations = {}
-                for y in _past_years:
-                    corr = _compute_correlation(_cur_curve, _yearly[y])
-                    _correlations[y] = corr
-                    if corr > _best_corr:
-                        _best_corr = corr
-                        _best_year = y
+                    # Find most correlated year (within filtered range)
+                    _filt_past = list(_filtered_yearly.keys())
+                    _best_year = _filt_past[0]
+                    _best_corr = 0
+                    _correlations = {}
+                    for y in _filt_past:
+                        corr = _compute_correlation(_cur_curve, _filtered_yearly[y])
+                        _correlations[y] = corr
+                        if corr > _best_corr:
+                            _best_corr = corr
+                            _best_year = y
 
-                # Month labels for x-axis
-                _month_ticks = {1: "يناير", 32: "فبراير", 60: "مارس", 91: "أبريل",
-                                121: "مايو", 152: "يونيو", 182: "يوليو", 213: "أغسطس",
-                                244: "سبتمبر", 274: "أكتوبر", 305: "نوفمبر", 335: "ديسمبر"}
+                    # Month labels for x-axis
+                    _month_ticks = {1: "يناير", 32: "فبراير", 60: "مارس", 91: "أبريل",
+                                    121: "مايو", 152: "يونيو", 182: "يوليو", 213: "أغسطس",
+                                    244: "سبتمبر", 274: "أكتوبر", 305: "نوفمبر", 335: "ديسمبر"}
+                    # Filter month ticks to visible range
+                    _vis_ticks = {k: v for k, v in _month_ticks.items() if _doy_from <= k <= _doy_to}
+                    if not _vis_ticks:
+                        _vis_ticks = _month_ticks
 
-                _s_fig = go.Figure()
+                    _s_fig = go.Figure()
 
-                # Average (green)
-                if _avg_curve:
+                    # Average (green)
+                    if _avg_curve:
+                        _s_fig.add_trace(go.Scatter(
+                            x=[d for d, _ in _avg_curve], y=[v for _, v in _avg_curve],
+                            mode="lines", name=f"المتوسط ({len(_filt_past)} سنوات)",
+                            line=dict(color="#00E676", width=2),
+                        ))
+
+                    # Best match year (dark green dotted)
+                    _best_curve = _filtered_yearly[_best_year]
                     _s_fig.add_trace(go.Scatter(
-                        x=[d for d, _ in _avg_curve], y=[v for _, v in _avg_curve],
-                        mode="lines", name=f"المتوسط ({len(_past_years)} سنوات)",
-                        line=dict(color="#00E676", width=2),
+                        x=[d for d, _ in _best_curve], y=[v for _, v in _best_curve],
+                        mode="lines", name=f"{_best_year} ({_best_corr:.0f}% تطابق)",
+                        line=dict(color="#1DE9B6", width=1.5, dash="dot"),
                     ))
 
-                # Best match year (dark green dotted)
-                _best_curve = _yearly[_best_year]
-                _s_fig.add_trace(go.Scatter(
-                    x=[d for d, _ in _best_curve], y=[v for _, v in _best_curve],
-                    mode="lines", name=f"{_best_year} ({_best_corr:.0f}% تطابق)",
-                    line=dict(color="#1DE9B6", width=1.5, dash="dot"),
-                ))
+                    # Current year (red/pink)
+                    _s_fig.add_trace(go.Scatter(
+                        x=[d for d, _ in _cur_curve], y=[v for _, v in _cur_curve],
+                        mode="lines", name=f"{_current_year} (الحالي)",
+                        line=dict(color="#FF5252", width=2.5),
+                    ))
 
-                # Current year (red/pink)
-                _s_fig.add_trace(go.Scatter(
-                    x=[d for d, _ in _cur_curve], y=[v for _, v in _cur_curve],
-                    mode="lines", name=f"{_current_year} (الحالي)",
-                    line=dict(color="#FF5252", width=2.5),
-                ))
+                    # Zero line
+                    _s_fig.add_hline(y=0, line_dash="dash", line_color="#374151", line_width=1)
 
-                # Zero line
-                _s_fig.add_hline(y=0, line_dash="dash", line_color="#374151", line_width=1)
+                    # Today marker (only if within selected range)
+                    _today_doy = datetime.date.today().timetuple().tm_yday
+                    if _doy_from <= _today_doy <= _doy_to:
+                        _s_fig.add_vline(x=_today_doy, line_dash="dot", line_color="#FFD700", line_width=1,
+                                         annotation_text="اليوم", annotation_font_color="#FFD700",
+                                         annotation_font_size=11)
 
-                # Today marker
-                _today_doy = _dt.date.today().timetuple().tm_yday
-                _s_fig.add_vline(x=_today_doy, line_dash="dot", line_color="#FFD700", line_width=1,
-                                 annotation_text="اليوم", annotation_font_color="#FFD700",
-                                 annotation_font_size=11)
+                    _s_fig.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(20,24,36,0.8)",
+                        height=400, margin=dict(l=40, r=20, t=10, b=40),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
+                                    font=dict(family="Tajawal", size=11)),
+                        yaxis=dict(title="% العائد", gridcolor="#192035",
+                                   tickfont=dict(size=10, color="#4b5563"), ticksuffix="%"),
+                        xaxis=dict(gridcolor="#192035", tickfont=dict(size=10, color="#4b5563"),
+                                   tickvals=list(_vis_ticks.keys()),
+                                   ticktext=list(_vis_ticks.values()),
+                                   range=[_doy_from - 2, _doy_to + 2]),
+                        font=dict(family="Tajawal"),
+                        hovermode="x unified",
+                    )
+                    st.plotly_chart(_s_fig, use_container_width=True, config={"displayModeBar": False})
 
-                _s_fig.update_layout(
-                    template="plotly_dark",
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(20,24,36,0.8)",
-                    height=400, margin=dict(l=40, r=20, t=10, b=40),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
-                                font=dict(family="Tajawal", size=11)),
-                    yaxis=dict(title="% العائد", gridcolor="#192035",
-                               tickfont=dict(size=10, color="#4b5563"), ticksuffix="%"),
-                    xaxis=dict(gridcolor="#192035", tickfont=dict(size=10, color="#4b5563"),
-                               tickvals=list(_month_ticks.keys()),
-                               ticktext=list(_month_ticks.values())),
-                    font=dict(family="Tajawal"),
-                    hovermode="x unified",
-                )
-                st.plotly_chart(_s_fig, use_container_width=True, config={"displayModeBar": False})
-
-                # Correlation cards
-                # Sort by correlation, show top 3
-                _sorted_corr = sorted(_correlations.items(), key=lambda x: -x[1])[:3]
-                _corr_cols = st.columns(len(_sorted_corr))
-                for _ci, (_cy, _cv) in enumerate(_sorted_corr):
-                    _cc = "#00E676" if _cv >= 70 else "#FFD700" if _cv >= 40 else "#FF5252"
-                    with _corr_cols[_ci]:
-                        st.markdown(f'''
-                        <div style="background:#131a2e;border:1px solid #192035;border-radius:12px;
-                                    padding:16px;text-align:center">
-                            <div style="color:#6b7280;font-size:0.78em;margin-bottom:4px">تطابق مع {_cy}</div>
-                            <div style="color:{_cc};font-size:1.8em;font-weight:800">{_cv:.0f}%</div>
-                        </div>''', unsafe_allow_html=True)
+                    # Correlation cards
+                    _sorted_corr = sorted(_correlations.items(), key=lambda x: -x[1])[:3]
+                    _corr_cols = st.columns(len(_sorted_corr))
+                    for _ci, (_cy, _cv) in enumerate(_sorted_corr):
+                        _cc = "#00E676" if _cv >= 70 else "#FFD700" if _cv >= 40 else "#FF5252"
+                        with _corr_cols[_ci]:
+                            st.markdown(f'<div style="background:#131a2e;border:1px solid #192035;border-radius:12px;padding:16px;text-align:center"><div style="color:#6b7280;font-size:0.78em;margin-bottom:4px">تطابق مع {_cy}</div><div style="color:{_cc};font-size:1.8em;font-weight:800">{_cv:.0f}%</div></div>', unsafe_allow_html=True)
+                else:
+                    st.info("لا توجد بيانات كافية للنطاق المحدد")
         else:
             st.info("لا توجد بيانات كافية لشارت الموسمية")
 
