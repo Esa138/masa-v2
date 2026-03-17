@@ -4107,6 +4107,148 @@ elif page == "🔍 تحليل شركة":
         else:
             st.info("لا توجد بيانات كافية لحساب الموسمية")
 
+        # ── Seasonality Overlay Chart ──────────────────────────
+        st.markdown('<h3 style="text-align:center;margin:30px 0 8px">📈 شارت الموسمية — مقارنة السنوات</h3>',
+                    unsafe_allow_html=True)
+        st.caption("أداء السنة الحالية مقارنة بمتوسط السنوات السابقة وأقرب سنة تشابهاً")
+
+        def _build_yearly_curves(df):
+            """Build normalized daily curves for each year (Jan 1 = 0%)."""
+            if df is None or df.empty:
+                return None
+            df_c = df.copy()
+            df_c.index = pd.to_datetime(df_c.index)
+            yearly = {}
+            for year, grp in df_c.groupby(df_c.index.year):
+                if len(grp) < 20:
+                    continue
+                first_price = grp["Close"].iloc[0]
+                if not first_price or first_price <= 0:
+                    continue
+                # Day of year (trading days from start)
+                pcts = [(d.timetuple().tm_yday, round((c - first_price) / first_price * 100, 2))
+                        for d, c in zip(grp.index, grp["Close"])]
+                yearly[year] = pcts
+            return yearly
+
+        def _compute_correlation(curve_a, curve_b):
+            """Pearson correlation between two yearly curves."""
+            # Align by day-of-year
+            dict_a = dict(curve_a)
+            dict_b = dict(curve_b)
+            common = sorted(set(dict_a.keys()) & set(dict_b.keys()))
+            if len(common) < 10:
+                return 0
+            vals_a = [dict_a[d] for d in common]
+            vals_b = [dict_b[d] for d in common]
+            mean_a = sum(vals_a) / len(vals_a)
+            mean_b = sum(vals_b) / len(vals_b)
+            num = sum((a - mean_a) * (b - mean_b) for a, b in zip(vals_a, vals_b))
+            den_a = sum((a - mean_a) ** 2 for a in vals_a) ** 0.5
+            den_b = sum((b - mean_b) ** 2 for b in vals_b) ** 0.5
+            if den_a == 0 or den_b == 0:
+                return 0
+            return round(num / (den_a * den_b) * 100, 1)
+
+        _yearly = _build_yearly_curves(_c_df)
+        if _yearly and len(_yearly) >= 2:
+            import datetime as _dt
+            _current_year = _dt.date.today().year
+            _past_years = sorted([y for y in _yearly if y != _current_year], reverse=True)
+
+            if _current_year in _yearly and _past_years:
+                _cur_curve = _yearly[_current_year]
+
+                # Average curve from past years
+                _all_days = sorted(set(d for y in _past_years for d, _ in _yearly[y]))
+                _avg_curve = []
+                for day in _all_days:
+                    vals = [dict(_yearly[y]).get(day) for y in _past_years if dict(_yearly[y]).get(day) is not None]
+                    if vals:
+                        _avg_curve.append((day, round(sum(vals) / len(vals), 2)))
+
+                # Find most correlated year
+                _best_year = _past_years[0]
+                _best_corr = 0
+                _correlations = {}
+                for y in _past_years:
+                    corr = _compute_correlation(_cur_curve, _yearly[y])
+                    _correlations[y] = corr
+                    if corr > _best_corr:
+                        _best_corr = corr
+                        _best_year = y
+
+                # Month labels for x-axis
+                _month_ticks = {1: "يناير", 32: "فبراير", 60: "مارس", 91: "أبريل",
+                                121: "مايو", 152: "يونيو", 182: "يوليو", 213: "أغسطس",
+                                244: "سبتمبر", 274: "أكتوبر", 305: "نوفمبر", 335: "ديسمبر"}
+
+                _s_fig = go.Figure()
+
+                # Average (green)
+                if _avg_curve:
+                    _s_fig.add_trace(go.Scatter(
+                        x=[d for d, _ in _avg_curve], y=[v for _, v in _avg_curve],
+                        mode="lines", name=f"المتوسط ({len(_past_years)} سنوات)",
+                        line=dict(color="#00E676", width=2),
+                    ))
+
+                # Best match year (dark green dotted)
+                _best_curve = _yearly[_best_year]
+                _s_fig.add_trace(go.Scatter(
+                    x=[d for d, _ in _best_curve], y=[v for _, v in _best_curve],
+                    mode="lines", name=f"{_best_year} ({_best_corr:.0f}% تطابق)",
+                    line=dict(color="#1DE9B6", width=1.5, dash="dot"),
+                ))
+
+                # Current year (red/pink)
+                _s_fig.add_trace(go.Scatter(
+                    x=[d for d, _ in _cur_curve], y=[v for _, v in _cur_curve],
+                    mode="lines", name=f"{_current_year} (الحالي)",
+                    line=dict(color="#FF5252", width=2.5),
+                ))
+
+                # Zero line
+                _s_fig.add_hline(y=0, line_dash="dash", line_color="#374151", line_width=1)
+
+                # Today marker
+                _today_doy = _dt.date.today().timetuple().tm_yday
+                _s_fig.add_vline(x=_today_doy, line_dash="dot", line_color="#FFD700", line_width=1,
+                                 annotation_text="اليوم", annotation_font_color="#FFD700",
+                                 annotation_font_size=11)
+
+                _s_fig.update_layout(
+                    template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(20,24,36,0.8)",
+                    height=400, margin=dict(l=40, r=20, t=10, b=40),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
+                                font=dict(family="Tajawal", size=11)),
+                    yaxis=dict(title="% العائد", gridcolor="#192035",
+                               tickfont=dict(size=10, color="#4b5563"), ticksuffix="%"),
+                    xaxis=dict(gridcolor="#192035", tickfont=dict(size=10, color="#4b5563"),
+                               tickvals=list(_month_ticks.keys()),
+                               ticktext=list(_month_ticks.values())),
+                    font=dict(family="Tajawal"),
+                    hovermode="x unified",
+                )
+                st.plotly_chart(_s_fig, use_container_width=True, config={"displayModeBar": False})
+
+                # Correlation cards
+                # Sort by correlation, show top 3
+                _sorted_corr = sorted(_correlations.items(), key=lambda x: -x[1])[:3]
+                _corr_cols = st.columns(len(_sorted_corr))
+                for _ci, (_cy, _cv) in enumerate(_sorted_corr):
+                    _cc = "#00E676" if _cv >= 70 else "#FFD700" if _cv >= 40 else "#FF5252"
+                    with _corr_cols[_ci]:
+                        st.markdown(f'''
+                        <div style="background:#131a2e;border:1px solid #192035;border-radius:12px;
+                                    padding:16px;text-align:center">
+                            <div style="color:#6b7280;font-size:0.78em;margin-bottom:4px">تطابق مع {_cy}</div>
+                            <div style="color:{_cc};font-size:1.8em;font-weight:800">{_cv:.0f}%</div>
+                        </div>''', unsafe_allow_html=True)
+        else:
+            st.info("لا توجد بيانات كافية لشارت الموسمية")
+
 
 # ══════════════════════════════════════════════════════════════
 # PAGE: Performance
