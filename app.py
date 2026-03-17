@@ -4141,6 +4141,21 @@ elif page == "🔍 تحليل شركة":
             base = filtered[0][1]
             return [(d, round(v - base, 2)) for d, v in filtered]
 
+        def _smooth_curve(curve, window=5):
+            """Smooth a curve using simple moving average."""
+            if len(curve) < window:
+                return curve
+            days = [d for d, _ in curve]
+            vals = [v for _, v in curve]
+            smoothed = []
+            half = window // 2
+            for i in range(len(vals)):
+                start = max(0, i - half)
+                end = min(len(vals), i + half + 1)
+                avg = sum(vals[start:end]) / (end - start)
+                smoothed.append((days[i], round(avg, 2)))
+            return smoothed
+
         def _build_yearly_curves(df):
             """Build normalized daily curves for each year (Jan 1 = 0%)."""
             if df is None or df.empty:
@@ -4224,18 +4239,22 @@ elif page == "🔍 تحليل شركة":
 
                     _s_fig = go.Figure()
 
+                    # Smooth curves for cleaner display
+                    _avg_smooth = _smooth_curve(_avg_curve, window=7)
+                    _best_curve_raw = _filtered_yearly[_best_year]
+                    _best_smooth = _smooth_curve(_best_curve_raw, window=5)
+
                     # Average (green)
-                    if _avg_curve:
+                    if _avg_smooth:
                         _s_fig.add_trace(go.Scatter(
-                            x=[d for d, _ in _avg_curve], y=[v for _, v in _avg_curve],
+                            x=[d for d, _ in _avg_smooth], y=[v for _, v in _avg_smooth],
                             mode="lines", name=f"المتوسط ({len(_filt_past)} سنوات)",
                             line=dict(color="#00E676", width=2),
                         ))
 
                     # Best match year (dark green dotted)
-                    _best_curve = _filtered_yearly[_best_year]
                     _s_fig.add_trace(go.Scatter(
-                        x=[d for d, _ in _best_curve], y=[v for _, v in _best_curve],
+                        x=[d for d, _ in _best_smooth], y=[v for _, v in _best_smooth],
                         mode="lines", name=f"{_best_year} ({_best_corr:.0f}% تطابق)",
                         line=dict(color="#1DE9B6", width=1.5, dash="dot"),
                     ))
