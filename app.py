@@ -3839,7 +3839,7 @@ elif page == "🔍 تحليل شركة":
 
     # ── Helper: Fetch company data (cached 5 min) ──
     @st.cache_data(ttl=300, show_spinner=False)
-    def _fetch_company(ticker, period="5y"):
+    def _fetch_company(ticker, period="10y"):
         t = yf.Ticker(ticker)
         df = t.history(period=period, interval="1d")
         if df is not None and not df.empty:
