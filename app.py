@@ -3014,9 +3014,14 @@ with st.sidebar:
 
     st.divider()
 
+    # Handle navigation from sector map → company analysis
+    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🔍 تحليل شركة", "📊 أداء النظام"]
+    if st.session_state.get("_goto_page"):
+        st.session_state["page_nav"] = st.session_state.pop("_goto_page")
+
     page = st.radio(
         "الصفحة",
-        ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🔍 تحليل شركة", "📊 أداء النظام"],
+        _pages,
         label_visibility="collapsed",
         key="page_nav",
     )
@@ -3851,7 +3856,7 @@ elif page == "🗺️ خريطة القطاعات":
                     with _btn_cols[_si % min(len(sd["stocks"]), 6)]:
                         if st.button(f"🔍 {s['name']}", key=f"goto_{sd['name']}_{s['ticker']}",
                                      use_container_width=True):
-                            st.session_state["page_nav"] = "🔍 تحليل شركة"
+                            st.session_state["_goto_page"] = "🔍 تحليل شركة"
                             st.session_state["_goto_ticker"] = s["ticker"]
                             st.rerun()
 
