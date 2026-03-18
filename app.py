@@ -2330,7 +2330,23 @@ def show_breakout_index(results, market_key="saudi"):
     # Build composite index
     dates, index_vals, index_highs, index_lows = build_composite_index(results)
 
-    if len(dates) < 20:
+    # For intraday: filter to last session only (match sector map)
+    _idx_intra = len(dates) > 0 and (len(dates[0]) > 10 or " " in dates[0] or "T" in dates[0])
+    if _idx_intra and dates:
+        _unique_days = sorted(set(d[:10] for d in dates))
+        for _off in range(len(_unique_days)):
+            _target = _unique_days[-(1 + _off)]
+            _mask = [(i, d, v, h, l) for i, (d, v, h, l) in enumerate(zip(dates, index_vals, index_highs, index_lows)) if d[:10] == _target]
+            if len(_mask) >= 2:
+                break
+        if _mask:
+            dates = [m[1] for m in _mask]
+            _base = _mask[0][2]  # first val
+            index_vals = [round(100 + (m[2] - _base) / _base * 100, 2) if _base > 0 else 100 for m in _mask]
+            index_highs = [m[3] for m in _mask]
+            index_lows = [m[4] for m in _mask]
+
+    if len(dates) < 5:
         st.warning("لا توجد بيانات كافية لبناء المؤشر")
         return
 
