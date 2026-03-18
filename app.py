@@ -2478,7 +2478,17 @@ def show_breakout_index(results, market_key="saudi"):
                 hovertemplate=f"{bench_name}: %{{y:.2f}}<extra></extra>",
             ))
 
-        # Shade the gap
+        # Detect intraday data → add rangebreaks to hide overnight gaps
+        _is_intra = len(dates) > 0 and (len(dates[0]) > 10 or " " in dates[0] or "T" in dates[0])
+        _xaxis_cfg = dict(showgrid=False, tickfont=dict(size=10, color="#6b7280"),
+                          tickformat="%d %b %Y")
+        if _is_intra:
+            _xaxis_cfg["rangebreaks"] = [
+                dict(bounds=[16, 9.5], pattern="hour"),  # Hide after-hours (4pm - 9:30am)
+                dict(bounds=["sat", "mon"], pattern="day of week"),  # Hide weekends
+            ]
+            _xaxis_cfg["tickformat"] = "%d %b %H:%M"
+
         comp_fig.update_layout(
             height=500,
             margin=dict(l=0, r=0, t=30, b=0),
@@ -2490,8 +2500,7 @@ def show_breakout_index(results, market_key="saudi"):
                 font=dict(size=12, color="#9ca3af"),
                 bgcolor="rgba(0,0,0,0)",
             ),
-            xaxis=dict(showgrid=False, tickfont=dict(size=10, color="#6b7280"),
-                       tickformat="%d %b %Y"),
+            xaxis=_xaxis_cfg,
             yaxis=dict(showgrid=True, gridcolor="#151d30",
                        tickfont=dict(size=10, color="#4b5563")),
             hovermode="x unified",
