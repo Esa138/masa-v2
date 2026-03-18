@@ -2179,6 +2179,7 @@ def _fetch_benchmark_normalized(dates, market_key="saudi", start_val=100.0):
     """
     Fetch benchmark index (TASI / S&P 500) and normalize to start_val,
     aligned to the same dates as the composite index.
+    Handles both daily and intraday date formats.
     """
     bench = BENCHMARK_MAP.get(market_key, BENCHMARK_MAP["saudi"])
     try:
@@ -2189,26 +2190,37 @@ def _fetch_benchmark_normalized(dates, market_key="saudi", start_val=100.0):
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
 
-        # Build date -> close map
+        # Build date -> close map (daily key: YYYY-MM-DD)
         bench_map = {}
         for dt, row in df.iterrows():
             bench_map[dt.strftime("%Y-%m-%d")] = float(row["Close"])
 
+        # Detect intraday: if dates have time component (longer than 10 chars or contain space/T)
+        _is_intraday = False
+        if dates and (len(dates[0]) > 10 or " " in dates[0] or "T" in dates[0]):
+            _is_intraday = True
+
+        # For intraday dates, extract just the date part for matching
+        def _date_key(d):
+            return d[:10] if _is_intraday else d
+
         # Find first date that exists in both
         first_val = None
         for d in dates:
-            if d in bench_map:
-                first_val = bench_map[d]
+            dk = _date_key(d)
+            if dk in bench_map:
+                first_val = bench_map[dk]
                 break
 
         if first_val is None or first_val == 0:
             return {}, 0, 0, bench["name"], bench["color"]
 
-        # Normalize
+        # Normalize — for intraday, spread daily value across all bars of that day
         normalized = {}
         for d in dates:
-            if d in bench_map:
-                normalized[d] = round(bench_map[d] / first_val * start_val, 2)
+            dk = _date_key(d)
+            if dk in bench_map:
+                normalized[d] = round(bench_map[dk] / first_val * start_val, 2)
 
         # Returns
         closes = [float(v) for v in df["Close"].values]
