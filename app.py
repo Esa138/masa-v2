@@ -2461,19 +2461,16 @@ def show_breakout_index(results, market_key="saudi"):
         # Comparison chart: Composite vs Benchmark
         comp_fig = go.Figure()
 
-        # Detect intraday and apply smoothing
+        # Detect intraday and apply strong EMA smoothing
         _is_intra = len(dates) > 0 and (len(dates[0]) > 10 or " " in dates[0] or "T" in dates[0])
         if _is_intra and len(index_vals) > 10:
-            _sw = min(7, len(index_vals) // 5)  # adaptive window
-            if _sw < 3:
-                _sw = 3
-            _smoothed_vals = []
-            _half = _sw // 2
-            for _i in range(len(index_vals)):
-                _s = max(0, _i - _half)
-                _e = min(len(index_vals), _i + _half + 1)
-                _smoothed_vals.append(round(sum(index_vals[_s:_e]) / (_e - _s), 2))
-            _plot_vals = _smoothed_vals
+            # EMA smoothing — much smoother than simple moving average
+            _span = max(20, len(index_vals) // 8)  # ~20-40 bars
+            _alpha = 2.0 / (_span + 1)
+            _ema = [index_vals[0]]
+            for _i in range(1, len(index_vals)):
+                _ema.append(round(_ema[-1] + _alpha * (index_vals[_i] - _ema[-1]), 2))
+            _plot_vals = _ema
         else:
             _plot_vals = index_vals
 
