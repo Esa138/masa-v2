@@ -2461,14 +2461,28 @@ def show_breakout_index(results, market_key="saudi"):
         # Comparison chart: Composite vs Benchmark
         comp_fig = go.Figure()
 
+        # Detect intraday → aggregate to daily for clean multi-day chart
+        _is_intra = len(dates) > 0 and (len(dates[0]) > 10 or " " in dates[0] or "T" in dates[0])
+        if _is_intra and len(dates) > 20:
+            # Group by date, take last value per day (= daily close)
+            _daily = {}
+            for _d, _v in zip(dates, index_vals):
+                _dk = _d[:10]
+                _daily[_dk] = _v  # last value wins = close of day
+            _plot_dates = list(_daily.keys())
+            _plot_vals = list(_daily.values())
+        else:
+            _plot_dates = dates
+            _plot_vals = index_vals
+
         comp_fig.add_trace(go.Scatter(
-            x=dates, y=index_vals, mode="lines",
+            x=_plot_dates, y=_plot_vals, mode="lines",
             line=dict(color="#4FC3F7", width=2.5),
             name="المؤشر المركب",
             hovertemplate="المؤشر: %{y:.2f}<extra></extra>",
         ))
         # Benchmark line
-        b_dates = [d for d in dates if d in bench_norm]
+        b_dates = [d for d in _plot_dates if d in bench_norm]
         b_vals = [bench_norm[d] for d in b_dates]
         if b_dates:
             comp_fig.add_trace(go.Scatter(
