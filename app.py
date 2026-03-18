@@ -3975,11 +3975,13 @@ elif page == "🔍 تحليل شركة":
     st.caption("بحث وتحليل مفصل لأي شركة — نظرة عامة + موسمية الأداء")
 
     # ── Stock selector ──
-    from data.markets import SAUDI_STOCKS, US_STOCKS, FOREX_STOCKS, CRYPTO_STOCKS, get_sector
+    from data.markets import SAUDI_STOCKS, US_STOCKS, FOREX_STOCKS, CRYPTO_STOCKS, COMMODITIES_STOCKS, get_sector
     if market_key == "us":
         _stocks_dict = US_STOCKS
     elif market_key == "forex":
         _stocks_dict = FOREX_STOCKS
+    elif market_key == "commodities":
+        _stocks_dict = COMMODITIES_STOCKS
     elif market_key == "crypto":
         _stocks_dict = CRYPTO_STOCKS
     else:

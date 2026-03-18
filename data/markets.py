@@ -577,6 +577,28 @@ CRYPTO_STOCKS = {
 
 
 # ══════════════════════════════════════════════════════════════
+# Commodities — Gold, Silver & Metals
+# ══════════════════════════════════════════════════════════════
+
+COMMODITIES_STOCKS = {
+    # ── المعادن الثمينة ──
+    "GC=F": "الذهب",
+    "SI=F": "الفضة",
+    "PL=F": "البلاتين",
+    "PA=F": "البلاديوم",
+    # ── الطاقة ──
+    "CL=F": "النفط الخام",
+    "BZ=F": "برنت",
+    "NG=F": "الغاز الطبيعي",
+    # ── المعادن الصناعية ──
+    "HG=F": "النحاس",
+    "ALI=F": "الألمنيوم",
+    # ── الزراعية ──
+    "ZC=F": "الذرة",
+}
+
+
+# ══════════════════════════════════════════════════════════════
 # Saudi Sector Mapping — Based on Tadawul GICS Classification
 # Source: Saudi Exchange official sector indices
 # ══════════════════════════════════════════════════════════════
@@ -1034,6 +1056,23 @@ CRYPTO_SECTORS = {
 }
 
 
+# Sector mapping for Commodities
+COMMODITIES_SECTORS = {
+    **{t: "معادن ثمينة" for t in [
+        "GC=F", "SI=F", "PL=F", "PA=F",
+    ]},
+    **{t: "طاقة" for t in [
+        "CL=F", "BZ=F", "NG=F",
+    ]},
+    **{t: "معادن صناعية" for t in [
+        "HG=F", "ALI=F",
+    ]},
+    **{t: "سلع زراعية" for t in [
+        "ZC=F",
+    ]},
+}
+
+
 # ══════════════════════════════════════════════════════════════
 # MARKET CONFIGS
 # ══════════════════════════════════════════════════════════════
@@ -1059,6 +1098,11 @@ MARKETS = {
         "stocks": CRYPTO_STOCKS,
         "label": "العملات الرقمية",
     },
+    "🥇 السلع (Commodities)": {
+        "key": "commodities",
+        "stocks": COMMODITIES_STOCKS,
+        "label": "السلع",
+    },
 }
 
 
@@ -1070,30 +1114,22 @@ def get_all_tickers(market: str = "saudi") -> list:
         return list(FOREX_STOCKS.keys())
     if market == "crypto":
         return list(CRYPTO_STOCKS.keys())
+    if market == "commodities":
+        return list(COMMODITIES_STOCKS.keys())
     return list(SAUDI_STOCKS.keys())
 
 
 def get_stock_name(ticker: str) -> str:
-    """Get company name for a ticker (Saudi, US, Forex, or Crypto)."""
-    if ticker in SAUDI_STOCKS:
-        return SAUDI_STOCKS[ticker]
-    if ticker in US_STOCKS:
-        return US_STOCKS[ticker]
-    if ticker in FOREX_STOCKS:
-        return FOREX_STOCKS[ticker]
-    if ticker in CRYPTO_STOCKS:
-        return CRYPTO_STOCKS[ticker]
-    return ticker.replace(".SR", "").replace("=X", "").replace("-USD", "")
+    """Get company name for a ticker."""
+    for d in (SAUDI_STOCKS, US_STOCKS, FOREX_STOCKS, CRYPTO_STOCKS, COMMODITIES_STOCKS):
+        if ticker in d:
+            return d[ticker]
+    return ticker.replace(".SR", "").replace("=X", "").replace("=F", "").replace("-USD", "")
 
 
 def get_sector(ticker: str) -> str:
     """Get sector for a ticker."""
-    if ticker in SAUDI_SECTORS:
-        return SAUDI_SECTORS[ticker]
-    if ticker in US_SECTORS:
-        return US_SECTORS[ticker]
-    if ticker in FOREX_SECTORS:
-        return FOREX_SECTORS[ticker]
-    if ticker in CRYPTO_SECTORS:
-        return CRYPTO_SECTORS[ticker]
+    for d in (SAUDI_SECTORS, US_SECTORS, FOREX_SECTORS, CRYPTO_SECTORS, COMMODITIES_SECTORS):
+        if ticker in d:
+            return d[ticker]
     return "أخرى"

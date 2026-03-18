@@ -36,6 +36,11 @@ SECTOR_COLORS = {
     # ── Crypto Market ──
     "عملات رقمية كبرى": "#FF9100",        # Deep Orange
     "عملات رقمية بديلة": "#FFAB40",       # Orange Accent
+    # ── Commodities Market ──
+    "معادن ثمينة": "#FFD700",             # Gold
+    "طاقة": "#FF1744",                    # Red (shared)
+    "معادن صناعية": "#B0BEC5",            # Silver
+    "سلع زراعية": "#8BC34A",              # Light Green
     # Default
     "أخرى": "#607D8B",
 }
