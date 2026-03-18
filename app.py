@@ -2461,13 +2461,9 @@ def show_breakout_index(results, market_key="saudi"):
         # Comparison chart: Composite vs Benchmark
         comp_fig = go.Figure()
 
-        # Use spline for visual smoothing without altering data values
-        _is_intra = len(dates) > 0 and (len(dates[0]) > 10 or " " in dates[0] or "T" in dates[0])
-        _line_shape = "spline" if _is_intra else "linear"
-
         comp_fig.add_trace(go.Scatter(
             x=dates, y=index_vals, mode="lines",
-            line=dict(color="#4FC3F7", width=2.5, shape=_line_shape, smoothing=1.3),
+            line=dict(color="#4FC3F7", width=2.5),
             name="المؤشر المركب",
             hovertemplate="المؤشر: %{y:.2f}<extra></extra>",
         ))
