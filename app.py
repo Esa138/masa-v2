@@ -2460,8 +2460,25 @@ def show_breakout_index(results, market_key="saudi"):
     with idx_tab_compare:
         # Comparison chart: Composite vs Benchmark
         comp_fig = go.Figure()
+
+        # Detect intraday and apply smoothing
+        _is_intra = len(dates) > 0 and (len(dates[0]) > 10 or " " in dates[0] or "T" in dates[0])
+        if _is_intra and len(index_vals) > 10:
+            _sw = min(7, len(index_vals) // 5)  # adaptive window
+            if _sw < 3:
+                _sw = 3
+            _smoothed_vals = []
+            _half = _sw // 2
+            for _i in range(len(index_vals)):
+                _s = max(0, _i - _half)
+                _e = min(len(index_vals), _i + _half + 1)
+                _smoothed_vals.append(round(sum(index_vals[_s:_e]) / (_e - _s), 2))
+            _plot_vals = _smoothed_vals
+        else:
+            _plot_vals = index_vals
+
         comp_fig.add_trace(go.Scatter(
-            x=dates, y=index_vals, mode="lines",
+            x=dates, y=_plot_vals, mode="lines",
             line=dict(color="#4FC3F7", width=2.5),
             name="المؤشر المركب",
             hovertemplate="المؤشر: %{y:.2f}<extra></extra>",
