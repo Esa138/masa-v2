@@ -3850,14 +3850,14 @@ elif page == "🗺️ خريطة القطاعات":
             if rows_html:
                 st.markdown(f'<div class="smap-rows">{rows_html}</div>',
                             unsafe_allow_html=True)
-                # Clickable stock buttons for navigation
+                # Clickable stock buttons → navigate to Order Flow detail
                 _btn_cols = st.columns(min(len(sd["stocks"]), 6))
                 for _si, s in enumerate(sd["stocks"]):
                     with _btn_cols[_si % min(len(sd["stocks"]), 6)]:
                         if st.button(f"🔍 {s['name']}", key=f"goto_{sd['name']}_{s['ticker']}",
                                      use_container_width=True):
-                            st.session_state["_goto_page"] = "🔍 تحليل شركة"
-                            st.session_state["_goto_ticker"] = s["ticker"]
+                            st.session_state["_goto_page"] = "🔬 Order Flow"
+                            st.session_state.selected_ticker = s["ticker"]
                             st.rerun()
 
 
