@@ -2504,6 +2504,7 @@ def show_breakout_index(results, market_key="saudi"):
                 dict(bounds=["sat", "mon"], pattern="day of week"),  # Hide weekends
             ]
             _xaxis_cfg["tickformat"] = "%d %b %H:%M"
+            _xaxis_cfg["hoverformat"] = "%d %b %H:%M"
 
         comp_fig.update_layout(
             height=500,
