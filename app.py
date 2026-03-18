@@ -3018,6 +3018,7 @@ with st.sidebar:
         "الصفحة",
         ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🔍 تحليل شركة", "📊 أداء النظام"],
         label_visibility="collapsed",
+        key="page_nav",
     )
 
     st.divider()
@@ -3840,10 +3841,19 @@ elif page == "🗺️ خريطة القطاعات":
 
             st.markdown(card_html, unsafe_allow_html=True)
 
-            # Stock rows
+            # Stock rows (HTML + clickable buttons)
             if rows_html:
                 st.markdown(f'<div class="smap-rows">{rows_html}</div>',
                             unsafe_allow_html=True)
+                # Clickable stock buttons for navigation
+                _btn_cols = st.columns(min(len(sd["stocks"]), 6))
+                for _si, s in enumerate(sd["stocks"]):
+                    with _btn_cols[_si % min(len(sd["stocks"]), 6)]:
+                        if st.button(f"🔍 {s['name']}", key=f"goto_{sd['name']}_{s['ticker']}",
+                                     use_container_width=True):
+                            st.session_state["page_nav"] = "🔍 تحليل شركة"
+                            st.session_state["_goto_ticker"] = s["ticker"]
+                            st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════
@@ -3978,10 +3988,17 @@ elif page == "🔍 تحليل شركة":
     _stock_list = list(_stock_options.keys())
     _stock_labels = list(_stock_options.values())
 
+    # Check if redirected from sector map
+    _default_idx = 0
+    if "_goto_ticker" in st.session_state:
+        _goto_tk = st.session_state.pop("_goto_ticker")
+        if _goto_tk in _stock_list:
+            _default_idx = _stock_list.index(_goto_tk)
+
     _selected_label = st.selectbox(
         "اختر الشركة",
         _stock_labels,
-        index=0,
+        index=_default_idx,
         key="company_select",
     )
     _selected_tk = _stock_list[_stock_labels.index(_selected_label)]
