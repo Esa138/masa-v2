@@ -953,9 +953,30 @@ def build_breakouts_chart(r, composite_dates=None, composite_vals=None):
             hovertemplate=f"دعم {tf['label']}: %{{y:.2f}}<extra></extra>",
         ))
 
-        # Breakout markers with count numbers
+        # Build sequential numbers that reset on opposite event
+        _all_events = []
+        for _idx, _dt in enumerate(breakout_dates):
+            _all_events.append(("bo", _dt, breakout_prices[_idx], _idx))
+        for _idx, _dt in enumerate(breakdown_dates):
+            _all_events.append(("bd", _dt, breakdown_prices[_idx], _idx))
+        _all_events.sort(key=lambda x: x[1])
+
+        _bo_nums = [0] * len(breakout_dates)
+        _bd_nums = [0] * len(breakdown_dates)
+        _bo_count = 0
+        _bd_count = 0
+        for _evt_type, _dt, _pr, _orig_idx in _all_events:
+            if _evt_type == "bo":
+                _bo_count += 1
+                _bd_count = 0  # reset breakdown count
+                _bo_nums[_orig_idx] = _bo_count
+            else:
+                _bd_count += 1
+                _bo_count = 0  # reset breakout count
+                _bd_nums[_orig_idx] = _bd_count
+
+        # Breakout markers with reset count
         if breakout_dates:
-            _bo_nums = list(range(1, len(breakout_dates) + 1))
             fig.add_trace(go.Scatter(
                 x=breakout_dates, y=breakout_prices,
                 mode="markers+text",
@@ -967,9 +988,8 @@ def build_breakouts_chart(r, composite_dates=None, composite_vals=None):
                 name=f"اختراق {tf['label']} ({len(breakout_dates)})",
                 hovertemplate=f"اختراق {tf['label']} #%{{text}}<br>%{{x}}<br>%{{y:.2f}}<extra></extra>",
             ))
-        # Breakdown markers with count numbers
+        # Breakdown markers with reset count
         if breakdown_dates:
-            _bd_nums = list(range(1, len(breakdown_dates) + 1))
             fig.add_trace(go.Scatter(
                 x=breakdown_dates, y=breakdown_prices,
                 mode="markers+text",
@@ -2092,12 +2112,28 @@ def build_composite_breakouts_chart(dates, index_vals, index_highs, index_lows):
             line=dict(color=tf["color"], width=1, dash="dot"),
             name=f"دعم {tf['label']}", opacity=0.7,
         ))
+        # Build sequential numbers that reset on opposite event
+        _all_ev = []
+        for _ix, _dt in enumerate(breakout_dates):
+            _all_ev.append(("bo", _dt, _ix))
+        for _ix, _dt in enumerate(breakdown_dates):
+            _all_ev.append(("bd", _dt, _ix))
+        _all_ev.sort(key=lambda x: x[1])
+        _bo_n = [0] * len(breakout_dates)
+        _bd_n = [0] * len(breakdown_dates)
+        _boc, _bdc = 0, 0
+        for _et, _dt, _oi in _all_ev:
+            if _et == "bo":
+                _boc += 1; _bdc = 0; _bo_n[_oi] = _boc
+            else:
+                _bdc += 1; _boc = 0; _bd_n[_oi] = _bdc
+
         if breakout_dates:
             fig.add_trace(go.Scatter(
                 x=breakout_dates, y=breakout_prices, mode="markers+text",
                 marker=dict(symbol="triangle-up", size=12, color=tf["color"],
                             line=dict(width=1, color="#fff")),
-                text=[str(i) for i in range(1, len(breakout_dates) + 1)],
+                text=[str(i) for i in _bo_n],
                 textposition="top center",
                 textfont=dict(size=9, color=tf["color"]),
                 name=f"اختراق {tf['label']} ({len(breakout_dates)})",
@@ -2107,7 +2143,7 @@ def build_composite_breakouts_chart(dates, index_vals, index_highs, index_lows):
                 x=breakdown_dates, y=breakdown_prices, mode="markers+text",
                 marker=dict(symbol="circle", size=10, color=tf["color"],
                             line=dict(width=1, color="#fff")),
-                text=[str(i) for i in range(1, len(breakdown_dates) + 1)],
+                text=[str(i) for i in _bd_n],
                 textposition="bottom center",
                 textfont=dict(size=9, color=tf["color"]),
                 name=f"كسر {tf['label']} ({len(breakdown_dates)})",
