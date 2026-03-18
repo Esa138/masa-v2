@@ -4416,21 +4416,29 @@ elif page == "🔍 تحليل شركة":
             _tdf = _c_df.copy()
             _tdf.index = pd.to_datetime(_tdf.index)
             _trades = []
-            for _yr in sorted(_tdf.index.year.unique(), reverse=True):
-                if _yr == datetime.date.today().year:
-                    continue
-                # Find open: first trading day on or after from_date
+            _available_years = sorted([y for y in _tdf.index.year.unique() if y != datetime.date.today().year], reverse=True)
+            _trade_years = _available_years[:_n_years]  # Respect selected year count
+            for _yr in _trade_years:
+                # Find open: first trading day on or after from_date (extend up to 5 days forward)
                 # Find close: if close_target falls on non-trading day, extend up to 5 days forward
                 _open_target = datetime.date(_yr, _date_from.month, _date_from.day)
+                _open_extended = _open_target + datetime.timedelta(days=5)
                 _close_target = datetime.date(_yr, _date_to.month, _date_to.day)
                 _close_extended = _close_target + datetime.timedelta(days=5)
+                # Get full range including extensions
                 _yr_data = _tdf[(_tdf.index.date >= _open_target) & (_tdf.index.date <= _close_extended)]
-                # Trim: keep up to the first trading day on or after close_target
+                if _yr_data.empty:
+                    continue
+                # Find actual open: first trading day on or after open_target
+                _actual_open_idx = _yr_data.index[0]
+                # Find actual close: first trading day on or after close_target
                 _post_target = _yr_data[_yr_data.index.date >= _close_target]
                 if not _post_target.empty:
                     _actual_close_idx = _post_target.index[0]
-                    _yr_data = _yr_data[_yr_data.index <= _actual_close_idx]
-                if _yr_data.empty or len(_yr_data) < 3:
+                else:
+                    _actual_close_idx = _yr_data.index[-1]
+                _yr_data = _tdf[(_tdf.index >= _actual_open_idx) & (_tdf.index <= _actual_close_idx)]
+                if _yr_data.empty or len(_yr_data) < 1:
                     continue
                 _open_price = _yr_data["Close"].iloc[0]
                 _close_price = _yr_data["Close"].iloc[-1]
