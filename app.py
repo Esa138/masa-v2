@@ -2461,22 +2461,13 @@ def show_breakout_index(results, market_key="saudi"):
         # Comparison chart: Composite vs Benchmark
         comp_fig = go.Figure()
 
-        # Detect intraday and apply strong EMA smoothing
+        # Use spline for visual smoothing without altering data values
         _is_intra = len(dates) > 0 and (len(dates[0]) > 10 or " " in dates[0] or "T" in dates[0])
-        if _is_intra and len(index_vals) > 10:
-            # EMA smoothing — much smoother than simple moving average
-            _span = max(20, len(index_vals) // 8)  # ~20-40 bars
-            _alpha = 2.0 / (_span + 1)
-            _ema = [index_vals[0]]
-            for _i in range(1, len(index_vals)):
-                _ema.append(round(_ema[-1] + _alpha * (index_vals[_i] - _ema[-1]), 2))
-            _plot_vals = _ema
-        else:
-            _plot_vals = index_vals
+        _line_shape = "spline" if _is_intra else "linear"
 
         comp_fig.add_trace(go.Scatter(
-            x=dates, y=_plot_vals, mode="lines",
-            line=dict(color="#4FC3F7", width=2.5),
+            x=dates, y=index_vals, mode="lines",
+            line=dict(color="#4FC3F7", width=2.5, shape=_line_shape, smoothing=1.3),
             name="المؤشر المركب",
             hovertemplate="المؤشر: %{y:.2f}<extra></extra>",
         ))
