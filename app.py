@@ -984,7 +984,7 @@ def build_breakouts_chart(r, composite_dates=None, composite_vals=None):
                             line=dict(width=1, color="#fff")),
                 text=[str(i) for i in _bo_nums],
                 textposition="top center",
-                textfont=dict(size=9, color=tf["color"], family="Tajawal"),
+                textfont=dict(size=13, color=tf["color"], family="Tajawal"),
                 name=f"اختراق {tf['label']} ({len(breakout_dates)})",
                 hovertemplate=f"اختراق {tf['label']} #%{{text}}<br>%{{x}}<br>%{{y:.2f}}<extra></extra>",
             ))
@@ -997,7 +997,7 @@ def build_breakouts_chart(r, composite_dates=None, composite_vals=None):
                             line=dict(width=1, color="#fff")),
                 text=[str(i) for i in _bd_nums],
                 textposition="bottom center",
-                textfont=dict(size=9, color=tf["color"], family="Tajawal"),
+                textfont=dict(size=13, color=tf["color"], family="Tajawal"),
                 name=f"كسر {tf['label']} ({len(breakdown_dates)})",
                 hovertemplate=f"كسر {tf['label']} #%{{text}}<br>%{{x}}<br>%{{y:.2f}}<extra></extra>",
             ))
@@ -2135,7 +2135,7 @@ def build_composite_breakouts_chart(dates, index_vals, index_highs, index_lows):
                             line=dict(width=1, color="#fff")),
                 text=[str(i) for i in _bo_n],
                 textposition="top center",
-                textfont=dict(size=9, color=tf["color"]),
+                textfont=dict(size=13, color=tf["color"]),
                 name=f"اختراق {tf['label']} ({len(breakout_dates)})",
             ))
         if breakdown_dates:
@@ -2145,7 +2145,7 @@ def build_composite_breakouts_chart(dates, index_vals, index_highs, index_lows):
                             line=dict(width=1, color="#fff")),
                 text=[str(i) for i in _bd_n],
                 textposition="bottom center",
-                textfont=dict(size=9, color=tf["color"]),
+                textfont=dict(size=13, color=tf["color"]),
                 name=f"كسر {tf['label']} ({len(breakdown_dates)})",
             ))
 
