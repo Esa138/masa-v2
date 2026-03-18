@@ -953,25 +953,33 @@ def build_breakouts_chart(r, composite_dates=None, composite_vals=None):
             hovertemplate=f"دعم {tf['label']}: %{{y:.2f}}<extra></extra>",
         ))
 
-        # Breakout markers
+        # Breakout markers with count numbers
         if breakout_dates:
+            _bo_nums = list(range(1, len(breakout_dates) + 1))
             fig.add_trace(go.Scatter(
                 x=breakout_dates, y=breakout_prices,
-                mode="markers",
+                mode="markers+text",
                 marker=dict(symbol="triangle-up", size=12, color=tf["color"],
                             line=dict(width=1, color="#fff")),
-                name=f"اختراق {tf['label']}",
-                hovertemplate=f"اختراق {tf['label']}<br>%{{x}}<br>%{{y:.2f}}<extra></extra>",
+                text=[str(i) for i in _bo_nums],
+                textposition="top center",
+                textfont=dict(size=9, color=tf["color"], family="Tajawal"),
+                name=f"اختراق {tf['label']} ({len(breakout_dates)})",
+                hovertemplate=f"اختراق {tf['label']} #%{{text}}<br>%{{x}}<br>%{{y:.2f}}<extra></extra>",
             ))
-        # Breakdown markers
+        # Breakdown markers with count numbers
         if breakdown_dates:
+            _bd_nums = list(range(1, len(breakdown_dates) + 1))
             fig.add_trace(go.Scatter(
                 x=breakdown_dates, y=breakdown_prices,
-                mode="markers",
+                mode="markers+text",
                 marker=dict(symbol="circle", size=10, color=tf["color"],
                             line=dict(width=1, color="#fff")),
-                name=f"كسر {tf['label']}",
-                hovertemplate=f"كسر {tf['label']}<br>%{{x}}<br>%{{y:.2f}}<extra></extra>",
+                text=[str(i) for i in _bd_nums],
+                textposition="bottom center",
+                textfont=dict(size=9, color=tf["color"], family="Tajawal"),
+                name=f"كسر {tf['label']} ({len(breakdown_dates)})",
+                hovertemplate=f"كسر {tf['label']} #%{{text}}<br>%{{x}}<br>%{{y:.2f}}<extra></extra>",
             ))
 
     # ── Composite Market Index overlay ──
@@ -2086,17 +2094,23 @@ def build_composite_breakouts_chart(dates, index_vals, index_highs, index_lows):
         ))
         if breakout_dates:
             fig.add_trace(go.Scatter(
-                x=breakout_dates, y=breakout_prices, mode="markers",
+                x=breakout_dates, y=breakout_prices, mode="markers+text",
                 marker=dict(symbol="triangle-up", size=12, color=tf["color"],
                             line=dict(width=1, color="#fff")),
-                name=f"اختراق {tf['label']}",
+                text=[str(i) for i in range(1, len(breakout_dates) + 1)],
+                textposition="top center",
+                textfont=dict(size=9, color=tf["color"]),
+                name=f"اختراق {tf['label']} ({len(breakout_dates)})",
             ))
         if breakdown_dates:
             fig.add_trace(go.Scatter(
-                x=breakdown_dates, y=breakdown_prices, mode="markers",
+                x=breakdown_dates, y=breakdown_prices, mode="markers+text",
                 marker=dict(symbol="circle", size=10, color=tf["color"],
                             line=dict(width=1, color="#fff")),
-                name=f"كسر {tf['label']}",
+                text=[str(i) for i in range(1, len(breakdown_dates) + 1)],
+                textposition="bottom center",
+                textfont=dict(size=9, color=tf["color"]),
+                name=f"كسر {tf['label']} ({len(breakdown_dates)})",
             ))
 
     fig.update_layout(
