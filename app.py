@@ -1391,7 +1391,9 @@ def show_events_page(results):
     with fcol1:
         type_filter = st.selectbox(
             "🏷️ النوع",
-            ["الكل", "⚡ ارتدادات فقط", "🚀 اختراقات فقط", "📉 كسرات فقط", "🔻 قاع المؤشر فقط"],
+            ["الكل", "⚡ ارتدادات فقط", "🚀 اختراقات فقط", "📉 كسرات فقط",
+             "🟢 الأرضية (≤98)", "🟢 التجميع (98-100)", "🔵 بداية الدرج (100-104)",
+             "🟡 الزخم (104-108)", "🟠 الإبطاء (108-112)", "🔴 القمة (112+)"],
             key="ev_type_filter",
         )
     with fcol2:
@@ -1420,14 +1422,25 @@ def show_events_page(results):
         )
 
     # Apply filters
+    # Zone label mapping for index_floor sub-filters
+    _zone_filter_map = {
+        "🟢 الأرضية (≤98)": "الأرضية",
+        "🟢 التجميع (98-100)": "التجميع",
+        "🔵 بداية الدرج (100-104)": "بداية الدرج",
+        "🟡 الزخم (104-108)": "منتصف الدرج",
+        "🟠 الإبطاء (108-112)": "اقتراب القمة",
+        "🔴 القمة (112+)": "القمة",
+    }
+
     if type_filter == "⚡ ارتدادات فقط":
         filtered = list(events["bounces"])
     elif type_filter == "🚀 اختراقات فقط":
         filtered = list(events["breakouts"])
     elif type_filter == "📉 كسرات فقط":
         filtered = list(events["breakdowns"])
-    elif type_filter == "🔻 قاع المؤشر فقط":
-        filtered = list(events["index_floors"])
+    elif type_filter in _zone_filter_map:
+        _zone_key = _zone_filter_map[type_filter]
+        filtered = [e for e in events["index_floors"] if _zone_key in e.get("event_label", "")]
     else:
         filtered = list(all_events)
 
