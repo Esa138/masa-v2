@@ -1304,12 +1304,19 @@ def show_events_page(results):
             show_detail_panel(selected_r)
             return
 
-    events = classify_events(results)
-    all_events = events["bounces"] + events["breakouts"] + events["breakdowns"]
+    # Compute composite index value for index_floor detection
+    _comp_dates, _comp_vals, _, _ = build_composite_index(results)
+    _comp_last = _comp_vals[-1] if _comp_vals else None
+    _comp_prev = _comp_vals[-2] if len(_comp_vals) >= 2 else None
+
+    events = classify_events(results, composite_value=_comp_last, composite_prev=_comp_prev)
+    all_events = (events["bounces"] + events["breakouts"]
+                  + events["breakdowns"] + events["index_floors"])
 
     bounce_count = len(events["bounces"])
     breakout_count = len(events["breakouts"])
     breakdown_count = len(events["breakdowns"])
+    index_floor_count = len(events["index_floors"])
     total_count = len(all_events)
 
     # Header
@@ -1337,7 +1344,7 @@ def show_events_page(results):
     avg_color = "#00E676" if avg_strength >= 65 else "#FFD700" if avg_strength >= 40 else "#9ca3af"
 
     st.markdown(f'''
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:10px 0">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:10px 0">
         <div class="masa-stat">
             <div class="masa-stat-label">📊 إجمالي الأحداث</div>
             <div class="masa-stat-value" style="color:#fff;font-size:1.4em">{total_count}</div>
@@ -1353,6 +1360,10 @@ def show_events_page(results):
         <div class="masa-stat">
             <div class="masa-stat-label">📉 كسرات</div>
             <div class="masa-stat-value" style="color:#FF5252;font-size:1.4em">{breakdown_count}</div>
+        </div>
+        <div class="masa-stat">
+            <div class="masa-stat-label">🔻 قاع المؤشر</div>
+            <div class="masa-stat-value" style="color:#E040FB;font-size:1.4em">{index_floor_count}</div>
         </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:0 0 16px 0">
@@ -1380,7 +1391,7 @@ def show_events_page(results):
     with fcol1:
         type_filter = st.selectbox(
             "🏷️ النوع",
-            ["الكل", "⚡ ارتدادات فقط", "🚀 اختراقات فقط", "📉 كسرات فقط"],
+            ["الكل", "⚡ ارتدادات فقط", "🚀 اختراقات فقط", "📉 كسرات فقط", "🔻 قاع المؤشر فقط"],
             key="ev_type_filter",
         )
     with fcol2:
@@ -1415,6 +1426,8 @@ def show_events_page(results):
         filtered = list(events["breakouts"])
     elif type_filter == "📉 كسرات فقط":
         filtered = list(events["breakdowns"])
+    elif type_filter == "🔻 قاع المؤشر فقط":
+        filtered = list(events["index_floors"])
     else:
         filtered = list(all_events)
 

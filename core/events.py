@@ -7,20 +7,23 @@ No new API calls — works entirely from existing scanner results.
 from datetime import datetime
 
 
-def classify_events(results: list) -> dict:
+def classify_events(results: list, composite_value=None, composite_prev=None) -> dict:
     """
-    Classify all scanned stocks into bounce/breakout/breakdown events.
+    Classify all scanned stocks into bounce/breakout/breakdown/index_floor events.
 
     Args:
         results: List of dicts from scan_market()
+        composite_value: Current composite index value (starts at 100)
+        composite_prev: Previous composite index value
 
     Returns:
-        {"bounces": [...], "breakouts": [...], "breakdowns": [...]}
+        {"bounces": [...], "breakouts": [...], "breakdowns": [...], "index_floors": [...]}
         Each item = original result dict + event_* fields
     """
     bounces = []
     breakouts = []
     breakdowns = []
+    index_floors = []
 
     for r in results:
         phase = r.get("phase", "neutral")
@@ -33,7 +36,7 @@ def classify_events(results: list) -> dict:
         volume_ratio = r.get("volume_ratio", 1.0)
         early_bounce = r.get("early_bounce", False)
 
-        # ── Priority: breakout > bounce > breakdown ──
+        # ── Priority: breakout > bounce > breakdown > index_floor ──
         # Check breakout first
         is_breakout, bo_label = _detect_breakout(
             zr_status, location, flow_bias, change_pct, phase, volume_ratio
@@ -61,12 +64,26 @@ def classify_events(results: list) -> dict:
             breakdowns.append(event)
             continue
 
+        # Check index floor — stocks dragging the composite below 100
+        if composite_value is not None and change_pct < 0:
+            is_floor, fl_label = _detect_index_floor(
+                composite_value, composite_prev
+            )
+            if is_floor:
+                event = _build_event(r, "index_floor", fl_label)
+                index_floors.append(event)
+                continue
+
     # Sort each list by strength (strongest first)
     bounces.sort(key=lambda x: x["event_strength"], reverse=True)
     breakouts.sort(key=lambda x: x["event_strength"], reverse=True)
     breakdowns.sort(key=lambda x: x["event_strength"], reverse=True)
+    index_floors.sort(key=lambda x: x["event_strength"], reverse=True)
 
-    return {"bounces": bounces, "breakouts": breakouts, "breakdowns": breakdowns}
+    return {
+        "bounces": bounces, "breakouts": breakouts,
+        "breakdowns": breakdowns, "index_floors": index_floors,
+    }
 
 
 # ── Detection Rules ──────────────────────────────────────────
@@ -121,6 +138,26 @@ def _detect_breakdown(phase, change_pct, flow_bias, location, cdv_trend, zr_stat
 
     if zr_status == "zr_floor" and flow_bias < -20 and change_pct < 0:
         return True, "فشل في الثبات عند قاع ZR"
+
+    return False, ""
+
+
+def _detect_index_floor(composite_value, composite_prev):
+    """Check if composite index is in floor zone (below 100)."""
+    if composite_value is None:
+        return False, ""
+
+    if composite_value >= 100 and composite_prev is not None and composite_prev < 100:
+        # Index just crossed back above 100
+        return True, "🔼 اخترق المؤشر ١٠٠"
+
+    if composite_value < 100:
+        if composite_prev is not None and composite_value < composite_prev:
+            # Index still falling — breaking lower
+            return True, "🔻 كسر قاع المؤشر"
+        else:
+            # Index at floor but stabilizing or bouncing
+            return True, "⬇️ وصل قاع المؤشر"
 
     return False, ""
 
@@ -329,8 +366,9 @@ def _build_event(r: dict, event_type: str, event_label: str) -> dict:
         "bounce": ("⚡ ارتداد", "#00E676"),
         "breakout": ("🚀 اختراق", "#FFD700"),
         "breakdown": ("📉 كسر", "#FF5252"),
+        "index_floor": ("🔻 قاع المؤشر", "#E040FB"),
     }
-    type_display, type_color = type_labels[event_type]
+    type_display, type_color = type_labels.get(event_type, ("❓", "#9ca3af"))
 
     # Date — find when the event actually started + scan time
     event_date = _find_event_date(r, event_type)
