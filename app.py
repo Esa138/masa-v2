@@ -1036,7 +1036,11 @@ def build_breakouts_chart(r, composite_dates=None, composite_vals=None):
             bgcolor="rgba(0,0,0,0)",
         ),
         xaxis=dict(showgrid=False, tickfont=dict(size=9, color="#6b7280"),
-                   tickformat="%d %b", dtick=14*86400000, tickangle=-45,
+                   tickformat="%d %b %H:%M" if is_intraday else "%d %b",
+                   dtick=None if is_intraday else 14*86400000, tickangle=-45,
+                   rangebreaks=([dict(bounds=[16, 9.5], pattern="hour"),
+                                 dict(bounds=["sat", "mon"], pattern="day of week")]
+                                if is_intraday else []),
                    showspikes=True, spikemode="across", spikethickness=1,
                    spikecolor="#4b5563", spikedash="dot"),
         yaxis=dict(showgrid=True, gridcolor="#151d30",
