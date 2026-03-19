@@ -887,6 +887,7 @@ def build_breakouts_chart(r, composite_dates=None, composite_vals=None):
     close_arr = np.array(closes, dtype=float)
     high_arr = np.array(highs, dtype=float)
     low_arr = np.array(lows, dtype=float)
+    is_intraday = r.get("timeframe", "1d") != "1d"
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
