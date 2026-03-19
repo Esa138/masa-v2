@@ -2048,7 +2048,7 @@ def build_composite_data_table(dates, index_vals):
 def build_composite_breakouts_chart(dates, index_vals, index_highs, index_lows):
     """Build a breakout chart for the composite index — same style as individual stocks."""
     n = len(dates)
-    if n < 20:
+    if n < 5:
         return None
 
     close_arr = np.array(index_vals, dtype=float)
