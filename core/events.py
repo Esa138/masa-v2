@@ -64,15 +64,29 @@ def classify_events(results: list, composite_value=None, composite_prev=None) ->
             breakdowns.append(event)
             continue
 
-        # Check index floor — stocks dragging the composite below 100
-        if composite_value is not None and change_pct < 0:
-            is_floor, fl_label = _detect_index_floor(
-                composite_value, composite_prev
-            )
-            if is_floor:
-                event = _build_event(r, "index_floor", fl_label)
-                index_floors.append(event)
-                continue
+        # Check index floor — stocks at their recent low while composite < 100
+        if composite_value is not None:
+            # Check if stock is near its own recent low (within 3% of 20-bar low)
+            chart_close = r.get("chart_close", [])
+            chart_low = r.get("chart_low", [])
+            _at_floor = False
+            if len(chart_close) >= 5:
+                _lookback = min(20, len(chart_close))
+                _recent_lows = chart_low[-_lookback:] if chart_low else chart_close[-_lookback:]
+                _min_low = min(_recent_lows) if _recent_lows else 0
+                _cur_price = chart_close[-1] if chart_close else 0
+                if _min_low > 0 and _cur_price > 0:
+                    _dist_from_low = (_cur_price - _min_low) / _min_low * 100
+                    _at_floor = _dist_from_low <= 3.0  # Within 3% of recent low
+
+            if _at_floor:
+                is_floor, fl_label = _detect_index_floor(
+                    composite_value, composite_prev
+                )
+                if is_floor:
+                    event = _build_event(r, "index_floor", fl_label)
+                    index_floors.append(event)
+                    continue
 
     # Sort each list by strength (strongest first)
     bounces.sort(key=lambda x: x["event_strength"], reverse=True)
