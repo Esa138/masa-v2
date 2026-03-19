@@ -1080,6 +1080,8 @@ def build_event_card_html(r):
     event_date = r["event_date"]
     event_scan_time = r.get("event_scan_time", "")
     event_factors = r["event_factors"]
+    stock_index = r.get("stock_index")
+    _idx_badge = f' <span style="background:#E040FB18;color:#E040FB;padding:1px 6px;border-radius:6px;font-size:0.70em;font-weight:700;margin-right:4px">📍 {stock_index}</span>' if stock_index else ""
 
     sector_color = SECTOR_COLORS.get(sector, "#607D8B")
     change_color = "#00E676" if change >= 0 else "#FF5252"
@@ -1236,7 +1238,7 @@ def build_event_card_html(r):
 </div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
 <span style="background:{sector_color}12;color:{sector_color};padding:2px 8px;border-radius:10px;font-size:0.68em;font-weight:500;border:1px solid {sector_color}18">{sector}</span>
-<span style="color:{event_type_color};font-size:0.72em;font-weight:600">{event_label}</span>
+<span style="color:{event_type_color};font-size:0.72em;font-weight:600">{event_label}{_idx_badge}</span>
 </div>
 <div style="margin-bottom:4px">
 <div style="font-size:1.10em;font-weight:700;color:#fff;line-height:1.3">{name}</div>
@@ -1392,8 +1394,7 @@ def show_events_page(results):
         type_filter = st.selectbox(
             "🏷️ النوع",
             ["الكل", "⚡ ارتدادات فقط", "🚀 اختراقات فقط", "📉 كسرات فقط",
-             "🟢 الأرضية (≤98)", "🟢 التجميع (98-100)", "🔵 بداية الدرج (100-104)",
-             "🟡 الزخم (104-108)", "🟠 الإبطاء (108-112)", "🔴 القمة (112+)"],
+             "🔻 قاع المؤشر فقط"],
             key="ev_type_filter",
         )
     with fcol2:
@@ -1422,25 +1423,14 @@ def show_events_page(results):
         )
 
     # Apply filters
-    # Zone label mapping for index_floor sub-filters
-    _zone_filter_map = {
-        "🟢 الأرضية (≤98)": "الأرضية",
-        "🟢 التجميع (98-100)": "التجميع",
-        "🔵 بداية الدرج (100-104)": "بداية الدرج",
-        "🟡 الزخم (104-108)": "منتصف الدرج",
-        "🟠 الإبطاء (108-112)": "اقتراب القمة",
-        "🔴 القمة (112+)": "القمة",
-    }
-
     if type_filter == "⚡ ارتدادات فقط":
         filtered = list(events["bounces"])
     elif type_filter == "🚀 اختراقات فقط":
         filtered = list(events["breakouts"])
     elif type_filter == "📉 كسرات فقط":
         filtered = list(events["breakdowns"])
-    elif type_filter in _zone_filter_map:
-        _zone_key = _zone_filter_map[type_filter]
-        filtered = [e for e in events["index_floors"] if _zone_key in e.get("event_label", "")]
+    elif type_filter == "🔻 قاع المؤشر فقط":
+        filtered = list(events["index_floors"])
     else:
         filtered = list(all_events)
 

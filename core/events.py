@@ -64,13 +64,13 @@ def classify_events(results: list, composite_value=None, composite_prev=None) ->
             breakdowns.append(event)
             continue
 
-        # Check index zone — classify ALL remaining stocks by composite zone
-        if composite_value is not None:
-            is_floor, fl_label = _detect_index_floor(
-                composite_value, composite_prev
-            )
+        # Check per-stock index zone — normalized from start of scan
+        stock_idx = _calc_stock_index(r)
+        if stock_idx is not None and stock_idx <= 100:
+            is_floor, fl_label = _detect_index_floor(stock_idx)
             if is_floor:
                 event = _build_event(r, "index_floor", fl_label)
+                event["stock_index"] = round(stock_idx, 2)
                 index_floors.append(event)
                 continue
 
@@ -142,32 +142,68 @@ def _detect_breakdown(phase, change_pct, flow_bias, location, cdv_trend, zr_stat
     return False, ""
 
 
-def _detect_index_floor(composite_value, composite_prev):
+def _calc_stock_index(r):
     """
-    Classify stock based on composite index zone.
+    Calculate per-stock normalized index based on position within
+    support/resistance range across multiple timeframes (3, 10, 15 days).
+
+    index = 98 + (price - total_low) / (total_high - total_low) * 16
+    Result: 98 = at lowest support, 106 = midrange, 114 = at highest resistance
+    """
+    import numpy as np
+    chart_close = r.get("chart_close", [])
+    chart_high = r.get("chart_high", [])
+    chart_low = r.get("chart_low", [])
+    if not chart_close or len(chart_close) < 4:
+        return None
+
+    price = chart_close[-1]
+    high_arr = np.array(chart_high, dtype=float)
+    low_arr = np.array(chart_low, dtype=float)
+    n = len(chart_close)
+
+    # Calculate support/resistance for each timeframe
+    supports = []
+    resistances = []
+    for d in (3, 4, 10, 15):
+        if n >= d:
+            supports.append(float(np.min(low_arr[-d:])))
+            resistances.append(float(np.max(high_arr[-d:])))
+
+    if not supports or not resistances:
+        return None
+
+    total_low = min(supports)     # lowest support across all timeframes
+    total_high = max(resistances)  # highest resistance across all timeframes
+
+    if total_high <= total_low:
+        return None
+
+    # Normalize: 98 = at lowest support, 114 = at highest resistance
+    index = 98 + (price - total_low) / (total_high - total_low) * 16
+    return index
+
+
+def _detect_index_floor(stock_index):
+    """
+    Classify stock by its normalized index zone.
+    Only returns True for stocks at or below 100 (floor/accumulation zone).
     Zones based on empirical backtesting:
-      ≤98    = الأرضية (Floor) — best entry, +14-16%
-      98-100 = التجميع (Accumulation) — excellent, +14%
-      100-104 = بداية الدرج (Launch) — good, +10%
-      104-108 = منتصف الدرج (Momentum) — ok, +6%
-      108-112 = اقتراب القمة (Slowdown) — weak, +2%
-      112+   = القمة (Exhaustion) — danger, 0%
+      ≤95    = أرضية عميقة — oversold
+      95-98  = الأرضية — best entry, +14-16%
+      98-100 = التجميع — excellent, +14%
     """
-    if composite_value is None:
+    if stock_index is None:
         return False, ""
 
-    if composite_value <= 98:
+    if stock_index <= 95:
+        return True, "🟢 أرضية عميقة — قاع قوي"
+    elif stock_index <= 98:
         return True, "🟢 الأرضية — أفضل دخول"
-    elif composite_value <= 100:
-        return True, "🟢 منطقة التجميع"
-    elif composite_value <= 104:
-        return True, "🔵 بداية الدرج"
-    elif composite_value <= 108:
-        return True, "🟡 منتصف الدرج — زخم"
-    elif composite_value <= 112:
-        return True, "🟠 اقتراب القمة — إبطاء"
-    else:
-        return True, "🔴 القمة — إرهاق"
+    elif stock_index <= 100:
+        return True, "🟡 منطقة التجميع"
+
+    return False, ""
 
 
 # ── Strength Scoring ─────────────────────────────────────────
