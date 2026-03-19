@@ -879,15 +879,26 @@ def build_breakouts_chart(r, composite_dates=None, composite_vals=None):
     closes = r.get("chart_close", [])
     highs = r.get("chart_high", [])
     lows = r.get("chart_low", [])
+    is_intraday = r.get("timeframe", "1d") != "1d"
+
+    # For intraday: show only today's session
+    if is_intraday and dates:
+        _today_str = dates[-1][:10]  # "2026-03-19" from last date
+        _today_idx = [i for i, d in enumerate(dates) if d[:10] == _today_str]
+        if _today_idx:
+            _start = _today_idx[0]
+            dates = dates[_start:]
+            closes = closes[_start:]
+            highs = highs[_start:]
+            lows = lows[_start:]
 
     n = len(closes)
-    if n < 20:
+    if n < 5:
         return None
 
     close_arr = np.array(closes, dtype=float)
     high_arr = np.array(highs, dtype=float)
     low_arr = np.array(lows, dtype=float)
-    is_intraday = r.get("timeframe", "1d") != "1d"
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
