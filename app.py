@@ -1036,13 +1036,18 @@ def build_breakouts_chart(r, composite_dates=None, composite_vals=None):
             bgcolor="rgba(0,0,0,0)",
         ),
         xaxis=dict(showgrid=False, tickfont=dict(size=9, color="#6b7280"),
-                   tickformat="%d %b", dtick=14*86400000, tickangle=-45),
+                   tickformat="%d %b", dtick=14*86400000, tickangle=-45,
+                   showspikes=True, spikemode="across", spikethickness=1,
+                   spikecolor="#4b5563", spikedash="dot"),
         yaxis=dict(showgrid=True, gridcolor="#151d30",
-                   tickfont=dict(size=10, color="#4b5563"), title=None),
+                   tickfont=dict(size=10, color="#4b5563"), title=None,
+                   showspikes=True, spikemode="across", spikethickness=1,
+                   spikecolor="#4b5563", spikedash="dot"),
         yaxis2=dict(showgrid=False,
                     tickfont=dict(size=9, color="#FFD700"),
                     title=None, overlaying="y", side="left"),
         hovermode="x unified",
+        spikedistance=-1,
     )
 
     return fig
@@ -2177,10 +2182,15 @@ def build_composite_breakouts_chart(dates, index_vals, index_highs, index_lows):
             bgcolor="rgba(0,0,0,0)",
         ),
         xaxis=dict(showgrid=False, tickfont=dict(size=10, color="#6b7280"),
-                   tickformat="%d %b %Y"),
+                   tickformat="%d %b %Y",
+                   showspikes=True, spikemode="across", spikethickness=1,
+                   spikecolor="#4b5563", spikedash="dot"),
         yaxis=dict(showgrid=True, gridcolor="#151d30",
-                   tickfont=dict(size=10, color="#4b5563")),
+                   tickfont=dict(size=10, color="#4b5563"),
+                   showspikes=True, spikemode="across", spikethickness=1,
+                   spikecolor="#4b5563", spikedash="dot"),
         hovermode="x unified",
+        spikedistance=-1,
     )
     return fig
 
@@ -2537,6 +2547,7 @@ def show_breakout_index(results, market_key="saudi"):
             yaxis=dict(showgrid=True, gridcolor="#151d30",
                        tickfont=dict(size=10, color="#4b5563")),
             hovermode="x unified",
+        spikedistance=-1,
             annotations=[
                 dict(text="كلاهما يبدأ من 100 — المقارنة نسبية",
                      x=0.5, y=-0.08, xref="paper", yref="paper",
@@ -3766,6 +3777,7 @@ elif page == "🗺️ خريطة القطاعات":
                 xaxis=dict(gridcolor="#192035", tickfont=dict(size=10, color="#4b5563")),
                 font=dict(family="Tajawal"),
                 hovermode="x unified",
+        spikedistance=-1,
             )
             st.plotly_chart(_top_fig, use_container_width=True, config={"displayModeBar": False})
 
@@ -4445,6 +4457,7 @@ elif page == "🔍 تحليل شركة":
                                    range=[_doy_from - 2, _doy_to + 2]),
                         font=dict(family="Tajawal"),
                         hovermode="x unified",
+        spikedistance=-1,
                     )
                     st.plotly_chart(_s_fig, use_container_width=True, config={"displayModeBar": False})
 
