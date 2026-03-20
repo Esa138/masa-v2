@@ -377,12 +377,14 @@ def scan_market(
             _max_chart = {"1d": 90, "1h": 100, "15m": 80, "5m": 60}
             chart_days = min(len(close), _max_chart.get(interval, 90))
             _date_fmt = "%Y-%m-%d %H:%M" if interval != "1d" else "%Y-%m-%d"
-            # Convert intraday timestamps to Saudi time (UTC+3)
+            # Convert intraday timestamps to Saudi time (Asia/Riyadh UTC+3)
             if interval != "1d":
-                from datetime import timezone, timedelta
-                _saudi_tz = timezone(timedelta(hours=3))
                 _chart_idx = close.index[-chart_days:]
-                chart_dates = [d.tz_convert(_saudi_tz).strftime(_date_fmt) if d.tzinfo else d.strftime(_date_fmt) for d in _chart_idx]
+                try:
+                    _chart_idx_saudi = _chart_idx.tz_convert("Asia/Riyadh")
+                    chart_dates = [d.strftime(_date_fmt) for d in _chart_idx_saudi]
+                except Exception:
+                    chart_dates = [d.strftime(_date_fmt) for d in _chart_idx]
             else:
                 chart_dates = [d.strftime(_date_fmt) for d in close.index[-chart_days:]]
             chart_open = [round(float(v), 2) for v in open_.iloc[-chart_days:]]
