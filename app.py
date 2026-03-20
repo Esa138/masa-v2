@@ -2082,7 +2082,7 @@ def build_composite_data_table(dates, index_vals):
     </div>'''
 
 
-def build_composite_breakouts_chart(dates, index_vals, index_highs, index_lows):
+def build_composite_breakouts_chart(dates, index_vals, index_highs, index_lows, is_intraday=False):
     """Build a breakout chart for the composite index — same style as individual stocks."""
     n = len(dates)
     if n < 5:
@@ -2198,7 +2198,10 @@ def build_composite_breakouts_chart(dates, index_vals, index_highs, index_lows):
             bgcolor="rgba(0,0,0,0)",
         ),
         xaxis=dict(showgrid=False, tickfont=dict(size=10, color="#6b7280"),
-                   tickformat="%d %b %H:%M" if (len(dates) > 1 and len(str(dates[0])) > 10) else "%d %b %Y",
+                   tickformat="%d %b %H:%M" if is_intraday else "%d %b %Y",
+                   rangebreaks=([dict(bounds=[16, 9.5], pattern="hour"),
+                                 dict(bounds=["sat", "mon"], pattern="day of week")]
+                                if is_intraday else []),
                    showspikes=True, spikemode="across", spikethickness=1,
                    spikecolor="#4b5563", spikedash="dot"),
         yaxis=dict(showgrid=True, gridcolor="#151d30",
@@ -2579,7 +2582,7 @@ def show_breakout_index(results, market_key="saudi"):
         show_10 = bc3.checkbox("عرض 10 أيام 🟣", value=True, key="idx_brk10")
         show_15 = bc4.checkbox("عرض 15 أيام 🔴", value=False, key="idx_brk15")
 
-        brk_chart = build_composite_breakouts_chart(dates, index_vals, index_highs, index_lows)
+        brk_chart = build_composite_breakouts_chart(dates, index_vals, index_highs, index_lows, is_intraday=_idx_intra)
         if brk_chart:
             tf_filter = {3: show_3, 4: show_4, 10: show_10, 15: show_15}
             for trace in brk_chart.data:
