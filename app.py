@@ -2377,6 +2377,9 @@ def show_breakout_index(results, market_key="saudi"):
 
     # For intraday: filter to last session only (match sector map)
     _idx_intra = len(dates) > 0 and (len(dates[0]) > 10 or " " in dates[0] or "T" in dates[0])
+    # DEBUG — remove after testing
+    if dates:
+        st.caption(f"🔍 DEBUG: dates[0]={dates[0]!r} | len={len(dates[0])} | intra={_idx_intra}")
     if _idx_intra and dates:
         _unique_days = sorted(set(d[:10] for d in dates))
         for _off in range(len(_unique_days)):
