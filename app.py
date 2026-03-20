@@ -2198,7 +2198,7 @@ def build_composite_breakouts_chart(dates, index_vals, index_highs, index_lows):
             bgcolor="rgba(0,0,0,0)",
         ),
         xaxis=dict(showgrid=False, tickfont=dict(size=10, color="#6b7280"),
-                   tickformat="%d %b %Y",
+                   tickformat="%d %b %H:%M" if (len(dates) > 1 and len(str(dates[0])) > 10) else "%d %b %Y",
                    showspikes=True, spikemode="across", spikethickness=1,
                    spikecolor="#4b5563", spikedash="dot"),
         yaxis=dict(showgrid=True, gridcolor="#151d30",
