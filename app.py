@@ -3103,7 +3103,7 @@ with st.sidebar:
     st.divider()
 
     # Handle navigation from sector map → company analysis
-    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🔍 تحليل شركة", "📊 أداء النظام"]
+    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "📊 أداء النظام"]
     if st.session_state.get("_goto_page"):
         st.session_state["page_nav"] = st.session_state.pop("_goto_page")
 
@@ -3983,6 +3983,172 @@ elif page == "🚀 مؤشر الاختراقات":
         ''', unsafe_allow_html=True)
     else:
         show_breakout_index(results, market_key=market_key)
+
+
+# ══════════════════════════════════════════════════════════════
+# PAGE: Sector Leader — القطاع القائد
+# ══════════════════════════════════════════════════════════════
+
+elif page == "🏆 القطاع القائد":
+
+    from core.sector_leader import (
+        SECTORS_CONFIG, classify_sector, classify_pattern,
+        compute_sector_returns, merge_order_flow,
+        save_session, load_history, compute_historical_stats,
+    )
+
+    st.markdown("## 🏆 القطاع القائد")
+    st.markdown("أي قطاع يسبق المؤشر وأيهم يتبعه — تلقائياً كل جلسة")
+
+    results = st.session_state.scan_results
+
+    if results is None or len(results) == 0:
+        st.warning("⚠️ لا توجد بيانات — شغّل المسح أولاً من صفحة Order Flow")
+    else:
+        # ── Group scan results by sector → compute sector returns ──
+        from collections import defaultdict
+        _sector_returns_raw = defaultdict(list)
+        for r in results:
+            sec = r.get("sector", "أخرى")
+            chg = r.get("change_pct", 0)
+            if chg is not None:
+                _sector_returns_raw[sec].append(float(chg))
+
+        # Average change per sector
+        _sector_returns = {}
+        for sec, changes in _sector_returns_raw.items():
+            if changes:
+                _sector_returns[sec] = round(sum(changes) / len(changes), 2)
+
+        # Index return = average of all stocks
+        _all_changes = [r.get("change_pct", 0) for r in results if r.get("change_pct") is not None]
+        _index_return = round(sum(_all_changes) / max(len(_all_changes), 1), 2) if _all_changes else 0.0
+
+        # Compute sector DataFrame
+        _sl_df = compute_sector_returns(_sector_returns, _index_return)
+
+        # ── Order Flow data per sector ──
+        _of_data = defaultdict(lambda: {"accumulation": 0, "distribution": 0, "masa_score": 0, "count": 0})
+        for r in results:
+            sec = r.get("sector", "أخرى")
+            phase = r.get("phase", "")
+            if phase in ("accumulation", "spring"):
+                _of_data[sec]["accumulation"] += 1
+            elif phase in ("distribution", "upthrust", "markdown"):
+                _of_data[sec]["distribution"] += 1
+            bias = r.get("flow_bias", 0) or 0
+            _of_data[sec]["masa_score"] += float(bias)
+            _of_data[sec]["count"] += 1
+        # Average MASA Score
+        _of_dict = {}
+        for sec, vals in _of_data.items():
+            cnt = max(vals["count"], 1)
+            _of_dict[sec] = {
+                "accumulation": vals["accumulation"],
+                "distribution": vals["distribution"],
+                "masa_score": round(vals["masa_score"] / cnt, 1),
+            }
+        _sl_df = merge_order_flow(_sl_df, _of_dict)
+
+        # ── Summary metrics ──
+        _n_leaders = len(_sl_df[_sl_df['الحالة'] == 'قائد'])
+        _n_synced = len(_sl_df[_sl_df['الحالة'] == 'متزامن'])
+        _n_followers = len(_sl_df[_sl_df['الحالة'] == 'تابع'])
+        _n_negatives = len(_sl_df[_sl_df['الحالة'] == 'سلبي'])
+
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("🏆 قائد", _n_leaders)
+        c2.metric("🔄 متزامن", _n_synced)
+        c3.metric("📉 تابع", _n_followers)
+        c4.metric("⛔ سلبي", _n_negatives)
+        c5.metric("📊 المؤشر", f"{_index_return:+.2f}%")
+
+        # ── Leader alert ──
+        if _n_leaders > 0:
+            _top = _sl_df.iloc[0]
+            st.success(f"🏆 القائد: **{_top['القطاع']}** (+{_top['العائد']}% | Alpha: +{_top['Alpha']}%)")
+
+        # ── Contradiction alerts ──
+        for _, _row in _sl_df.iterrows():
+            if _row.get('MASA_Score', 0) != '' and _row.get('MASA_Score', 0) != 0:
+                _masa = float(_row.get('MASA_Score', 0))
+                if _row['الحالة'] == 'تابع' and _masa > 20:
+                    st.info(f"⚡ تناقض: **{_row['القطاع']}** تابع بالعائد لكن MASA Score +{_masa:.1f} (تجميع نشط!) — راقب")
+
+        # ── Main table ──
+        st.markdown("### ترتيب القطاعات")
+        _display = _sl_df.copy()
+        _display['#'] = range(1, len(_display) + 1)
+        _cols = ['#', 'القطاع', 'العائد', 'Alpha', 'الحالة']
+        if 'تجميع' in _display.columns:
+            _cols.extend(['تجميع', 'تصريف', 'نسبة_تجميع', 'MASA_Score'])
+        st.dataframe(
+            _display[_cols],
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                'العائد': st.column_config.NumberColumn(format="%.2f%%"),
+                'Alpha': st.column_config.NumberColumn(format="%.2f%%"),
+            }
+        )
+
+        # ── Comparison chart ──
+        st.markdown("### شارت المقارنة")
+        import plotly.graph_objects as go
+        _sl_fig = go.Figure()
+        for _, _row in _sl_df.iterrows():
+            _sl_fig.add_trace(go.Bar(
+                y=[_row['القطاع']],
+                x=[_row['العائد']],
+                orientation='h',
+                marker_color=_row['اللون'],
+                name=_row['القطاع'],
+                showlegend=False,
+                text=f"{_row['العائد']:+.2f}%",
+                textposition='outside',
+            ))
+        _sl_fig.add_vline(x=_index_return, line_dash="dash", line_color="#1D9E75",
+                          annotation_text=f"المؤشر {_index_return:+.2f}%")
+        _sl_fig.add_vline(x=0, line_dash="dot", line_color="gray", line_width=0.5)
+        _sl_fig.update_layout(
+            height=max(400, len(_sl_df) * 30),
+            margin=dict(l=0, r=0, t=30, b=0),
+            yaxis=dict(autorange="reversed"),
+            xaxis_title="العائد %",
+            template="plotly_dark",
+        )
+        st.plotly_chart(_sl_fig, use_container_width=True)
+
+        # ── Save session ──
+        _scan_tf_label = st.session_state.get("scan_timeframe", "📊 يومي")
+        _tf_map = {"📊 يومي": "daily", "⏱️ 1 ساعة": "1h", "⏱️ 15 دقيقة": "15m", "⏱️ 5 دقائق": "15m"}
+        save_session(_sl_df, _tf_map.get(_scan_tf_label, "daily"), _index_return)
+
+        # ── History ──
+        st.divider()
+        st.markdown("### 📜 تاريخ الجلسات")
+        _hist_days = st.slider("عدد الأيام", 7, 90, 30, key="sl_hist_days")
+        _hist = load_history(days=_hist_days)
+        if len(_hist) == 0:
+            st.info("لا يوجد تاريخ بعد — سيتراكم مع كل جلسة")
+        else:
+            _hist_tf = st.radio("الفريم", ['daily', '1h', '15m'], horizontal=True, key="sl_hist_tf")
+            _stats = compute_historical_stats(_hist, timeframe=_hist_tf)
+            if len(_stats) == 0:
+                st.info(f"لا توجد بيانات على فريم {_hist_tf}")
+            else:
+                st.dataframe(_stats, use_container_width=True, hide_index=True)
+                import plotly.express as px
+                _hist_fig = px.bar(
+                    _stats.head(10), y='القطاع', x='نسبة_القيادة', orientation='h',
+                    color='نسبة_القيادة', color_continuous_scale=['#E24B4A', '#EF9F27', '#1D9E75'],
+                    title='نسبة القيادة لأفضل 10 قطاعات',
+                )
+                _hist_fig.update_layout(
+                    height=400, yaxis=dict(autorange="reversed"),
+                    xaxis_title="نسبة القيادة %", template="plotly_dark",
+                )
+                st.plotly_chart(_hist_fig, use_container_width=True)
 
 
 # ══════════════════════════════════════════════════════════════
