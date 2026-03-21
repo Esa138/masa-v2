@@ -3996,6 +3996,7 @@ elif page == "🏆 القطاع القائد":
         compute_sector_returns, merge_order_flow,
         save_session, load_history, compute_historical_stats,
     )
+    from core.sector_alerts import render_alerts
 
     st.markdown("## 🏆 القطاع القائد")
     st.markdown("أي قطاع يسبق المؤشر وأيهم يتبعه — تلقائياً كل جلسة")
@@ -4118,6 +4119,9 @@ elif page == "🏆 القطاع القائد":
             template="plotly_dark",
         )
         st.plotly_chart(_sl_fig, use_container_width=True)
+
+        # ── Contradiction alerts ──
+        render_alerts(_sl_df)
 
         # ── Save session ──
         _scan_tf_label = st.session_state.get("scan_timeframe", "📊 يومي")
