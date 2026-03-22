@@ -3884,6 +3884,160 @@ elif page == "🗺️ خريطة القطاعات":
                 unsafe_allow_html=True
             )
 
+        # ── Seasonality Tab ──
+        with st.expander("📊 التحليل الموسمي للقطاعات", expanded=False):
+            from core.seasonality import build_seasonality_for_sectors, MONTH_NAMES_AR
+            # Use full (unsliced) sector composites for seasonality
+            _full_sector_comps = {}
+            for sd in sector_data:
+                _fsd, _fsv, _, _ = build_composite_index(sd["stocks"])
+                if len(_fsd) >= 20:
+                    _full_sector_comps[sd["name"]] = {"dates": _fsd, "vals": _fsv, "ret": 0}
+            # Also add market composite
+            _fcd, _fcv, _, _ = build_composite_index(results)
+            if len(_fcd) >= 20:
+                _full_sector_comps["السوق الكلي"] = {"dates": _fcd, "vals": _fcv, "ret": 0}
+
+            _seasonality = build_seasonality_for_sectors(_full_sector_comps)
+
+            if _seasonality:
+                _seas_sectors = ["السوق الكلي"] + [s for s in _seasonality if s != "السوق الكلي"]
+                _seas_sel = st.selectbox("اختر القطاع:", _seas_sectors, key="_seas_sel")
+
+                if _seas_sel in _seasonality:
+                    _ss = _seasonality[_seas_sel]
+                    _ss_stats = _ss["stats"]
+                    _ss_years = _ss.get("years_covered", [])
+
+                    st.caption(f"البيانات تغطي: {min(_ss_years)} — {max(_ss_years)} ({len(_ss_years)} سنوات)")
+
+                    # Current month insight
+                    _ins = _ss.get("insight")
+                    if _ins:
+                        _ins_c = "#00E676" if _ins["avg_return"] > 0 else "#FF5252"
+                        _ins_txt = (
+                            f"{_ins['phase_icon']} **{_ins['month_ar']}** تاريخياً: "
+                            f"متوسط العائد **{_ins['avg_return']:+.1f}%** | "
+                            f"نسبة النجاح **{_ins['win_rate']:.0f}%** | "
+                            f"التصنيف: **{_ins['phase']}**"
+                        )
+                        if _ins.get("next_month_ar"):
+                            _ins_txt += (
+                                f"\n\n{_ins['next_icon']} الشهر القادم (**{_ins['next_month_ar']}**): "
+                                f"متوسط **{_ins['next_avg']:+.1f}%** — {_ins['next_phase']}"
+                            )
+                        if _ins["avg_return"] > 0:
+                            st.success(_ins_txt)
+                        elif _ins["avg_return"] < -0.5:
+                            st.error(_ins_txt)
+                        else:
+                            st.info(_ins_txt)
+
+                    # Heatmap table
+                    st.markdown("##### 🗓️ خريطة الأداء الشهري")
+                    _heat_rows = []
+                    for mo in range(1, 13):
+                        if mo not in _ss_stats:
+                            continue
+                        s = _ss_stats[mo]
+                        _heat_rows.append({
+                            "الشهر": f"{s['phase_icon']} {s['month_ar']}",
+                            "متوسط العائد %": s["avg_return"],
+                            "نسبة النجاح %": s["win_rate"],
+                            "إيجابي": s["positive"],
+                            "سلبي": s["negative"],
+                            "أفضل %": s["best"],
+                            "أسوأ %": s["worst"],
+                            "التصنيف": s["phase"],
+                        })
+
+                    if _heat_rows:
+                        _heat_df = pd.DataFrame(_heat_rows)
+                        st.dataframe(
+                            _heat_df.style.applymap(
+                                lambda v: "color: #00E676" if isinstance(v, (int, float)) and v > 0
+                                else "color: #FF5252" if isinstance(v, (int, float)) and v < 0
+                                else "",
+                                subset=["متوسط العائد %", "أفضل %", "أسوأ %"]
+                            ).applymap(
+                                lambda v: "color: #00E676" if isinstance(v, (int, float)) and v >= 60
+                                else "color: #FF5252" if isinstance(v, (int, float)) and v < 40
+                                else "color: #FFD700",
+                                subset=["نسبة النجاح %"]
+                            ),
+                            use_container_width=True, hide_index=True,
+                        )
+
+                    # Heatmap chart — monthly returns by year
+                    st.markdown("##### 📈 العوائد الشهرية حسب السنة")
+                    _yr_mo_data = []
+                    for m in _ss.get("monthly", []):
+                        _yr_mo_data.append({
+                            "السنة": str(m["year"]),
+                            "الشهر": m["month"],
+                            "الشهر_عربي": m["month_ar"],
+                            "العائد": m["return_pct"],
+                        })
+
+                    if _yr_mo_data:
+                        _ym_df = pd.DataFrame(_yr_mo_data)
+                        _pivot = _ym_df.pivot_table(
+                            index="السنة", columns="الشهر",
+                            values="العائد", aggfunc="first"
+                        )
+                        _pivot.columns = [MONTH_NAMES_AR.get(c, str(c)) for c in _pivot.columns]
+
+                        # Heatmap with plotly
+                        import plotly.figure_factory as ff
+                        _z = _pivot.values.tolist()
+                        _x = list(_pivot.columns)
+                        _y = list(_pivot.index)
+                        _z_text = [[f"{v:+.1f}%" if not pd.isna(v) else "" for v in row] for row in _z]
+
+                        _hm_fig = ff.create_annotated_heatmap(
+                            z=_z, x=_x, y=_y,
+                            annotation_text=_z_text,
+                            colorscale=[
+                                [0, "#B71C1C"], [0.3, "#FF5252"],
+                                [0.45, "#37474F"], [0.55, "#37474F"],
+                                [0.7, "#4CAF50"], [1.0, "#00E676"],
+                            ],
+                            showscale=True,
+                            zmin=-10, zmax=10,
+                        )
+                        _hm_fig.update_layout(
+                            template="plotly_dark",
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="rgba(0,0,0,0)",
+                            height=max(200, len(_y) * 45 + 80),
+                            margin=dict(l=60, r=20, t=10, b=40),
+                            font=dict(family="Tajawal", size=12),
+                            xaxis=dict(side="bottom"),
+                        )
+                        st.plotly_chart(_hm_fig, use_container_width=True, config={"displayModeBar": False})
+
+                    # Transitions
+                    _trans = _ss.get("transitions", [])
+                    if _trans:
+                        st.markdown("##### 🔄 نقاط التحول الموسمية")
+                        for t in _trans:
+                            if t["type"] == "تحسن":
+                                st.success(f"{t['icon']} {t['description']}")
+                            else:
+                                st.error(f"{t['icon']} {t['description']}")
+
+                    # Best/worst months summary
+                    if _ss_stats:
+                        _sorted_months = sorted(_ss_stats.values(), key=lambda x: x["avg_return"], reverse=True)
+                        _best3 = _sorted_months[:3]
+                        _worst3 = _sorted_months[-3:]
+                        _b3_txt = " • ".join([f"**{m['month_ar']}** ({m['avg_return']:+.1f}%)" for m in _best3])
+                        _w3_txt = " • ".join([f"**{m['month_ar']}** ({m['avg_return']:+.1f}%)" for m in _worst3])
+                        st.markdown(f"🟢 **أفضل 3 أشهر:** {_b3_txt}")
+                        st.markdown(f"🔴 **أسوأ 3 أشهر:** {_w3_txt}")
+            else:
+                st.info("لا توجد بيانات كافية للتحليل الموسمي — أعد المسح بفترة أطول (سنة+)")
+
         # ── Render sector cards ──
         for sd in sector_data:
             sector_color = SECTOR_COLORS.get(sd["name"], "#607D8B")
