@@ -3898,7 +3898,10 @@ elif page == "🗺️ خريطة القطاعات":
             if len(_fcd) >= 20:
                 _full_sector_comps["السوق الكلي"] = {"dates": _fcd, "vals": _fcv, "ret": 0}
 
-            _seasonality = build_seasonality_for_sectors(_full_sector_comps)
+            # Detect market type for catalysts
+            _market_sel_key = st.session_state.get("market_select", "🇸🇦 السوق السعودي (TASI)")
+            _seas_mkt = "us" if "أمريكي" in _market_sel_key or "S&P" in _market_sel_key else "saudi"
+            _seasonality = build_seasonality_for_sectors(_full_sector_comps, market_key=_seas_mkt)
 
             if _seasonality:
                 _seas_sectors = ["السوق الكلي"] + [s for s in _seasonality if s != "السوق الكلي"]
@@ -3908,24 +3911,41 @@ elif page == "🗺️ خريطة القطاعات":
                     _ss = _seasonality[_seas_sel]
                     _ss_stats = _ss["stats"]
                     _ss_years = _ss.get("years_covered", [])
+                    _ss_catalysts = _ss.get("catalysts", {})
 
-                    st.caption(f"البيانات تغطي: {min(_ss_years)} — {max(_ss_years)} ({len(_ss_years)} سنوات)")
+                    _n_years = len(_ss_years)
+                    _yr_range = f"{min(_ss_years)} — {max(_ss_years)}" if _ss_years else ""
+                    _sample_note = " ⚠️ عيّنة صغيرة" if _n_years < 5 else ""
+                    st.caption(f"البيانات تغطي: {_yr_range} ({_n_years} سنوات){_sample_note}")
 
-                    # Current month insight
+                    # ── Current month insight with catalysts ──
                     _ins = _ss.get("insight")
                     if _ins:
-                        _ins_c = "#00E676" if _ins["avg_return"] > 0 else "#FF5252"
                         _ins_txt = (
                             f"{_ins['phase_icon']} **{_ins['month_ar']}** تاريخياً: "
                             f"متوسط العائد **{_ins['avg_return']:+.1f}%** | "
                             f"نسبة النجاح **{_ins['win_rate']:.0f}%** | "
-                            f"التصنيف: **{_ins['phase']}**"
+                            f"Sharpe **{_ins.get('sharpe', 0):.1f}** | "
+                            f"Profit Factor **{_ins.get('profit_factor', 0):.1f}**"
                         )
+                        # Misleading warning
+                        if _ins.get("misleading"):
+                            _ins_txt += "\n\n⚠️ **تحذير:** نسبة النجاح عالية لكن **التوقع الرياضي سلبي** — الخسائر أكبر من الأرباح!"
+                        # Catalyst events
+                        if _ins.get("catalyst_events"):
+                            _cat_events = " • ".join(_ins["catalyst_events"])
+                            _ins_txt += f"\n\n📅 **المحفزات:** {_cat_events}"
+                            if _ins.get("catalyst_note"):
+                                _ins_txt += f"\n💡 {_ins['catalyst_note']}"
+                        # Next month
                         if _ins.get("next_month_ar"):
                             _ins_txt += (
                                 f"\n\n{_ins['next_icon']} الشهر القادم (**{_ins['next_month_ar']}**): "
                                 f"متوسط **{_ins['next_avg']:+.1f}%** — {_ins['next_phase']}"
                             )
+                            if _ins.get("next_catalyst"):
+                                _ins_txt += f" | 💡 {_ins['next_catalyst']}"
+
                         if _ins["avg_return"] > 0:
                             st.success(_ins_txt)
                         elif _ins["avg_return"] < -0.5:
@@ -3933,23 +3953,30 @@ elif page == "🗺️ خريطة القطاعات":
                         else:
                             st.info(_ins_txt)
 
-                    # Heatmap table
+                    # ── Heatmap table with Sharpe + Win/Loss ──
                     st.markdown("##### 🗓️ خريطة الأداء الشهري")
                     _heat_rows = []
                     for mo in range(1, 13):
                         if mo not in _ss_stats:
                             continue
                         s = _ss_stats[mo]
-                        _heat_rows.append({
+                        _row = {
                             "الشهر": f"{s['phase_icon']} {s['month_ar']}",
-                            "متوسط العائد %": s["avg_return"],
-                            "نسبة النجاح %": s["win_rate"],
-                            "إيجابي": s["positive"],
-                            "سلبي": s["negative"],
+                            "متوسط %": s["avg_return"],
+                            "نجاح %": s["win_rate"],
+                            "Sharpe": s.get("sharpe", 0),
+                            "ربح %": s.get("avg_win", 0),
+                            "خسارة %": s.get("avg_loss", 0),
+                            "P.Factor": s.get("profit_factor", 0),
                             "أفضل %": s["best"],
                             "أسوأ %": s["worst"],
-                            "التصنيف": s["phase"],
-                        })
+                        }
+                        # Add catalyst
+                        if mo in _ss_catalysts:
+                            _row["المحفز"] = _ss_catalysts[mo]["impact"]
+                        else:
+                            _row["المحفز"] = ""
+                        _heat_rows.append(_row)
 
                     if _heat_rows:
                         _heat_df = pd.DataFrame(_heat_rows)
@@ -3958,17 +3985,39 @@ elif page == "🗺️ خريطة القطاعات":
                                 lambda v: "color: #00E676" if isinstance(v, (int, float)) and v > 0
                                 else "color: #FF5252" if isinstance(v, (int, float)) and v < 0
                                 else "",
-                                subset=["متوسط العائد %", "أفضل %", "أسوأ %"]
+                                subset=["متوسط %", "ربح %", "خسارة %", "أفضل %", "أسوأ %"]
                             ).applymap(
                                 lambda v: "color: #00E676" if isinstance(v, (int, float)) and v >= 60
                                 else "color: #FF5252" if isinstance(v, (int, float)) and v < 40
                                 else "color: #FFD700",
-                                subset=["نسبة النجاح %"]
+                                subset=["نجاح %"]
+                            ).applymap(
+                                lambda v: "color: #00E676" if isinstance(v, (int, float)) and v > 1
+                                else "color: #FF5252" if isinstance(v, (int, float)) and v < 0
+                                else "color: #FFD700",
+                                subset=["Sharpe", "P.Factor"]
                             ),
                             use_container_width=True, hide_index=True,
                         )
 
-                    # Heatmap chart — monthly returns by year
+                        # Legend
+                        st.caption(
+                            "**Sharpe** = العائد ÷ التذبذب (أعلى = أفضل جودة) | "
+                            "**P.Factor** = إجمالي الأرباح ÷ إجمالي الخسائر (أعلى من 1 = رابح) | "
+                            "**ربح %** = متوسط الربح لما يكسب | **خسارة %** = متوسط الخسارة لما يخسر"
+                        )
+
+                    # ── Misleading months warning ──
+                    _misleading = [s for s in _ss_stats.values() if s.get("misleading")]
+                    if _misleading:
+                        for _ml in _misleading:
+                            st.warning(
+                                f"⚠️ **{_ml['month_ar']}**: نسبة نجاح {_ml['win_rate']:.0f}% "
+                                f"لكن متوسط الربح **{_ml['avg_win']:+.1f}%** ومتوسط الخسارة **{_ml['avg_loss']:+.1f}%** "
+                                f"— التوقع الرياضي **{_ml['expectancy']:+.1f}%** (سلبي رغم النسبة العالية!)"
+                            )
+
+                    # ── Heatmap chart ──
                     st.markdown("##### 📈 العوائد الشهرية حسب السنة")
                     _yr_mo_data = []
                     for m in _ss.get("monthly", []):
@@ -3987,7 +4036,6 @@ elif page == "🗺️ خريطة القطاعات":
                         )
                         _pivot.columns = [MONTH_NAMES_AR.get(c, str(c)) for c in _pivot.columns]
 
-                        # Heatmap with plotly
                         import plotly.figure_factory as ff
                         _z = _pivot.values.tolist()
                         _x = list(_pivot.columns)
@@ -4002,13 +4050,11 @@ elif page == "🗺️ خريطة القطاعات":
                                 [0.45, "#37474F"], [0.55, "#37474F"],
                                 [0.7, "#4CAF50"], [1.0, "#00E676"],
                             ],
-                            showscale=True,
-                            zmin=-10, zmax=10,
+                            showscale=True, zmin=-10, zmax=10,
                         )
                         _hm_fig.update_layout(
                             template="plotly_dark",
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            plot_bgcolor="rgba(0,0,0,0)",
+                            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                             height=max(200, len(_y) * 45 + 80),
                             margin=dict(l=60, r=20, t=10, b=40),
                             font=dict(family="Tajawal", size=12),
@@ -4016,7 +4062,24 @@ elif page == "🗺️ خريطة القطاعات":
                         )
                         st.plotly_chart(_hm_fig, use_container_width=True, config={"displayModeBar": False})
 
-                    # Transitions
+                    # ── Catalyst timeline ──
+                    if _ss_catalysts:
+                        st.markdown("##### 📅 تقويم المحفزات الأساسية")
+                        _cat_cols = st.columns(4)
+                        for _ci, mo in enumerate(range(1, 13)):
+                            if mo not in _ss_catalysts:
+                                continue
+                            _cat = _ss_catalysts[mo]
+                            _cat_icon = "🟢" if _cat["impact"] in ("إيجابي", "إيجابي قوي") else "🔴" if "سلبي" in _cat["impact"] else "⚪"
+                            _mo_stat = _ss_stats.get(mo)
+                            _mo_avg = f" ({_mo_stat['avg_return']:+.1f}%)" if _mo_stat else ""
+                            _cat_cols[_ci % 4].markdown(
+                                f"**{_cat_icon} {MONTH_NAMES_AR[mo]}{_mo_avg}**\n\n"
+                                f"{'  •  '.join(_cat['events'])}\n\n"
+                                f"*{_cat['note']}*\n\n---"
+                            )
+
+                    # ── Transitions ──
                     _trans = _ss.get("transitions", [])
                     if _trans:
                         st.markdown("##### 🔄 نقاط التحول الموسمية")
@@ -4026,15 +4089,15 @@ elif page == "🗺️ خريطة القطاعات":
                             else:
                                 st.error(f"{t['icon']} {t['description']}")
 
-                    # Best/worst months summary
+                    # ── Best/worst by Sharpe ──
                     if _ss_stats:
-                        _sorted_months = sorted(_ss_stats.values(), key=lambda x: x["avg_return"], reverse=True)
-                        _best3 = _sorted_months[:3]
-                        _worst3 = _sorted_months[-3:]
-                        _b3_txt = " • ".join([f"**{m['month_ar']}** ({m['avg_return']:+.1f}%)" for m in _best3])
-                        _w3_txt = " • ".join([f"**{m['month_ar']}** ({m['avg_return']:+.1f}%)" for m in _worst3])
-                        st.markdown(f"🟢 **أفضل 3 أشهر:** {_b3_txt}")
-                        st.markdown(f"🔴 **أسوأ 3 أشهر:** {_w3_txt}")
+                        _by_sharpe = sorted(_ss_stats.values(), key=lambda x: x.get("sharpe", 0), reverse=True)
+                        _best3 = _by_sharpe[:3]
+                        _worst3 = _by_sharpe[-3:]
+                        _b3_txt = " • ".join([f"**{m['month_ar']}** (Sharpe {m.get('sharpe', 0):.1f}, {m['avg_return']:+.1f}%)" for m in _best3])
+                        _w3_txt = " • ".join([f"**{m['month_ar']}** (Sharpe {m.get('sharpe', 0):.1f}, {m['avg_return']:+.1f}%)" for m in _worst3])
+                        st.markdown(f"🟢 **أفضل 3 أشهر (معدّل بالمخاطرة):** {_b3_txt}")
+                        st.markdown(f"🔴 **أسوأ 3 أشهر (معدّل بالمخاطرة):** {_w3_txt}")
             else:
                 st.info("لا توجد بيانات كافية للتحليل الموسمي — أعد المسح بفترة أطول (سنة+)")
 
