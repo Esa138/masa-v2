@@ -3758,6 +3758,41 @@ elif page == "🗺️ خريطة القطاعات":
         # ══ Master Chart: Platform + Benchmark + All Sectors ══
         _comp_dates, _comp_vals, _, _ = build_composite_index(results)
         _comp_dates, _comp_vals = _filter_session(_comp_dates, _comp_vals)
+
+        # Time range filter (daily only)
+        if not _smap_intra and len(_comp_dates) > 20:
+            _sm_range_opts = {"الكل": 0, "سنة": 252, "3 سنوات": 756, "5 سنوات": 1260}
+            _sm_rcols = st.columns(len(_sm_range_opts))
+            _sm_sel = st.session_state.get("_smap_range", "الكل")
+            for _ri, (_rl, _rd) in enumerate(_sm_range_opts.items()):
+                _btn_t = "primary" if _sm_sel == _rl else "secondary"
+                if _sm_rcols[_ri].button(_rl, key=f"_smap_r_{_rl}", type=_btn_t, use_container_width=True):
+                    st.session_state["_smap_range"] = _rl
+                    _sm_sel = _rl
+            _sm_rd = _sm_range_opts.get(_sm_sel, 0)
+            if _sm_rd > 0 and len(_comp_dates) > _sm_rd:
+                _comp_dates = _comp_dates[-_sm_rd:]
+                _comp_vals = _comp_vals[-_sm_rd:]
+                # Rebase to start from first value
+                _bv = _comp_vals[0] if _comp_vals else 100
+                if _bv > 0:
+                    _comp_vals = [round(100 + (v - _bv) / _bv * 100, 2) for v in _comp_vals]
+                # Also slice sector composites
+                _start_d = _comp_dates[0]
+                for _sk in list(_sector_composites.keys()):
+                    _sd_data = _sector_composites[_sk]
+                    _sd_idx = [i for i, d in enumerate(_sd_data["dates"]) if d >= _start_d]
+                    if len(_sd_idx) >= 3:
+                        _sd_dates = [_sd_data["dates"][i] for i in _sd_idx]
+                        _sd_vals = [_sd_data["vals"][i] for i in _sd_idx]
+                        _sd_bv = _sd_vals[0] if _sd_vals else 100
+                        if _sd_bv > 0:
+                            _sd_vals = [round(100 + (v - _sd_bv) / _sd_bv * 100, 2) for v in _sd_vals]
+                        _sd_ret = round((_sd_vals[-1] - _sd_vals[0]) / _sd_vals[0] * 100, 2) if _sd_vals[0] > 0 else 0
+                        _sector_composites[_sk] = {"dates": _sd_dates, "vals": _sd_vals, "ret": _sd_ret}
+                    else:
+                        del _sector_composites[_sk]
+
         _min_bars = 3 if _smap_intra else 15
         if len(_comp_dates) >= _min_bars:
             # Benchmark only for daily (intraday has no matching benchmark data)
