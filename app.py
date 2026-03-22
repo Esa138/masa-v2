@@ -2524,13 +2524,15 @@ def show_breakout_index(results, market_key="saudi"):
         _comp_vals = index_vals
         if not _idx_intra and len(dates) > 20:
             _total_bars_idx = len(dates)
-            _range_options = {"الكل": 0, "6 أشهر": 126, "سنة": 252, "سنتين": 504}
+            _all_idx_ranges = [("الكل", 0), ("3 أشهر", 63), ("6 أشهر", 126), ("سنة", 252), ("سنتين", 504), ("3 سنوات", 756), ("5 سنوات", 1260)]
+            _range_options = {k: v for k, v in _all_idx_ranges if v == 0 or v < _total_bars_idx}
             _range_cols = st.columns(len(_range_options))
             _selected_range = st.session_state.get("_comp_range", "الكل")
+            if _selected_range not in _range_options:
+                _selected_range = "الكل"
             for _ci, (_rlabel, _rdays) in enumerate(_range_options.items()):
                 _btn_style = "primary" if _selected_range == _rlabel else "secondary"
-                _disabled = _rdays > 0 and _rdays >= _total_bars_idx
-                if _range_cols[_ci].button(_rlabel, key=f"_comp_r_{_rlabel}", type=_btn_style, use_container_width=True, disabled=_disabled):
+                if _range_cols[_ci].button(_rlabel, key=f"_comp_r_{_rlabel}", type=_btn_style, use_container_width=True):
                     st.session_state["_comp_range"] = _rlabel
                     _selected_range = _rlabel
             _rdays = _range_options.get(_selected_range, 0)
@@ -3763,13 +3765,15 @@ elif page == "🗺️ خريطة القطاعات":
         # Time range filter (daily only)
         if not _smap_intra and len(_comp_dates) > 20:
             _total_bars = len(_comp_dates)
-            _sm_range_opts = {"الكل": 0, "6 أشهر": 126, "سنة": 252, "سنتين": 504}
+            _all_ranges = [("الكل", 0), ("3 أشهر", 63), ("6 أشهر", 126), ("سنة", 252), ("سنتين", 504), ("3 سنوات", 756), ("5 سنوات", 1260)]
+            _sm_range_opts = {k: v for k, v in _all_ranges if v == 0 or v < _total_bars}
             _sm_rcols = st.columns(len(_sm_range_opts))
             _sm_sel = st.session_state.get("_smap_range", "الكل")
+            if _sm_sel not in _sm_range_opts:
+                _sm_sel = "الكل"
             for _ri, (_rl, _rd) in enumerate(_sm_range_opts.items()):
                 _btn_t = "primary" if _sm_sel == _rl else "secondary"
-                _disabled = _rd > 0 and _rd >= _total_bars
-                if _sm_rcols[_ri].button(_rl, key=f"_smap_r_{_rl}", type=_btn_t, use_container_width=True, disabled=_disabled):
+                if _sm_rcols[_ri].button(_rl, key=f"_smap_r_{_rl}", type=_btn_t, use_container_width=True):
                     st.session_state["_smap_range"] = _rl
                     _sm_sel = _rl
             _sm_rd = _sm_range_opts.get(_sm_sel, 0)
