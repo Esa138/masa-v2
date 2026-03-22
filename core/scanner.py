@@ -373,9 +373,9 @@ def scan_market(
             if _is_early_bounce:
                 _early_bounce_label = f"⚡ ارتداد حاد — هبط {abs(_drop_from_peak):.0f}% وارتد {_bounce_from_low:.0f}%"
 
-            # ── Chart data — limit bars for readability ──
-            _max_chart = {"1d": 90, "1h": 100, "15m": 80, "5m": 60}
-            chart_days = min(len(close), _max_chart.get(interval, 90))
+            # ── Chart data — keep all daily bars, limit intraday ──
+            _max_chart = {"1h": 100, "15m": 80, "5m": 60}
+            chart_days = min(len(close), _max_chart.get(interval, len(close)))
             _date_fmt = "%Y-%m-%d %H:%M" if interval != "1d" else "%Y-%m-%d"
             # Convert intraday timestamps to Saudi time (Asia/Riyadh UTC+3)
             if interval != "1d":
