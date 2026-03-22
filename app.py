@@ -2377,9 +2377,6 @@ def show_breakout_index(results, market_key="saudi"):
 
     # For intraday: filter to last session only (match sector map)
     _idx_intra = len(dates) > 0 and (len(dates[0]) > 10 or " " in dates[0] or "T" in dates[0])
-    # DEBUG — remove after testing
-    if dates:
-        st.caption(f"🔍 DEBUG: dates[0]={dates[0]!r} | len={len(dates[0])} | intra={_idx_intra}")
     if _idx_intra and dates:
         _unique_days = sorted(set(d[:10] for d in dates))
         for _off in range(len(_unique_days)):
@@ -2522,18 +2519,48 @@ def show_breakout_index(results, market_key="saudi"):
     ])
 
     with idx_tab_compare:
+        # Time range filter (daily only)
+        _comp_dates = dates
+        _comp_vals = index_vals
+        if not _idx_intra and len(dates) > 20:
+            from datetime import datetime as _dt, timedelta as _td
+            _range_options = {"الكل": 0, "سنة": 252, "3 سنوات": 756, "5 سنوات": 1260}
+            _range_cols = st.columns(len(_range_options))
+            _selected_range = st.session_state.get("_comp_range", "الكل")
+            for _ci, (_rlabel, _rdays) in enumerate(_range_options.items()):
+                _btn_style = "primary" if _selected_range == _rlabel else "secondary"
+                if _range_cols[_ci].button(_rlabel, key=f"_comp_r_{_rlabel}", type=_btn_style, use_container_width=True):
+                    st.session_state["_comp_range"] = _rlabel
+                    _selected_range = _rlabel
+            _rdays = _range_options.get(_selected_range, 0)
+            if _rdays > 0 and len(dates) > _rdays:
+                _comp_dates = dates[-_rdays:]
+                _comp_vals = index_vals[-_rdays:]
+            # Rebase to 100 from start of selected range
+            _base_v = _comp_vals[0] if _comp_vals else 100
+            if _base_v > 0:
+                _comp_vals = [round(100 + (v - _base_v) / _base_v * 100, 2) for v in _comp_vals]
+
+        # Re-fetch benchmark for the selected range
+        if _comp_dates is not dates:
+            _comp_bench, _, _, _, _ = _fetch_benchmark_normalized(
+                _comp_dates, market_key=market_key, start_val=100
+            )
+        else:
+            _comp_bench = bench_norm
+
         # Comparison chart: Composite vs Benchmark
         comp_fig = go.Figure()
 
         comp_fig.add_trace(go.Scatter(
-            x=dates, y=index_vals, mode="lines",
+            x=_comp_dates, y=_comp_vals, mode="lines",
             line=dict(color="#4FC3F7", width=2.5),
             name="المؤشر المركب",
             hovertemplate="المؤشر: %{y:.2f}<extra></extra>",
         ))
         # Benchmark line
-        b_dates = [d for d in dates if d in bench_norm]
-        b_vals = [bench_norm[d] for d in b_dates]
+        b_dates = [d for d in _comp_dates if d in _comp_bench]
+        b_vals = [_comp_bench[d] for d in b_dates]
         if b_dates:
             comp_fig.add_trace(go.Scatter(
                 x=b_dates, y=b_vals, mode="lines",
