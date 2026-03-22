@@ -3183,7 +3183,7 @@ if page == "🔬 Order Flow":
         )
         selected_interval = timeframe_options[selected_tf_label]
     with hcol3:
-        period_options = {"سنة": "1y", "سنتين": "2y", "٣ سنوات": "3y", "٥ سنوات": "5y"}
+        period_options = {"سنة": "1y", "سنتين": "2y", "٣ سنوات": "3y", "٥ سنوات": "5y", "١٠ سنوات": "10y", "الكل": "max"}
         selected_period_label = st.selectbox(
             "📅 الفترة", list(period_options.keys()), index=2,
             key="scan_period", label_visibility="collapsed",
@@ -3765,7 +3765,7 @@ elif page == "🗺️ خريطة القطاعات":
         # Time range filter (daily only)
         if not _smap_intra and len(_comp_dates) > 20:
             _total_bars = len(_comp_dates)
-            _all_ranges = [("الكل", 0), ("3 أشهر", 63), ("6 أشهر", 126), ("سنة", 252), ("سنتين", 504), ("3 سنوات", 756), ("5 سنوات", 1260)]
+            _all_ranges = [("الكل", 0), ("3 أشهر", 63), ("6 أشهر", 126), ("سنة", 252), ("سنتين", 504), ("3 سنوات", 756), ("5 سنوات", 1260), ("10 سنوات", 2520)]
             _sm_range_opts = {k: v for k, v in _all_ranges if v == 0 or v < _total_bars}
             _sm_rcols = st.columns(len(_sm_range_opts))
             _sm_sel = st.session_state.get("_smap_range", "الكل")
