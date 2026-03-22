@@ -2523,17 +2523,18 @@ def show_breakout_index(results, market_key="saudi"):
         _comp_dates = dates
         _comp_vals = index_vals
         if not _idx_intra and len(dates) > 20:
-            from datetime import datetime as _dt, timedelta as _td
-            _range_options = {"الكل": 0, "سنة": 252, "3 سنوات": 756, "5 سنوات": 1260}
+            _total_bars_idx = len(dates)
+            _range_options = {"الكل": 0, "6 أشهر": 126, "سنة": 252, "سنتين": 504}
             _range_cols = st.columns(len(_range_options))
             _selected_range = st.session_state.get("_comp_range", "الكل")
             for _ci, (_rlabel, _rdays) in enumerate(_range_options.items()):
                 _btn_style = "primary" if _selected_range == _rlabel else "secondary"
-                if _range_cols[_ci].button(_rlabel, key=f"_comp_r_{_rlabel}", type=_btn_style, use_container_width=True):
+                _disabled = _rdays > 0 and _rdays >= _total_bars_idx
+                if _range_cols[_ci].button(_rlabel, key=f"_comp_r_{_rlabel}", type=_btn_style, use_container_width=True, disabled=_disabled):
                     st.session_state["_comp_range"] = _rlabel
                     _selected_range = _rlabel
             _rdays = _range_options.get(_selected_range, 0)
-            if _rdays > 0 and len(dates) > _rdays:
+            if _rdays > 0 and _rdays < _total_bars_idx:
                 _comp_dates = dates[-_rdays:]
                 _comp_vals = index_vals[-_rdays:]
             # Rebase to 100 from start of selected range
@@ -3761,16 +3762,18 @@ elif page == "🗺️ خريطة القطاعات":
 
         # Time range filter (daily only)
         if not _smap_intra and len(_comp_dates) > 20:
-            _sm_range_opts = {"الكل": 0, "سنة": 252, "3 سنوات": 756, "5 سنوات": 1260}
+            _total_bars = len(_comp_dates)
+            _sm_range_opts = {"الكل": 0, "6 أشهر": 126, "سنة": 252, "سنتين": 504}
             _sm_rcols = st.columns(len(_sm_range_opts))
             _sm_sel = st.session_state.get("_smap_range", "الكل")
             for _ri, (_rl, _rd) in enumerate(_sm_range_opts.items()):
                 _btn_t = "primary" if _sm_sel == _rl else "secondary"
-                if _sm_rcols[_ri].button(_rl, key=f"_smap_r_{_rl}", type=_btn_t, use_container_width=True):
+                _disabled = _rd > 0 and _rd >= _total_bars
+                if _sm_rcols[_ri].button(_rl, key=f"_smap_r_{_rl}", type=_btn_t, use_container_width=True, disabled=_disabled):
                     st.session_state["_smap_range"] = _rl
                     _sm_sel = _rl
             _sm_rd = _sm_range_opts.get(_sm_sel, 0)
-            if _sm_rd > 0 and len(_comp_dates) > _sm_rd:
+            if _sm_rd > 0 and _sm_rd < _total_bars:
                 _comp_dates = _comp_dates[-_sm_rd:]
                 _comp_vals = _comp_vals[-_sm_rd:]
                 # Rebase to start from first value
