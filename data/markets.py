@@ -523,6 +523,17 @@ US_STOCKS = {
     "DOW": "Dow Inc",
     "DD": "DuPont",
     "PPG": "PPG Industries",
+    # ── Added batch ──
+    "CTAS": "Cintas",
+    "CEG": "Constellation Energy",
+    "VRSK": "Verisk Analytics",
+    "MELI": "MercadoLibre",
+    "GEHC": "GE HealthCare",
+    "MNST": "Monster Beverage",
+    "ADP": "ADP",
+    "ASML": "ASML",
+    "ZS": "Zscaler",
+    "FER": "Ferrovial",
 }
 
 
@@ -972,13 +983,13 @@ US_SECTORS = {
         "CSCO", "ADBE", "ACN", "IBM", "INTC", "TXN", "QCOM", "AMAT", "NOW",
         "INTU", "AMD", "PANW", "MU", "LRCX", "ADI", "KLAC", "SNPS", "CDNS",
         "CRWD", "MRVL", "FTNT", "MSI", "NXPI", "ROP", "ADSK", "WDAY", "TEAM",
-        "MCHP", "ON", "HPE", "HPQ", "DELL",
+        "MCHP", "ON", "HPE", "HPQ", "DELL", "ASML", "ZS",
     ]},
     # السلع الاستهلاكية
     **{t: "السلع الاستهلاكية" for t in [
         "AMZN", "TSLA", "HD", "COST", "NKE", "MCD", "SBUX", "TGT", "LOW",
         "TJX", "BKNG", "MAR", "CMG", "ORLY", "AZO", "ROST", "DHI", "LEN",
-        "YUM", "DG", "DLTR", "EBAY", "ABNB", "DASH", "GM", "F", "RIVN",
+        "YUM", "DG", "DLTR", "EBAY", "ABNB", "DASH", "GM", "F", "RIVN", "MELI",
     ]},
     # التقنية المالية
     **{t: "التقنية المالية" for t in [
@@ -989,7 +1000,7 @@ US_SECTORS = {
         "UNH", "JNJ", "LLY", "PFE", "ABBV", "MRK", "TMO", "ABT", "DHR",
         "AMGN", "BMY", "MDT", "ISRG", "GILD", "VRTX", "REGN", "SYK", "ZTS",
         "BSX", "BDX", "EW", "CI", "HCA", "ELV", "HUM", "DXCM", "IDXX", "A",
-        "BIIB", "MRNA",
+        "BIIB", "MRNA", "GEHC",
     ]},
     # الطاقة
     **{t: "الطاقة" for t in [
@@ -1001,11 +1012,12 @@ US_SECTORS = {
         "CAT", "GE", "HON", "UNP", "DE", "UPS", "MMM",
         "ITW", "EMR", "ETN", "FDX", "CSX", "NSC", "WM", "JCI",
         "CARR", "FAST", "IR", "PCAR", "CMI", "ROK", "UBER",
+        "CTAS", "ADP", "VRSK", "FER",
     ]},
     # السلع الاستهلاكية الأساسية
     **{t: "السلع الاستهلاكية الأساسية" for t in [
         "PG", "KO", "PEP", "WMT", "CL", "MDLZ", "GIS", "KDP",
-        "KHC", "SYY", "HSY", "KR", "ADM", "EL",
+        "KHC", "SYY", "HSY", "KR", "ADM", "EL", "MNST",
     ]},
     # الاتصالات
     **{t: "الاتصالات" for t in [
@@ -1014,7 +1026,7 @@ US_SECTORS = {
     ]},
     # المرافق العامة
     **{t: "المرافق العامة" for t in [
-        "NEE", "DUK", "SO", "D", "AEP", "SRE", "EXC", "XEL", "WEC", "ED",
+        "NEE", "DUK", "SO", "D", "AEP", "SRE", "EXC", "XEL", "WEC", "ED", "CEG",
     ]},
     # العقارات
     **{t: "العقارات" for t in [
