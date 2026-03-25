@@ -452,41 +452,41 @@ def _determine_phase(
             and cdv_trend == "falling"):
         return "upthrust"
 
-    # ── Accumulation ──────────────────────────────────────
-    # Strong positive flow + buyer aggression + location makes sense
+    # ── Accumulation (V3: stricter — buyers only, stronger flow) ──
+    # Strong positive flow + BUYER aggression (V3: removed "balanced")
     if (flow_bias > 25
             and positive_weight >= 6
-            and aggressor in ("buyers", "balanced")
+            and aggressor == "buyers"  # V3: must be buyers, not balanced
             and location not in ("resistance",)):
         return "accumulation"
 
-    # Moderate positive + strong divergence (hidden accumulation)
-    if (flow_bias > 10
+    # Hidden accumulation — V3: raised flow threshold from 10 → 20
+    if (flow_bias > 20  # V3: was 10 (too weak)
             and last_divergence > 25
             and location in ("bottom", "support", "middle")):
         return "accumulation"
 
-    # ── Distribution ──────────────────────────────────────
-    # Strong negative flow + seller aggression
+    # ── Distribution (V3: stricter — sellers only) ────────
+    # Strong negative flow + SELLER aggression (V3: removed "balanced")
     if (flow_bias < -25
             and negative_weight >= 6
-            and aggressor in ("sellers", "balanced")):
+            and aggressor == "sellers"):  # V3: must be sellers, not balanced
         return "distribution"
 
-    # Moderate negative + bearish divergence (hidden distribution)
-    if (flow_bias < -10
+    # Hidden distribution — V3: raised threshold from -10 → -20
+    if (flow_bias < -20  # V3: was -10 (too weak)
             and last_divergence < -25
             and location in ("resistance", "above", "middle")):
         return "distribution"
 
-    # ── Markup (trending up) ──────────────────────────────
-    if (is_above_ma50 and is_above_ma200
+    # ── Markup (V3: needs at least MA200, not both required) ──
+    if (is_above_ma200  # V3: only MA200 required (was both MA50+MA200)
             and cdv_trend == "rising"
             and flow_bias > 10):
         return "markup"
 
-    # ── Markdown (trending down) ──────────────────────────
-    if (not is_above_ma50 and not is_above_ma200
+    # ── Markdown (V3: needs at least below MA200, not both) ──
+    if (not is_above_ma200  # V3: only MA200 required (was both)
             and cdv_trend == "falling"
             and flow_bias < -10):
         return "markdown"
@@ -588,8 +588,10 @@ def compute_accumulation_maturity(
         cont_val = float(contraction.iloc[i]) if pd.notna(contraction.iloc[i]) else 0
         rsi_val = float(rsi.iloc[i]) if pd.notna(rsi.iloc[i]) else 50
 
-        # Is this day showing accumulation?
-        is_accum = rd > 0 and cdv_5d > 0
+        # Is this day showing accumulation? V3: add magnitude threshold
+        # V3: rd and cdv_5d must be meaningfully positive, not just >0
+        _rd_threshold = 0.01  # minimum rolling delta (prevents noise)
+        is_accum = rd > _rd_threshold and cdv_5d > 0
 
         daily_signals.append({
             "idx": i,
@@ -676,14 +678,21 @@ def compute_accumulation_maturity(
     today_date = idx_to_date(daily_signals[-1]["idx"])
 
     # ── Stage determination: duration + intensity ──
-    # Strong signals still need minimum duration for confirmation
-    if intensity >= 2 and streak >= 3:
-        # Very strong signals + enough duration → confirmed late
+    # V3: Late stage requires 7+ days minimum (was 3 — too short for real accumulation)
+    if intensity >= 2 and streak >= 7:
+        # V3: Very strong signals + 7+ days → confirmed late
         timeline.append({"stage": "late", "date": today_date,
                           "label": "🟢 سبرنق — إشارات قوية", "action": "ادخل"})
         stage = "late"
         stage_label = "🟢 سبرنق — إشارات قوية جداً"
         stage_color = "#00E676"
+    elif intensity >= 2 and streak >= 3:
+        # V3: Strong signals + 3-6 days → mid (was late at 3 days!)
+        timeline.append({"stage": "mid", "date": today_date,
+                          "label": "🟡 تجميع متوسط — إشارات قوية تحتاج وقت", "action": "راقب"})
+        stage = "mid"
+        stage_label = "🟡 تجميع متوسط — إشارات قوية تحتاج تأكيد"
+        stage_color = "#FFD700"
     elif intensity >= 2 and streak < 3:
         # Strong signals but too early — needs confirmation
         timeline.append({"stage": "early", "date": today_date,

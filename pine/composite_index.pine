@@ -1,0 +1,206 @@
+// This Pine Script™ is subject to the terms of the Mozilla Public License 2.0
+// © MASA Quant V95 PRO
+
+//@version=5
+indicator("MASA Composite Index", shorttitle="MASA مؤشر مركب", overlay=false, precision=2, max_labels_count=500)
+
+// ─── المدخلات ───
+grp_periods = "فترات الدعم والمقاومة"
+p1 = input.int(3,  "فترة ١", minval=1, group=grp_periods)
+p2 = input.int(4,  "فترة ٢", minval=1, group=grp_periods)
+p3 = input.int(10, "فترة ٣", minval=1, group=grp_periods)
+p4 = input.int(15, "فترة ٤", minval=1, group=grp_periods)
+
+grp_index = "إعدادات المؤشر"
+base_val   = input.float(98.0, "القاعدة",  group=grp_index)
+range_val  = input.float(30.0, "المدى",    group=grp_index)
+
+grp_breakout = "إعدادات الاختراق"
+show_breakouts = input.bool(true, "عرض مثلثات الاختراق", group=grp_breakout)
+show_breakdowns = input.bool(true, "عرض مثلثات الكسر", group=grp_breakout)
+breakout_period = input.int(4, "فترة الاختراق", minval=1, maxval=50, group=grp_breakout)
+
+grp_zones = "ألوان المناطق"
+col_deep_floor  = input.color(color.new(#00E676, 0),  "أرضية عميقة ≤95",     group=grp_zones)
+col_floor       = input.color(color.new(#00C853, 0),  "الأرضية 95-98",        group=grp_zones)
+col_accum       = input.color(color.new(#FFEB3B, 0),  "تجميع 98-100",         group=grp_zones)
+col_launch      = input.color(color.new(#2196F3, 0),  "انطلاق 100-104",       group=grp_zones)
+col_momentum    = input.color(color.new(#FF9800, 0),  "زخم 104-108",          group=grp_zones)
+col_slowdown    = input.color(color.new(#FF5722, 0),  "تباطؤ 108-112",        group=grp_zones)
+col_exhaustion  = input.color(color.new(#F44336, 0),  "إرهاق >125",           group=grp_zones)
+
+// ─── حساب الدعوم والمقاومات ───
+lowest_p1  = ta.lowest(low,  p1)
+lowest_p2  = ta.lowest(low,  p2)
+lowest_p3  = ta.lowest(low,  p3)
+lowest_p4  = ta.lowest(low,  p4)
+
+highest_p1 = ta.highest(high, p1)
+highest_p2 = ta.highest(high, p2)
+highest_p3 = ta.highest(high, p3)
+highest_p4 = ta.highest(high, p4)
+
+total_low  = math.min(lowest_p1,  lowest_p2,  lowest_p3,  lowest_p4)
+total_high = math.max(highest_p1, highest_p2, highest_p3, highest_p4)
+
+// ─── حساب المؤشر المركب ───
+price_range = total_high - total_low
+composite = price_range > 0 ? base_val + (close - total_low) / price_range * range_val : base_val
+
+// ─── اختراق/كسر الفترة المحددة ───
+breakout_resistance = ta.highest(high, breakout_period)[1]
+breakout_support    = ta.lowest(low, breakout_period)[1]
+
+is_breakout   = close > breakout_resistance and close[1] <= breakout_resistance
+is_breakdown  = close < breakout_support and close[1] >= breakout_support
+
+// عداد الاختراقات — ينعاد بعد كل كسر (والعكس)
+var int breakout_count = 0
+var int breakdown_count = 0
+
+if is_breakout
+    breakout_count += 1
+    breakdown_count := 0
+if is_breakdown
+    breakdown_count += 1
+    breakout_count := 0
+
+// ─── تحديد المنطقة ───
+f_zone_color(float val) =>
+    if val <= 95
+        col_deep_floor
+    else if val <= 98
+        col_floor
+    else if val <= 100
+        col_accum
+    else if val <= 104
+        col_launch
+    else if val <= 108
+        col_momentum
+    else if val <= 115
+        col_slowdown
+    else if val <= 125
+        col_exhaustion
+    else
+        col_exhaustion
+
+zone_color = f_zone_color(composite)
+
+// ─── المقص ───
+scissors = math.abs(composite - 100)
+
+f_scissors_quality(float s) =>
+    if s <= 4
+        "نظيف"
+    else if s <= 8
+        "مقبول"
+    else if s <= 12
+        "انتظر"
+    else
+        "لا تدخل"
+
+scissors_quality = f_scissors_quality(scissors)
+
+f_scissors_color(float s) =>
+    if s <= 4
+        color.green
+    else if s <= 8
+        color.yellow
+    else
+        color.red
+
+// ─── الرسم ───
+plot(composite, "المؤشر المركب", color=zone_color, linewidth=2)
+
+// خطوط الدعم والمقاومة للفترة المختارة
+plot(base_val + (breakout_resistance - total_low) / price_range * range_val, "مقاومة الفترة", color=color.new(color.teal, 40), style=plot.style_circles, linewidth=1)
+plot(base_val + (breakout_support - total_low) / price_range * range_val, "دعم الفترة", color=color.new(color.teal, 40), style=plot.style_circles, linewidth=1)
+
+// خطوط المناطق
+h100 = hline(100, "خط ١٠٠", color=color.new(color.white, 50), linestyle=hline.style_solid, linewidth=2)
+h98  = hline(98,  "خط ٩٨",  color=color.new(color.green, 70), linestyle=hline.style_dashed)
+h95  = hline(95,  "خط ٩٥",  color=color.new(color.green, 50), linestyle=hline.style_dashed)
+h104 = hline(104, "خط ١٠٤", color=color.new(color.blue, 70),  linestyle=hline.style_dashed)
+h108 = hline(108, "خط ١٠٨", color=color.new(color.orange, 70), linestyle=hline.style_dashed)
+h115 = hline(115, "خط ١١٥", color=color.new(color.red, 70),   linestyle=hline.style_dashed)
+h125 = hline(125, "خط ١٢٥", color=color.new(color.red, 30),   linestyle=hline.style_solid)
+
+// تعبئة المناطق
+fill(h95, h98,   color=color.new(col_floor, 85),      title="منطقة الأرضية")
+fill(h98, h100,  color=color.new(col_accum, 85),       title="منطقة التجميع")
+fill(h100, h104, color=color.new(col_launch, 85),      title="منطقة الانطلاق")
+fill(h104, h108, color=color.new(col_momentum, 85),    title="منطقة الزخم")
+fill(h108, h115, color=color.new(col_slowdown, 85),    title="منطقة التباطؤ")
+fill(h115, h125, color=color.new(col_exhaustion, 85),  title="منطقة الإرهاق")
+
+// ─── مثلثات الاختراق مع أرقام ───
+if is_breakout and show_breakouts
+    label.new(bar_index, composite, str.tostring(breakout_count), style=label.style_triangleup, color=color.new(#00E676, 0), textcolor=color.white, size=size.small)
+
+if is_breakdown and show_breakdowns
+    label.new(bar_index, composite, str.tostring(breakdown_count), style=label.style_triangledown, color=color.new(#FF5252, 0), textcolor=color.white, size=size.small)
+
+// ─── تنبيهات الأرضية ───
+floor_entry = ta.crossunder(composite, 98)
+plotshape(floor_entry, "دخول الأرضية", shape.triangledown, location.top, col_floor, size=size.tiny)
+
+breakout_100 = ta.crossover(composite, 100)
+plotshape(breakout_100, "اختراق ١٠٠", shape.triangleup, location.bottom, col_launch, size=size.tiny)
+
+deep_floor = ta.crossunder(composite, 95)
+plotshape(deep_floor, "أرضية عميقة", shape.diamond, location.top, col_deep_floor, size=size.tiny)
+
+// ─── جدول المعلومات ───
+var table info_table = table.new(position.top_right, 2, 8, bgcolor=color.new(#1E1E1E, 10), border_width=1, border_color=color.new(color.gray, 60))
+
+f_zone_text(float val) =>
+    if val <= 95
+        "🟢 أرضية عميقة"
+    else if val <= 98
+        "🟢 الأرضية"
+    else if val <= 100
+        "🟡 تجميع"
+    else if val <= 104
+        "🔵 انطلاق"
+    else if val <= 108
+        "🟠 زخم"
+    else if val <= 115
+        "🔴 تباطؤ"
+    else if val <= 125
+        "⛔ إرهاق"
+    else
+        "🔥 فوق ١٢٥"
+
+if barstate.islast
+    zone_text = f_zone_text(composite)
+
+    table.cell(info_table, 0, 0, "المؤشر المركب", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 0, str.tostring(composite, "#.##"), text_color=zone_color, text_size=size.normal)
+
+    table.cell(info_table, 0, 1, "المنطقة", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 1, zone_text, text_color=zone_color, text_size=size.small)
+
+    table.cell(info_table, 0, 2, "المقص", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 2, str.tostring(scissors, "#.##") + " — " + scissors_quality, text_color=f_scissors_color(scissors), text_size=size.small)
+
+    table.cell(info_table, 0, 3, "الدعم الكلي", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 3, str.tostring(total_low, "#.##"), text_color=color.green, text_size=size.small)
+
+    table.cell(info_table, 0, 4, "المقاومة الكلية", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 4, str.tostring(total_high, "#.##"), text_color=color.red, text_size=size.small)
+
+    table.cell(info_table, 0, 5, "اختراقات", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 5, str.tostring(breakout_count), text_color=color.new(#00E676, 0), text_size=size.small)
+
+    table.cell(info_table, 0, 6, "كسور", text_color=color.white, text_size=size.small)
+    table.cell(info_table, 1, 6, str.tostring(breakdown_count), text_color=color.new(#FF5252, 0), text_size=size.small)
+
+    table.cell(info_table, 0, 7, "MASA V95", text_color=color.gray, text_size=size.tiny)
+    table.cell(info_table, 1, 7, "© Composite Index", text_color=color.gray, text_size=size.tiny)
+
+// ─── تنبيهات الشروط ───
+alertcondition(floor_entry,   "دخول الأرضية",    "MASA: السهم دخل منطقة الأرضية (تحت 98)")
+alertcondition(breakout_100,  "اختراق ١٠٠",      "MASA: السهم اخترق مستوى ١٠٠ — انطلاق")
+alertcondition(deep_floor,    "أرضية عميقة",      "MASA: السهم وصل أرضية عميقة (تحت 95) — فرصة قوية")
+alertcondition(is_breakout,   "اختراق مقاومة",    "MASA: اختراق مقاومة الفترة المحددة")
+alertcondition(is_breakdown,  "كسر دعم",          "MASA: كسر دعم الفترة المحددة")

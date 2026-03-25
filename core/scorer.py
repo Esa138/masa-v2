@@ -158,7 +158,11 @@ def score_stock(
     elif location == "support":
         reasons_for.append("قريب من منطقة دعم رئيسية")
     elif location == "above":
-        reasons_for.append("كسر المقاومة — سماء مفتوحة")
+        # V3: Check for failed breakout (above + CDV falling = upthrust trap)
+        if cdv_trend == "falling" and _today_change < -0.5:
+            reasons_against.append("⚠️ اختراق فاشل — فوق المقاومة لكن CDV هابط + السعر ينزل (upthrust)")
+        else:
+            reasons_for.append("كسر المقاومة — سماء مفتوحة")
     elif location == "resistance":
         reasons_against.append("قريب من سقف المقاومة — خطر الارتداد")
 
@@ -174,12 +178,16 @@ def score_stock(
     elif market_health <= 30:
         reasons_against.append(f"السوق ضعيف جداً ({market_health:.0f}%)")
 
-    # 9. RSI extremes — WITH FALLING KNIFE PROTECTION
+    # 9. RSI extremes — V3: phase-aware + falling knife protection
     if rsi > 75:
         reasons_against.append(f"RSI مرتفع ({rsi:.0f}) — تشبع شرائي")
     elif rsi < 28:
-        # RSI low BUT: is the stock breaking support? If yes = falling knife, not bounce
-        if _breaking_support or _broke_below_support or cdv_trend == "falling":
+        # V3: RSI low in markdown/distribution = crash continuing, NOT bounce
+        if phase in ("markdown", "distribution"):
+            reasons_against.append(
+                f"⚠️ RSI منخفض ({rsi:.0f}) في مرحلة {phase} — هبوط مستمر مو ارتداد!"
+            )
+        elif _breaking_support or _broke_below_support or cdv_trend == "falling":
             reasons_against.append(
                 f"⚠️ RSI منخفض ({rsi:.0f}) لكن مع كسر دعم + CDV هابط — سكين ساقطة لا ارتداد!"
             )
@@ -209,54 +217,74 @@ def score_stock(
             "🔴 سكين ساقطة — RSI متطرف + كسر دعم + CDV هابط = لا تلمسه"
         )
 
-    # ── STOP LOSS & TARGET ─────────────────────────────────
+    # ── STOP LOSS & TARGET (V3: min 2% floor, max 8% cap) ──
     stop_loss = round(last_close - (last_atr * 1.5), 2)
     stop_pct = (last_close - stop_loss) / last_close * 100
 
+    # V3: Floor — stop can't be tighter than 2% (prevents noise exits)
+    if stop_pct < 2.0:
+        stop_loss = round(last_close * 0.98, 2)
+        stop_pct = 2.0
+    # Cap — stop can't be wider than 8%
     if stop_pct > 8:
         stop_loss = round(last_close * 0.92, 2)
         stop_pct = 8.0
 
     risk = last_close - stop_loss
+    if risk <= 0:
+        risk = last_close * 0.03  # fallback 3%
+        stop_loss = round(last_close - risk, 2)
+
     target = round(last_close + (risk * 2.5), 2)
     rr_ratio = 2.5
 
-    # Adjust target if near resistance
-    if orderflow_data.get("zr_high") and location != "above":
-        zr_h = orderflow_data["zr_high"]
+    # Adjust target if near resistance — V3: validate zr_high > entry
+    zr_h = orderflow_data.get("zr_high", 0)
+    if zr_h > last_close and location != "above":
         if target > zr_h:
             target = round(zr_h * 0.98, 2)
             rr_ratio = round((target - last_close) / risk, 1) if risk > 0 else 0
 
-    # ── FINAL DECISION ─────────────────────────────────────
+    # ── V3: VALIDATE TARGET > ENTRY ─────────────────────────
+    if target <= last_close:
+        # ZR_high was stale or below entry — recalculate without cap
+        target = round(last_close + (risk * 2.5), 2)
+        rr_ratio = 2.5
+
+    # ── FINAL DECISION (V3: stricter, flow-aware) ──────────
     if rr_ratio < 1.0:
         reasons_against.append(f"R:R سيء ({rr_ratio:.1f}) — المخاطرة أعلى من العائد")
         decision = "avoid"
     elif rr_ratio < 1.5:
-        reasons_against.append(f"R:R ضعيف ({rr_ratio:.1f})")
+        reasons_against.append(f"R:R ضعيف ({rr_ratio:.1f}) — أقل من 1.5")
+        decision = "avoid"  # V3: R:R < 1.5 = avoid (was just a warning)
 
     n_for = len(reasons_for)
     n_against = len(reasons_against)
 
-    if rr_ratio < 1.0:
+    if rr_ratio < 1.5:
         decision = "avoid"
-    elif phase in ("spring",) and n_for >= 2:
-        # Spring is the strongest signal — lower bar
+    elif phase in ("spring",) and n_for >= 3 and flow_bias > 15:
+        # V3: Spring needs 3 reasons + meaningful flow (was 2 reasons, no flow check)
         decision = "enter"
-    elif phase in ("accumulation",) and n_for >= 3:
+    elif phase in ("accumulation",) and n_for >= 4 and flow_bias > 20:
+        # V3: Accumulation needs 4 reasons + strong flow (was 3 reasons, no flow check)
         decision = "enter"
-    elif phase == "markup" and flow_bias > 15 and n_for > n_against:
+    elif phase == "markup" and flow_bias > 25 and n_for > n_against + 1:
+        # V3: Markup needs stronger flow (was 15) and clearer advantage (was n_for > n_against)
         decision = "enter"
-    elif phase in ("accumulation", "markup") and n_for > n_against:
+    elif phase in ("accumulation", "markup") and n_for > n_against + 2 and flow_bias > 10:
+        # V3: Need 3+ more reasons_for than against + positive flow (was just n_for > n_against)
         decision = "enter"
     elif phase in ("distribution", "markdown"):
         decision = "avoid"
     elif phase == "upthrust":
         decision = "avoid"
-    elif n_against > n_for + 1:
+    elif n_against >= n_for:
+        # V3: Equal or more against = avoid (was n_against > n_for + 1)
         decision = "avoid"
     elif n_for > n_against:
-        decision = "watch"  # Positive but not in the right phase
+        decision = "watch"
     else:
         decision = "watch"
 

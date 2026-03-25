@@ -3094,6 +3094,9 @@ with st.sidebar:
         <div style="color:#888;font-size:9px;letter-spacing:2px;font-weight:bold;margin-top:4px">
             Order Flow Scanner — من المهاجم؟
         </div>
+        <div style="background:#FF6D00;color:#000;font-size:10px;font-weight:bold;padding:2px 8px;border-radius:4px;margin-top:4px;display:inline-block">
+            ⚡ V3-TEST — نسخة تجريبية
+        </div>
     </div>
     ''', unsafe_allow_html=True)
 
