@@ -2396,8 +2396,8 @@ def show_breakout_index(results, market_key="saudi"):
             index_highs = [round(100 + (m[3] - _base) / _base * 100, 2) if _base > 0 else 100 for m in _mask]
             index_lows = [round(100 + (m[4] - _base) / _base * 100, 2) if _base > 0 else 100 for m in _mask]
 
-    if len(dates) < 5:
-        st.warning(f"لا توجد بيانات كافية لبناء المؤشر (dates={len(dates)}, intra={_idx_intra})")
+    if len(dates) < 2:
+        st.warning("لا توجد بيانات كافية لبناء المؤشر")
         return
 
     # Fetch benchmark (TASI or S&P 500)
