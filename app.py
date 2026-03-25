@@ -2377,7 +2377,10 @@ def show_breakout_index(results, market_key="saudi"):
 
     # Debug: show how many results and dates
     _n_with_chart = sum(1 for r in results if len(r.get("chart_dates", [])) >= 15)
-    st.caption(f"🔍 Debug: {len(results)} أسهم | {_n_with_chart} بـ chart≥15 | {len(dates)} تاريخ مركب")
+    _d0 = dates[0] if dates else "N/A"
+    _d0_len = len(_d0) if dates else 0
+    _d0_space = " " in _d0 if dates else False
+    st.caption(f"🔍 Debug: {len(results)} أسهم | {_n_with_chart} chart≥15 | {len(dates)} تاريخ | d0='{_d0}' len={_d0_len} space={_d0_space}")
 
     # For intraday: filter to last session only (match sector map)
     _idx_intra = len(dates) > 0 and (len(dates[0]) > 10 or " " in dates[0] or "T" in dates[0])
