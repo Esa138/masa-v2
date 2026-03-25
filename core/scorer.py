@@ -135,8 +135,25 @@ def score_stock(
     elif divergence < -25:
         reasons_against.append(f"دايفرجنس بيعي ({divergence:+.0f}) — تصريف خفي")
 
-    # 6. Location context
-    if location == "bottom":
+    # 6. Location context — WITH SUPPORT BREAK DETECTION
+    # Check if price is BREAKING support vs BOUNCING off support
+    _zr_low = orderflow_data.get("zr_low", 0)
+    _prev_close = float(close.iloc[-2]) if len(close) >= 2 else last_close
+    _today_change = (last_close - _prev_close) / _prev_close * 100 if _prev_close > 0 else 0
+    _breaking_support = (
+        location in ("support", "bottom")
+        and _today_change < -1.0  # falling >1% today
+        and cdv_trend == "falling"  # CDV confirms selling
+    )
+    _broke_below_support = (
+        _zr_low > 0
+        and last_close < _zr_low  # price below support level
+        and _today_change < -0.5  # still falling
+    )
+
+    if _breaking_support or _broke_below_support:
+        reasons_against.append("⚠️ كسر دعم — السعر يكسر الدعم مع ضغط بيعي (لا تلتقط السكين)")
+    elif location == "bottom":
         reasons_for.append("موقع ممتاز — قريب من قاع القناة التاريخية")
     elif location == "support":
         reasons_for.append("قريب من منطقة دعم رئيسية")
@@ -157,11 +174,17 @@ def score_stock(
     elif market_health <= 30:
         reasons_against.append(f"السوق ضعيف جداً ({market_health:.0f}%)")
 
-    # 9. RSI extremes
+    # 9. RSI extremes — WITH FALLING KNIFE PROTECTION
     if rsi > 75:
         reasons_against.append(f"RSI مرتفع ({rsi:.0f}) — تشبع شرائي")
     elif rsi < 28:
-        reasons_for.append(f"RSI منخفض ({rsi:.0f}) — احتمال ارتداد")
+        # RSI low BUT: is the stock breaking support? If yes = falling knife, not bounce
+        if _breaking_support or _broke_below_support or cdv_trend == "falling":
+            reasons_against.append(
+                f"⚠️ RSI منخفض ({rsi:.0f}) لكن مع كسر دعم + CDV هابط — سكين ساقطة لا ارتداد!"
+            )
+        else:
+            reasons_for.append(f"RSI منخفض ({rsi:.0f}) — احتمال ارتداد")
 
     # 10. Institutional data
     if institutional_data:
@@ -174,6 +197,17 @@ def score_stock(
             reasons_against.append(
                 f"ملكية الأجانب نقصت {foreign_change:.1f}% — تصريف مؤسساتي"
             )
+
+    # 11. CDV Contradiction — buy signals but CDV falling = DANGER
+    if cdv_trend == "falling" and flow_bias > 0:
+        reasons_against.append(
+            "⚠️ تناقض: أوردر فلو إيجابي لكن CDV هابط — البائعون يتسللون"
+        )
+    # 12. Falling knife veto — extreme oversold + broken support + falling CDV
+    if rsi < 20 and cdv_trend == "falling" and (_breaking_support or _broke_below_support):
+        reasons_against.append(
+            "🔴 سكين ساقطة — RSI متطرف + كسر دعم + CDV هابط = لا تلمسه"
+        )
 
     # ── STOP LOSS & TARGET ─────────────────────────────────
     stop_loss = round(last_close - (last_atr * 1.5), 2)
@@ -258,5 +292,9 @@ def _check_veto(close, ma200, rsi, phase, flow_bias, market_health) -> str:
     # Veto 4: Strong negative flow + seller aggression
     if flow_bias < -60 and market_health < 45:
         return "❌ فيتو: أوردر فلو سلبي شديد + سوق ضعيف"
+
+    # Veto 5: Extreme RSI + deep below MA200 = crash in progress
+    if rsi < 15 and close < ma200 * 0.92:
+        return f"❌ فيتو: RSI {rsi:.0f} + تحت MA200 بـ {((close/ma200-1)*100):.0f}% — انهيار نشط"
 
     return None
