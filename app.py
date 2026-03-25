@@ -2375,10 +2375,15 @@ def show_breakout_index(results, market_key="saudi"):
     # Build composite index
     dates, index_vals, index_highs, index_lows = build_composite_index(results)
 
+    # Debug: show how many results and dates
+    _n_with_chart = sum(1 for r in results if len(r.get("chart_dates", [])) >= 15)
+    st.caption(f"🔍 Debug: {len(results)} أسهم | {_n_with_chart} بـ chart≥15 | {len(dates)} تاريخ مركب")
+
     # For intraday: filter to last session only (match sector map)
     _idx_intra = len(dates) > 0 and (len(dates[0]) > 10 or " " in dates[0] or "T" in dates[0])
     if _idx_intra and dates:
         _unique_days = sorted(set(d[:10] for d in dates))
+        _mask = []
         for _off in range(len(_unique_days)):
             _target = _unique_days[-(1 + _off)]
             _mask = [(i, d, v, h, l) for i, (d, v, h, l) in enumerate(zip(dates, index_vals, index_highs, index_lows)) if d[:10] == _target]
@@ -2392,7 +2397,7 @@ def show_breakout_index(results, market_key="saudi"):
             index_lows = [round(100 + (m[4] - _base) / _base * 100, 2) if _base > 0 else 100 for m in _mask]
 
     if len(dates) < 5:
-        st.warning("لا توجد بيانات كافية لبناء المؤشر")
+        st.warning(f"لا توجد بيانات كافية لبناء المؤشر (dates={len(dates)}, intra={_idx_intra})")
         return
 
     # Fetch benchmark (TASI or S&P 500)
