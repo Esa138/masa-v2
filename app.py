@@ -2375,7 +2375,7 @@ def show_breakout_index(results, market_key="saudi"):
     # Build composite index
     dates, index_vals, index_highs, index_lows = build_composite_index(results)
 
-    # For intraday: filter to last session only (match sector map)
+    # For intraday: filter to last session only (match sector map) — keep RAW values
     _idx_intra = len(dates) > 0 and (len(dates[0]) > 10 or " " in dates[0] or "T" in dates[0])
     if _idx_intra and dates:
         _unique_days = sorted(set(d[:10] for d in dates))
@@ -2387,10 +2387,9 @@ def show_breakout_index(results, market_key="saudi"):
                 break
         if _mask:
             dates = [m[1] for m in _mask]
-            _base = _mask[0][2]  # first val
-            index_vals = [round(100 + (m[2] - _base) / _base * 100, 2) if _base > 0 else 100 for m in _mask]
-            index_highs = [round(100 + (m[3] - _base) / _base * 100, 2) if _base > 0 else 100 for m in _mask]
-            index_lows = [round(100 + (m[4] - _base) / _base * 100, 2) if _base > 0 else 100 for m in _mask]
+            index_vals = [round(m[2], 2) for m in _mask]
+            index_highs = [round(m[3], 2) for m in _mask]
+            index_lows = [round(m[4], 2) for m in _mask]
 
     if len(dates) < 2:
         st.warning("لا توجد بيانات كافية لبناء المؤشر")
@@ -2408,7 +2407,10 @@ def show_breakout_index(results, market_key="saudi"):
     last_val = index_vals[-1]
     first_val = index_vals[0]
     total_return = (last_val - first_val) / first_val * 100
-    day_return = (index_vals[-1] - index_vals[-2]) / index_vals[-2] * 100 if len(index_vals) >= 2 else 0
+    # Daily change: compare last bar to previous bar
+    prev_val = index_vals[-2] if len(index_vals) >= 2 else last_val
+    day_change = last_val - prev_val  # absolute change
+    day_return = (day_change / prev_val * 100) if prev_val > 0 else 0
     week_return = (index_vals[-1] - index_vals[-5]) / index_vals[-5] * 100 if len(index_vals) >= 5 else 0
 
     # Benchmark return
@@ -2419,6 +2421,38 @@ def show_breakout_index(results, market_key="saudi"):
     tc = "#00E676" if total_return >= 0 else "#FF5252"
     dc = "#00E676" if day_return >= 0 else "#FF5252"
     bench_tc = "#00E676" if bench_total_ret >= 0 else "#FF5252"
+
+    # ── Support / Resistance on composite index ──
+    import numpy as np
+    _iv_arr = np.array(index_vals, dtype=float)
+    _n_iv = len(_iv_arr)
+    _comp_support = round(float(np.min(_iv_arr[-min(20, _n_iv):])), 2) if _n_iv >= 5 else None
+    _comp_resistance = round(float(np.max(_iv_arr[-min(20, _n_iv):])), 2) if _n_iv >= 5 else None
+    _comp_high_all = round(float(np.max(_iv_arr)), 2)
+    _comp_low_all = round(float(np.min(_iv_arr)), 2)
+
+    # Distance from support/resistance
+    _dist_support = round((last_val - _comp_support) / _comp_support * 100, 1) if _comp_support and _comp_support > 0 else None
+    _dist_resistance = round((_comp_resistance - last_val) / last_val * 100, 1) if _comp_resistance and last_val > 0 else None
+
+    # Alert: crossing key levels
+    _comp_alerts = []
+    if _comp_support and len(index_vals) >= 3:
+        if last_val < _comp_support and index_vals[-2] >= _comp_support:
+            _comp_alerts.append(("🔴", f"كسر دعم المؤشر ({_comp_support:.1f})", "#FF5252"))
+        if _comp_resistance and last_val > _comp_resistance and index_vals[-2] <= _comp_resistance:
+            _comp_alerts.append(("🟢", f"اختراق مقاومة المؤشر ({_comp_resistance:.1f})", "#00E676"))
+    # Trend direction
+    if _n_iv >= 10:
+        _recent_slope = (_iv_arr[-1] - _iv_arr[-10]) / 10
+        if _recent_slope > 0.3:
+            _comp_trend = ("📈", "صاعد", "#00E676")
+        elif _recent_slope < -0.3:
+            _comp_trend = ("📉", "هابط", "#FF5252")
+        else:
+            _comp_trend = ("➡️", "عرضي", "#FFD700")
+    else:
+        _comp_trend = ("➡️", "—", "#9E9E9E")
 
     # Lead/lag badge — honest assessment
     if best_lead > 0:
@@ -2440,11 +2474,11 @@ def show_breakout_index(results, market_key="saudi"):
 
     st.markdown(f'''
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;direction:rtl">
-        <div style="background:linear-gradient(135deg,#131a2e,#0e1424);border:1px solid #192035;
+        <div style="background:linear-gradient(135deg,#131a2e,#0e1424);border:1px solid #4FC3F740;
                     border-radius:12px;padding:14px;text-align:center">
             <div style="color:#6b7280;font-size:0.78em;margin-bottom:6px">📊 المؤشر المركب</div>
-            <div style="color:#4FC3F7;font-size:1.8em;font-weight:800">{last_val:.2f}</div>
-            <div style="color:{dc};font-size:0.82em;font-weight:600">{day_return:+.2f}% اليوم</div>
+            <div style="color:#4FC3F7;font-size:2em;font-weight:800">{last_val:.2f}</div>
+            <div style="color:{dc};font-size:0.85em;font-weight:600">{day_return:+.2f}% اليوم ({day_change:+.1f})</div>
         </div>
         <div style="background:linear-gradient(135deg,#131a2e,#0e1424);border:1px solid #192035;
                     border-radius:12px;padding:14px;text-align:center">
@@ -2464,7 +2498,31 @@ def show_breakout_index(results, market_key="saudi"):
             <div style="color:{lead_color};font-size:1.1em;font-weight:800">{lead_text}</div>
         </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;direction:rtl">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px;direction:rtl">
+        <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:8px 12px;text-align:center">
+            <div style="color:#6b7280;font-size:0.7em">🟢 الدعم (20d)</div>
+            <div style="color:#00E676;font-weight:700;font-size:1.1em">{_comp_support:.1f}</div>
+            <div style="color:#4b5563;font-size:0.7em">بُعد {_dist_support:+.1f}%</div>
+        </div>
+        <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:8px 12px;text-align:center">
+            <div style="color:#6b7280;font-size:0.7em">🔴 المقاومة (20d)</div>
+            <div style="color:#FF5252;font-weight:700;font-size:1.1em">{_comp_resistance:.1f}</div>
+            <div style="color:#4b5563;font-size:0.7em">بُعد {_dist_resistance:.1f}%</div>
+        </div>
+        <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:8px 12px;text-align:center">
+            <div style="color:#6b7280;font-size:0.7em">{_comp_trend[0]} الاتجاه</div>
+            <div style="color:{_comp_trend[2]};font-weight:700;font-size:1.1em">{_comp_trend[1]}</div>
+        </div>
+        <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:8px 12px;text-align:center">
+            <div style="color:#6b7280;font-size:0.7em">🔝 أعلى قمة</div>
+            <div style="color:#FFD700;font-weight:700;font-size:1.1em">{_comp_high_all:.1f}</div>
+        </div>
+        <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:8px 12px;text-align:center">
+            <div style="color:#6b7280;font-size:0.7em">📉 أدنى قاع</div>
+            <div style="color:#9E9E9E;font-weight:700;font-size:1.1em">{_comp_low_all:.1f}</div>
+        </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;direction:rtl">
         <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px 16px;
                     display:flex;justify-content:space-between;align-items:center">
             <span style="color:#4FC3F7;font-weight:700;font-size:0.88em">عائد المؤشر المركب</span>
@@ -2477,6 +2535,13 @@ def show_breakout_index(results, market_key="saudi"):
         </div>
     </div>
     ''', unsafe_allow_html=True)
+
+    # ── Composite Index Alerts ──
+    for _ca_icon, _ca_text, _ca_color in _comp_alerts:
+        if _ca_color == "#FF5252":
+            st.error(f"**{_ca_icon} تنبيه المؤشر المركب:** {_ca_text}")
+        else:
+            st.success(f"**{_ca_icon} تنبيه المؤشر المركب:** {_ca_text}")
 
     # ── Platform Flow Index (PFI) ──────────────────────────
     pfi, acc_breadth, dist_breadth, flow_scores, pfi_interp = build_platform_flow_index(results)
@@ -2540,15 +2605,13 @@ def show_breakout_index(results, market_key="saudi"):
             if _rdays > 0 and _rdays < _total_bars_idx:
                 _comp_dates = dates[-_rdays:]
                 _comp_vals = index_vals[-_rdays:]
-            # Rebase to 100 from start of selected range
-            _base_v = _comp_vals[0] if _comp_vals else 100
-            if _base_v > 0:
-                _comp_vals = [round(100 + (v - _base_v) / _base_v * 100, 2) for v in _comp_vals]
+            # NO rebase — raw values. Just zoom.
 
-        # Re-fetch benchmark for the selected range
+        # Re-fetch benchmark normalized to composite's start value for this range
+        _start_v = _comp_vals[0] if _comp_vals else 100
         if _comp_dates is not dates:
             _comp_bench, _, _, _, _ = _fetch_benchmark_normalized(
-                _comp_dates, market_key=market_key, start_val=100
+                _comp_dates, market_key=market_key, start_val=_start_v
             )
         else:
             _comp_bench = bench_norm
@@ -2602,11 +2665,19 @@ def show_breakout_index(results, market_key="saudi"):
             hovermode="x unified",
         spikedistance=-1,
             annotations=[
-                dict(text="كلاهما يبدأ من 100 — المقارنة نسبية",
-                     x=0.5, y=-0.08, xref="paper", yref="paper",
-                     showarrow=False, font=dict(size=10, color="#4b5563")),
             ],
         )
+
+        # Add support/resistance lines on chart
+        if _comp_support:
+            comp_fig.add_hline(y=_comp_support, line_dash="dot", line_color="#00E676", line_width=1,
+                               annotation_text=f"دعم {_comp_support:.1f}", annotation_position="bottom left",
+                               annotation_font_size=10, annotation_font_color="#00E676")
+        if _comp_resistance:
+            comp_fig.add_hline(y=_comp_resistance, line_dash="dot", line_color="#FF5252", line_width=1,
+                               annotation_text=f"مقاومة {_comp_resistance:.1f}", annotation_position="top left",
+                               annotation_font_size=10, annotation_font_color="#FF5252")
+
         st.plotly_chart(comp_fig, use_container_width=True, config={"displayModeBar": False})
 
     with idx_tab_chart:
@@ -3784,11 +3855,8 @@ elif page == "🗺️ خريطة القطاعات":
             if _sm_rd > 0 and _sm_rd < _total_bars:
                 _comp_dates = _comp_dates[-_sm_rd:]
                 _comp_vals = _comp_vals[-_sm_rd:]
-                # Rebase to start from first value
-                _bv = _comp_vals[0] if _comp_vals else 100
-                if _bv > 0:
-                    _comp_vals = [round(100 + (v - _bv) / _bv * 100, 2) for v in _comp_vals]
-                # Also slice sector composites
+                # NO rebase — keep raw values. Just zoom.
+                # Also slice sector composites (raw values too)
                 _start_d = _comp_dates[0]
                 for _sk in list(_sector_composites.keys()):
                     _sd_data = _sector_composites[_sk]
@@ -3796,9 +3864,6 @@ elif page == "🗺️ خريطة القطاعات":
                     if len(_sd_idx) >= 3:
                         _sd_dates = [_sd_data["dates"][i] for i in _sd_idx]
                         _sd_vals = [_sd_data["vals"][i] for i in _sd_idx]
-                        _sd_bv = _sd_vals[0] if _sd_vals else 100
-                        if _sd_bv > 0:
-                            _sd_vals = [round(100 + (v - _sd_bv) / _sd_bv * 100, 2) for v in _sd_vals]
                         _sd_ret = round((_sd_vals[-1] - _sd_vals[0]) / _sd_vals[0] * 100, 2) if _sd_vals[0] > 0 else 0
                         _sector_composites[_sk] = {"dates": _sd_dates, "vals": _sd_vals, "ret": _sd_ret}
                     else:
