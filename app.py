@@ -5209,8 +5209,45 @@ elif page == "🤖 تقارير AI":
                     </div>
                     """, unsafe_allow_html=True)
                     if st.button("🚀 حلل السهم", key="ai_stock_btn", type="primary", use_container_width=True):
+                        # Gather sector + seasonality context
+                        _stock_sector = _sel_r.get("sector", "")
+                        _stock_sector_info = None
+                        _stock_season_info = None
+                        # Find sector health from results
+                        if _stock_sector and results:
+                            _sec_stocks = [r for r in results if r.get("sector") == _stock_sector]
+                            if _sec_stocks:
+                                _n_acc = sum(1 for r in _sec_stocks if r.get("phase") in ("accumulation", "spring", "markup"))
+                                _n_dist = sum(1 for r in _sec_stocks if r.get("phase") in ("distribution", "markdown", "upthrust"))
+                                _avg_flow = sum(r.get("flow_bias", 0) for r in _sec_stocks) / len(_sec_stocks)
+                                _stock_sector_info = {
+                                    "name": _stock_sector, "n": len(_sec_stocks),
+                                    "n_accum": _n_acc, "n_dist": _n_dist,
+                                    "health": round(_avg_flow, 1),
+                                }
+                        # Seasonality for sector
+                        try:
+                            from core.seasonality import build_seasonality_for_sectors, compute_monthly_returns, compute_seasonality_stats
+                            _sec_results = [r for r in results if r.get("sector") == _stock_sector]
+                            if _sec_results and len(_sec_results) >= 3:
+                                _sec_dates_all = []
+                                _sec_vals_all = []
+                                for r in _sec_results:
+                                    cd = r.get("chart_dates", [])
+                                    cc = r.get("chart_close", [])
+                                    if len(cd) >= 20:
+                                        _sec_dates_all = cd  # use first stock's dates as proxy
+                                        break
+                                if _sec_dates_all:
+                                    _sec_comps = {_stock_sector: {"dates": _sec_dates_all, "vals": [100] * len(_sec_dates_all)}}
+                                    _seas = build_seasonality_for_sectors(_sec_comps)
+                                    if _stock_sector in _seas:
+                                        _stock_season_info = _seas[_stock_sector]
+                        except Exception:
+                            pass
+
                         with st.spinner(f"🤖 Claude يحلل {_sel_r.get('name', '')}..."):
-                            report = generate_stock_report(_sel_r)
+                            report = generate_stock_report(_sel_r, _stock_sector_info, _stock_season_info)
                         st.markdown("---")
                         st.markdown(report)
 
