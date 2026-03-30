@@ -82,15 +82,33 @@ SYSTEM_MARKET = """أنت محلل أسواق مالية خبير — مستوى
 ### 📊 نبض القطاعات
 أي قطاع يقود؟ أي قطاع يتأخر؟ أي قطاع فيه تناقض (يبان قوي لكنه ضعيف من الداخل)؟
 
-### 🎯 التوصية
-هل السوق مناسب للشراء اليوم أم الانتظار؟ ولماذا؟
-درجة الثقة من 1-10.
+### 🎯 التوصية النهائية
+| العنصر | القيمة |
+|--------|--------|
+| حالة السوق | شراء / انتظار / بيع |
+| درجة الثقة | X/100 |
+| الأفق الزمني | هذا الأسبوع / هذا الشهر |
+| أفضل قطاع للدخول | اسم القطاع + السبب |
+| أسوأ قطاع | اسم القطاع + السبب |
+
+### ⚡ أقوى 3 فرص (بالأرقام)
+لكل فرصة:
+| العنصر | القيمة |
+|--------|--------|
+| السهم | الاسم (الرمز) — السعر |
+| الدخول | السعر بالضبط |
+| الوقف | السعر + النسبة |
+| الهدف | السعر + النسبة |
+| R:R | X:1 |
+| الثقة | X/100 |
+| السبب | جملتين |
 
 ## قواعد صارمة:
 - لا تكرر الأرقام بدون تحليل. "flow_bias 34" وحدها لا تعني شي — قل "تدفق قوي يعني المشترين عدوانيين".
 - كل سهم تذكره اربطه بسبب — ليش هو فرصة أو خطر
 - اكتشف الأنماط بين الأسهم — هل فيه مجموعة تتحرك مع بعض؟
-- لا تعطي أكثر من 1200 كلمة"""
+- كل رقم من البيانات — لا تخترع. لو ما عندك الرقم قل "غير متوفر"
+- لا تتجاوز 1500 كلمة"""
 
 SYSTEM_SECTOR = """أنت محلل قطاعات مالية خبير — مستوى institutional.
 تكتب بالعربية.
@@ -127,46 +145,74 @@ SYSTEM_SECTOR = """أنت محلل قطاعات مالية خبير — مستو
 
 لا تتجاوز 800 كلمة."""
 
-SYSTEM_STOCK = """أنت محلل فني ومالي خبير.
-تكتب بالعربية.
+SYSTEM_STOCK = """أنت محلل فني ومالي خبير — مستوى hedge fund.
+تكتب بالعربية (سعودي مهني).
 
 ## مهمتك:
-حلل السهم بعمق كأنك تقدم توصية لمدير محفظة.
+حلل السهم بعمق كأنك تقدم توصية لمدير محفظة بمليارات. كل كلمة لازم تكون مدعومة بدليل.
 
-## الهيكل:
+## الهيكل الإلزامي:
 
-### 🎯 القرار (جملة واحدة)
-ادخل / راقب / تجنب — والسبب الرئيسي.
+### 🎯 القرار + درجة الثقة
+| العنصر | القيمة |
+|--------|--------|
+| القرار | ادخل / راقب / تجنب |
+| درجة الثقة | X/100 (اشرح ليش هالرقم مو أعلى أو أقل) |
+| الأفق الزمني | قصير (1-5 أيام) / متوسط (1-4 أسابيع) / طويل (1-6 أشهر) |
+| المخاطرة | منخفضة / متوسطة / عالية |
 
-### 🔬 تحليل Order Flow
-- **CDV**: صاعد/هابط/مستقر — وش يعني للسهم
-- **المهاجم**: مشتري/بائع/متوازن — مين يسيطر فعلياً
-- **Divergence**: لو موجود، هل هو إشارة حقيقية أو فخ؟
-- **Absorption**: هل فيه امتصاص عند الدعم/المقاومة؟
+### 📊 بطاقة التنفيذ
+| العنصر | القيمة |
+|--------|--------|
+| سعر الدخول | الرقم بالضبط (مو "عند الدعم") |
+| وقف الخسارة | الرقم + النسبة من الدخول |
+| الهدف الأول | الرقم + النسبة |
+| الهدف الثاني | الرقم + النسبة (لو موجود) |
+| R:R | X:1 — هل يستاهل المخاطرة |
 
-### 📐 التحليل الفني
-- الموقع: فوق/تحت MA200، قريب من دعم/مقاومة
-- RSI: تشبع شرائي/بيعي أو منطقة صحية
-- ZR (Zero Reversal): وش يقول السقف والقاع
+### 🔬 تحليل Order Flow (الأدلة)
+- **CDV**: صاعد/هابط/مستقر — هل يتوافق مع اتجاه السعر؟ لو تناقض = خطر أو فرصة.
+- **المهاجم**: مشتري/بائع/متوازن — مين يسيطر فعلياً + aggressive_ratio
+- **Divergence**: رقمه + تفسيره. لو فوق +25 = تجميع خفي مؤكد. لو تحت -25 = تصريف خفي.
+- **Absorption**: الدرجة + الاتجاه (شرائي عند دعم = ممتاز. بيعي عند مقاومة = خطر).
 
-### 🔄 مرحلة وايكوف
-أي مرحلة بالضبط وكم عمرها (أيام التجميع). هل ناضجة أو مبكرة؟
+### 🔄 مرحلة وايكوف + النضج
+- المرحلة: accumulation/spring/markup/distribution/markdown
+- عمر التجميع: X أيام (أقل من 3 = مبكر جداً. 3-7 = مبكر. 7-15 = ناضج. 15+ = متأخر)
+- مرحلة النضج: stage_label
 
-### ⚠️ المخاطر
-- وقف الخسارة: كم ونسبته
-- أسوأ سيناريو: وش يصير لو غلطت
-- أسباب الحذر كاملة
+### 📍 موقع القطاع
+- القطاع: اسمه
+- حالة القطاع: هل القطاع قائد/متزامن/تابع بناءً على بيانات القطاع
+- هل السهم يتوافق مع اتجاه القطاع أو يتناقض؟ (سهم يتجمع في قطاع يُصرَّف = حذر. سهم يتجمع في قطاع قائد = قوة)
 
-### 💰 الفرصة
-- الهدف: كم ونسبته
-- R:R: هل يستاهل المخاطرة
-- متى تدخل بالضبط (الشرط)
+### 📅 الموسمية (لو البيانات متوفرة)
+- أداء الشهر الحالي تاريخياً: متوسط العائد + نسبة النجاح
+- هل الموسمية متوافقة أو متناقضة مع Order Flow؟
+- لو تناقض (مثل: OF يقول اشتر لكن الشهر تاريخياً سلبي) = نبّه!
+
+### ⚠️ التناقضات والمخاطر
+ابحث عن أي تناقض:
+1. CDV يصعد لكن السعر ينزل = تجميع خفي (إيجابي)
+2. CDV ينزل لكن السعر يصعد = صعود كاذب (خطير!)
+3. RSI منخفض + كسر دعم + CDV هابط = سكين ساقطة (لا تلمس!)
+4. المشتري مهاجم + السعر ثابت = امتصاص (فرصة)
+5. أسباب الدخول كثيرة لكن R:R أقل من 1.5 = مخاطرة أعلى من العائد
+6. Veto موجود = لا تدخل مهما كان
 
 ### 🤔 السر
-شي واحد ما يشوفه المتداول العادي — تناقض، نمط خفي، إشارة مبكرة.
+شي واحد ما يشوفه المتداول العادي. ممكن يكون:
+- تناقض بين Order Flow والسعر
+- نمط تكرر تاريخياً في هالقطاع
+- إشارة مبكرة على تحول (من تجميع لانطلاق أو من تصريف لانهيار)
+- ربط مع حدث خارجي (توزيعات، نتائج، أوبك)
 
-درجة الثقة: 1-10
-لا تتجاوز 600 كلمة."""
+## قواعد صارمة:
+- كل رقم تذكره لازم يكون من البيانات — لا تخترع
+- لا تقول "قريب من الدعم" قل "السعر 115.9 والدعم 112.5 (بُعد 3%)"
+- لا تقول "R:R جيد" قل "R:R 2.5:1 (وقف 3.5% مقابل هدف 8.7%)"
+- درجة الثقة لازم تعكس قوة الأدلة: 90+ = أدلة قاطعة. 70-89 = أدلة قوية مع تحفظ. 50-69 = متوازنة. تحت 50 = ضعيفة.
+- لا تتجاوز 800 كلمة."""
 
 SYSTEM_COMPOSITE = """أنت محلل مؤشرات مالية خبير.
 تكتب بالعربية.
@@ -423,7 +469,7 @@ def _prepare_sector_data(results, sector_name):
     return json.dumps({"sector": sector_name, "total": len(stocks_data), "stocks": stocks_data}, ensure_ascii=False, indent=2)
 
 
-def _prepare_stock_data(result):
+def _prepare_stock_data(result, sector_info=None, seasonality_info=None):
     data = {
         "name": result.get("name", result["ticker"]),
         "ticker": result["ticker"],
@@ -460,6 +506,53 @@ def _prepare_stock_data(result):
         "maturity_label": result.get("maturity", {}).get("stage_label", ""),
         "maturity_days": result.get("maturity", {}).get("current_days", 0),
     }
+
+    # Contradictions pre-computed
+    contradictions = []
+    if result.get("cdv_trend") == "rising" and result.get("change_pct", 0) < -0.5:
+        contradictions.append("CDV صاعد لكن السعر ينزل = تجميع خفي محتمل")
+    if result.get("cdv_trend") == "falling" and result.get("change_pct", 0) > 0.5:
+        contradictions.append("CDV هابط لكن السعر يرتفع = صعود كاذب محتمل")
+    if result.get("aggressor") == "buyers" and result.get("change_pct", 0) < 0:
+        contradictions.append("المشتري مهاجم لكن السعر ينزل = امتصاص شرائي")
+    if result.get("rsi", 50) < 30 and result.get("flow_bias", 0) > 15:
+        contradictions.append("RSI منخفض جداً + تدفق إيجابي = ارتداد محتمل")
+    if result.get("rsi", 50) < 25 and result.get("cdv_trend") == "falling":
+        contradictions.append("RSI متطرف + CDV هابط = سكين ساقطة - خطر!")
+
+    data["contradictions"] = contradictions
+
+    # Sector context
+    if sector_info:
+        data["sector_health"] = sector_info.get("health", 0)
+        data["sector_accum"] = sector_info.get("n_accum", 0)
+        data["sector_dist"] = sector_info.get("n_dist", 0)
+        data["sector_total"] = sector_info.get("n", 0)
+
+    # Seasonality
+    if seasonality_info:
+        from datetime import datetime
+        mo = datetime.now().month
+        if mo in seasonality_info.get("stats", {}):
+            ms = seasonality_info["stats"][mo]
+            data["seasonality"] = {
+                "month": ms.get("month_ar", ""),
+                "avg_return": ms.get("avg_return", 0),
+                "win_rate": ms.get("win_rate", 0),
+                "phase": ms.get("phase", ""),
+                "sharpe": ms.get("sharpe", 0),
+                "profit_factor": ms.get("profit_factor", 0),
+            }
+            # Seasonality vs OF contradiction
+            if ms.get("avg_return", 0) < -1 and result.get("flow_bias", 0) > 15:
+                data["contradictions"].append(
+                    f"تناقض موسمي: {ms['month_ar']} تاريخياً سلبي ({ms['avg_return']:+.1f}%) لكن OF إيجابي — حذر!"
+                )
+            elif ms.get("avg_return", 0) > 1 and result.get("flow_bias", 0) < -10:
+                data["contradictions"].append(
+                    f"تناقض موسمي: {ms['month_ar']} تاريخياً إيجابي ({ms['avg_return']:+.1f}%) لكن OF سلبي — غريب!"
+                )
+
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
@@ -477,10 +570,10 @@ def generate_sector_report(results, sector_name):
     return _call_sonnet(SYSTEM_SECTOR, f"حلل قطاع {sector_name} واكتشف الأسرار:\n\n{data}", 4000)
 
 
-def generate_stock_report(result):
-    data = _prepare_stock_data(result)
+def generate_stock_report(result, sector_info=None, seasonality_info=None):
+    data = _prepare_stock_data(result, sector_info, seasonality_info)
     name = result.get("name", result["ticker"])
-    return _call_sonnet(SYSTEM_STOCK, f"حلل سهم {name} بعمق:\n\n{data}", 3000)
+    return _call_sonnet(SYSTEM_STOCK, f"حلل سهم {name} بعمق:\n\n{data}", 4000)
 
 
 def generate_composite_report(composite_data, pfi_data=None):
