@@ -3205,7 +3205,7 @@ with st.sidebar:
     st.divider()
 
     # Handle navigation from sector map → company analysis
-    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "📊 أداء النظام"]
+    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "🤖 تقارير AI", "📊 أداء النظام"]
     if st.session_state.get("_goto_page"):
         st.session_state["page_nav"] = st.session_state.pop("_goto_page")
 
@@ -5093,6 +5093,153 @@ elif page == "🔍 تحليل شركة":
                     _rc = "#00E676" if _t["ret"] > 0 else "#FF5252"
                     _t_rows += f'<tr><td style="padding:8px 12px;border-bottom:1px solid #0d1117;color:#9ca3af;font-size:0.85em">{_t["open_dt"]}</td><td style="padding:8px 12px;border-bottom:1px solid #0d1117;color:#9ca3af;font-size:0.85em">{_t["close_dt"]}</td><td style="padding:8px 12px;border-bottom:1px solid #0d1117;color:#e5e7eb;font-size:0.85em">{_t["open_p"]:.2f}</td><td style="padding:8px 12px;border-bottom:1px solid #0d1117;color:#e5e7eb;font-size:0.85em">{_t["close_p"]:.2f}</td><td style="padding:8px 12px;border-bottom:1px solid #0d1117;color:{_rc};font-weight:700;font-size:0.85em">{_t["ret"]:+.2f}%</td><td style="padding:8px 12px;border-bottom:1px solid #0d1117;color:#FF5252;font-size:0.85em">{_t["drop"]:.2f}%</td><td style="padding:8px 12px;border-bottom:1px solid #0d1117;color:#00E676;font-size:0.85em">+{_t["rise"]:.2f}%</td></tr>'
                 st.markdown(f'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;background:#131a2e;border-radius:12px;overflow:hidden;margin-top:12px"><thead>{_t_header}</thead><tbody>{_t_rows}</tbody></table></div>', unsafe_allow_html=True)
+
+
+# ══════════════════════════════════════════════════════════════
+# PAGE: AI Reports — تقارير AI
+# ══════════════════════════════════════════════════════════════
+
+elif page == "🤖 تقارير AI":
+    from core.ai_reports import (
+        is_ai_available, generate_market_report, generate_sector_report,
+        generate_stock_report, generate_composite_report, generate_opportunities_report,
+    )
+
+    st.markdown('''
+    <div style="text-align:center;padding:20px 0 10px 0">
+        <span style="font-size:1.8em;font-weight:800;color:#fff">🤖 تقارير AI</span>
+        <div style="color:#6b7280;font-size:0.92em;margin-top:6px">
+            تحليل ذكي شامل بالذكاء الاصطناعي — مدعوم بـ Claude Sonnet
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    if not is_ai_available():
+        st.error("❌ مفتاح API غير موجود. أضف `ANTHROPIC_API_KEY` في Settings → Secrets")
+    else:
+        results = st.session_state.get("scan_results")
+        if results is None:
+            st.info("🔍 أمسح السوق أولاً من Order Flow ثم ارجع هنا")
+        else:
+            # Get market key
+            _market_sel = st.session_state.get("market_select", "🇸🇦 السوق السعودي (TASI)")
+            _mkt_info = MARKETS.get(_market_sel, list(MARKETS.values())[0])
+            market_key = _mkt_info["key"]
+
+            # Prepare composite data
+            _ai_comp_dates, _ai_comp_vals, _, _ = build_composite_index(results)
+            _ai_comp_data = None
+            if _ai_comp_vals:
+                _ai_comp_data = {
+                    "value": round(_ai_comp_vals[-1], 2),
+                    "prev": round(_ai_comp_vals[-2], 2) if len(_ai_comp_vals) >= 2 else None,
+                    "change_pct": round((_ai_comp_vals[-1] - _ai_comp_vals[-2]) / _ai_comp_vals[-2] * 100, 2) if len(_ai_comp_vals) >= 2 else 0,
+                    "high_20d": round(max(_ai_comp_vals[-20:]), 2) if len(_ai_comp_vals) >= 20 else round(max(_ai_comp_vals), 2),
+                    "low_20d": round(min(_ai_comp_vals[-20:]), 2) if len(_ai_comp_vals) >= 20 else round(min(_ai_comp_vals), 2),
+                    "total_bars": len(_ai_comp_vals),
+                }
+
+            # PFI data
+            try:
+                _ai_pfi, _ai_acc, _ai_dist, _, _ai_interp = build_platform_flow_index(results)
+                _ai_pfi_data = {
+                    "pfi": _ai_pfi,
+                    "accumulation_pct": _ai_acc,
+                    "distribution_pct": _ai_dist,
+                    "interpretation": _ai_interp,
+                }
+            except Exception:
+                _ai_pfi_data = None
+
+            # Report type tabs
+            _ai_tabs = st.tabs([
+                "📋 تقرير السوق اليومي",
+                "🏢 تقرير قطاع",
+                "📈 تحليل سهم",
+                "📊 تقرير المؤشر المركب",
+                "💎 اكتشاف الفرص والمخاطر",
+            ])
+
+            # ── Tab 1: Daily Market Report ──
+            with _ai_tabs[0]:
+                st.markdown("### 📋 تقرير السوق اليومي الشامل")
+                st.caption(f"يحلل {len(results)} سهم — القرارات، القطاعات، التدفقات، الفرص والمخاطر")
+                if st.button("🚀 أنشئ التقرير", key="ai_market_btn", type="primary", use_container_width=True):
+                    with st.spinner("🤖 Claude يحلل السوق..."):
+                        report = generate_market_report(results, _ai_comp_data, _ai_pfi_data)
+                    st.markdown("---")
+                    st.markdown(report)
+
+            # ── Tab 2: Sector Report ──
+            with _ai_tabs[1]:
+                st.markdown("### 🏢 تقرير قطاع مفصّل")
+                # Get unique sectors
+                _ai_sectors = sorted(set(r.get("sector", "") for r in results if r.get("sector")))
+                _ai_sector_sel = st.selectbox("اختر القطاع:", _ai_sectors, key="ai_sector_sel")
+                if _ai_sector_sel:
+                    _sect_stocks = [r for r in results if r.get("sector") == _ai_sector_sel]
+                    st.caption(f"القطاع فيه {len(_sect_stocks)} سهم")
+                    if st.button("🚀 حلل القطاع", key="ai_sector_btn", type="primary", use_container_width=True):
+                        with st.spinner(f"🤖 Claude يحلل {_ai_sector_sel}..."):
+                            report = generate_sector_report(results, _ai_sector_sel)
+                        st.markdown("---")
+                        st.markdown(report)
+
+            # ── Tab 3: Stock Report ──
+            with _ai_tabs[2]:
+                st.markdown("### 📈 تحليل سهم بالذكاء الاصطناعي")
+                # Stock selector
+                _ai_stock_options = {f"{r.get('name', r['ticker'])} ({r['ticker']})": r for r in results}
+                _ai_stock_sel = st.selectbox("اختر السهم:", list(_ai_stock_options.keys()), key="ai_stock_sel")
+                if _ai_stock_sel:
+                    _sel_r = _ai_stock_options[_ai_stock_sel]
+                    _dec_color = "#00E676" if _sel_r.get("decision") == "enter" else "#FF5252" if _sel_r.get("decision") == "avoid" else "#FFD700"
+                    st.markdown(f"""
+                    <div style="display:flex;gap:20px;align-items:center;margin:10px 0">
+                        <span style="font-size:1.3em;font-weight:700">{_sel_r.get('last_close', 0):.2f}</span>
+                        <span style="color:{'#00E676' if _sel_r.get('change_pct', 0) >= 0 else '#FF5252'};font-weight:600">
+                            {_sel_r.get('change_pct', 0):+.1f}%
+                        </span>
+                        <span style="background:{_dec_color};color:#000;padding:4px 12px;border-radius:20px;font-weight:700;font-size:0.85em">
+                            {_sel_r.get('decision_info', {}).get('label', _sel_r.get('decision', ''))}
+                        </span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    if st.button("🚀 حلل السهم", key="ai_stock_btn", type="primary", use_container_width=True):
+                        with st.spinner(f"🤖 Claude يحلل {_sel_r.get('name', '')}..."):
+                            report = generate_stock_report(_sel_r)
+                        st.markdown("---")
+                        st.markdown(report)
+
+            # ── Tab 4: Composite Index Report ──
+            with _ai_tabs[3]:
+                st.markdown("### 📊 تقرير المؤشر المركب")
+                if _ai_comp_data:
+                    _cv = _ai_comp_data["value"]
+                    _cc = _ai_comp_data.get("change_pct", 0)
+                    st.markdown(f"""
+                    <div style="text-align:center;margin:15px 0">
+                        <span style="font-size:2.5em;font-weight:800;color:#4FC3F7">{_cv:.2f}</span>
+                        <span style="color:{'#00E676' if _cc >= 0 else '#FF5252'};font-size:1.2em;margin-right:10px">{_cc:+.2f}%</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    if st.button("🚀 حلل المؤشر", key="ai_comp_btn", type="primary", use_container_width=True):
+                        with st.spinner("🤖 Claude يحلل المؤشر المركب..."):
+                            report = generate_composite_report(_ai_comp_data, _ai_pfi_data)
+                        st.markdown("---")
+                        st.markdown(report)
+                else:
+                    st.warning("لا توجد بيانات كافية للمؤشر المركب")
+
+            # ── Tab 5: Opportunities & Risks ──
+            with _ai_tabs[4]:
+                st.markdown("### 💎 اكتشاف الفرص المخفية والمخاطر الخفية")
+                st.caption("يبحث عن تجميع خفي، صعود كاذب، سبرنق، تناقضات — أشياء ما تشوفها بعينك")
+                if st.button("🚀 ابحث عن الفرص", key="ai_opp_btn", type="primary", use_container_width=True):
+                    with st.spinner("🤖 Claude يبحث عن الفرص المخفية..."):
+                        report = generate_opportunities_report(results)
+                    st.markdown("---")
+                    st.markdown(report)
 
 
 # ══════════════════════════════════════════════════════════════
