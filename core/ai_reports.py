@@ -642,14 +642,65 @@ def _fetch_stock_seasonality(ticker, sector=""):
         return None
 
 
+def _fallback_seasonality_from_scan(result):
+    """Fallback: compute seasonality from scan's chart_dates/chart_close if yfinance fails."""
+    try:
+        from core.seasonality import compute_monthly_returns, compute_seasonality_stats, get_current_month_insight, _get_sector_catalysts
+        from datetime import datetime
+
+        dates = result.get("chart_dates", [])
+        closes = result.get("chart_close", [])
+        if not dates or len(dates) < 60:
+            return None
+
+        monthly = compute_monthly_returns(dates, closes)
+        if not monthly or len(monthly) < 6:
+            return None
+
+        stats = compute_seasonality_stats(monthly)
+        sector = result.get("sector", "")
+        market_key = "saudi" if ".SR" in result.get("ticker", "") else "us"
+        catalysts = _get_sector_catalysts(sector, market_key)
+        insight = get_current_month_insight(stats, catalysts)
+
+        mo = datetime.now().month
+        cs = stats.get(mo)
+
+        return {
+            "years_covered": sorted(set(m["year"] for m in monthly)),
+            "n_years": len(set(m["year"] for m in monthly)),
+            "current_month": {
+                "name": cs["month_ar"] if cs else "",
+                "avg_return": cs["avg_return"] if cs else 0,
+                "win_rate": cs["win_rate"] if cs else 0,
+                "sharpe": cs.get("sharpe", 0) if cs else 0,
+                "phase": cs["phase"] if cs else "",
+                "best": cs["best"] if cs else 0,
+                "worst": cs["worst"] if cs else 0,
+                "profit_factor": cs.get("profit_factor", 0) if cs else 0,
+            } if cs else None,
+            "insight": insight,
+            "catalysts": catalysts.get(mo, {}),
+            "source": "scan_data",
+        }
+    except Exception:
+        return None
+
+
 def generate_stock_report(result, sector_info=None, seasonality_info=None):
     # Always try to fetch independent seasonality
-    if not seasonality_info or (isinstance(seasonality_info, dict) and not seasonality_info.get("stats")):
+    if not seasonality_info or (isinstance(seasonality_info, dict) and not seasonality_info.get("stats") and not seasonality_info.get("current_month")):
         ticker = result.get("ticker", "")
         sector = result.get("sector", "")
+        # Try 1: yfinance max
         fetched = _fetch_stock_seasonality(ticker, sector)
         if fetched:
             seasonality_info = fetched
+        else:
+            # Try 2: fallback from scan data
+            fallback = _fallback_seasonality_from_scan(result)
+            if fallback:
+                seasonality_info = fallback
 
     data = _prepare_stock_data(result, sector_info, seasonality_info)
     name = result.get("name", result["ticker"])
