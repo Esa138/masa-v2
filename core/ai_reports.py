@@ -570,7 +570,62 @@ def generate_sector_report(results, sector_name):
     return _call_sonnet(SYSTEM_SECTOR, f"حلل قطاع {sector_name} واكتشف الأسرار:\n\n{data}", 4000)
 
 
+def _fetch_stock_seasonality(ticker, sector=""):
+    """Fetch seasonality independently from yfinance (max period) — doesn't depend on scan."""
+    try:
+        import yfinance as yf
+        from core.seasonality import compute_monthly_returns, compute_seasonality_stats, get_current_month_insight, _get_sector_catalysts
+        from datetime import datetime
+
+        t = yf.Ticker(ticker)
+        df = t.history(period="max", interval="1d")
+        if df is None or df.empty or len(df) < 252:
+            return None
+
+        dates = [d.strftime("%Y-%m-%d") for d in df.index]
+        closes = [float(v) for v in df["Close"]]
+
+        monthly = compute_monthly_returns(dates, closes)
+        if not monthly or len(monthly) < 12:
+            return None
+
+        stats = compute_seasonality_stats(monthly)
+        market_key = "saudi" if ".SR" in ticker else "us"
+        catalysts = _get_sector_catalysts(sector, market_key)
+        insight = get_current_month_insight(stats, catalysts)
+
+        current_month = datetime.now().month
+        current_stats = stats.get(current_month)
+
+        return {
+            "years_covered": sorted(set(m["year"] for m in monthly)),
+            "n_years": len(set(m["year"] for m in monthly)),
+            "current_month": {
+                "name": current_stats["month_ar"] if current_stats else "",
+                "avg_return": current_stats["avg_return"] if current_stats else 0,
+                "win_rate": current_stats["win_rate"] if current_stats else 0,
+                "sharpe": current_stats.get("sharpe", 0) if current_stats else 0,
+                "phase": current_stats["phase"] if current_stats else "",
+                "best": current_stats["best"] if current_stats else 0,
+                "worst": current_stats["worst"] if current_stats else 0,
+                "profit_factor": current_stats.get("profit_factor", 0) if current_stats else 0,
+            } if current_stats else None,
+            "insight": insight,
+            "catalysts": catalysts.get(current_month, {}),
+        }
+    except Exception:
+        return None
+
+
 def generate_stock_report(result, sector_info=None, seasonality_info=None):
+    # Always try to fetch independent seasonality
+    if not seasonality_info or (isinstance(seasonality_info, dict) and not seasonality_info.get("stats")):
+        ticker = result.get("ticker", "")
+        sector = result.get("sector", "")
+        fetched = _fetch_stock_seasonality(ticker, sector)
+        if fetched:
+            seasonality_info = fetched
+
     data = _prepare_stock_data(result, sector_info, seasonality_info)
     name = result.get("name", result["ticker"])
     return _call_sonnet(SYSTEM_STOCK, f"حلل سهم {name} بعمق:\n\n{data}", 4000)
