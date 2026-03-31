@@ -595,24 +595,33 @@ def generate_sector_report(results, sector_name):
     return _call_sonnet(SYSTEM_SECTOR, f"حلل قطاع {sector_name} واكتشف الأسرار:\n\n{data}", 4000)
 
 
+@st.cache_data(ttl=86400, show_spinner=False)
 def _fetch_stock_seasonality(ticker, sector=""):
-    """Fetch seasonality independently from yfinance (max period) — doesn't depend on scan."""
+    """Fetch seasonality from yfinance — cached 24h. Tries multiple periods."""
     try:
         import yfinance as yf
         from core.seasonality import compute_monthly_returns, compute_seasonality_stats, get_current_month_insight, _get_sector_catalysts
         from datetime import datetime
 
         t = yf.Ticker(ticker)
-        df = t.history(period="max", interval="1d")
-        if df is None or df.empty or len(df) < 252:
-            return None
+        df = None
+        for p in ["max", "10y", "5y", "2y"]:
+            try:
+                df = t.history(period=p, interval="1d")
+                if df is not None and not df.empty and len(df) >= 200:
+                    break
+            except Exception:
+                continue
+
+        if df is None or df.empty or len(df) < 200:
+            return {"error": "no_data"}
 
         dates = [d.strftime("%Y-%m-%d") for d in df.index]
         closes = [float(v) for v in df["Close"]]
 
         monthly = compute_monthly_returns(dates, closes)
-        if not monthly or len(monthly) < 12:
-            return None
+        if not monthly or len(monthly) < 6:
+            return {"error": "insufficient_monthly"}
 
         stats = compute_seasonality_stats(monthly)
         market_key = "saudi" if ".SR" in ticker else "us"
@@ -637,9 +646,10 @@ def _fetch_stock_seasonality(ticker, sector=""):
             } if current_stats else None,
             "insight": insight,
             "catalysts": catalysts.get(current_month, {}),
+            "source": f"yfinance_{len(df)}_bars",
         }
-    except Exception:
-        return None
+    except Exception as e:
+        return {"error": str(e)}
 
 
 def _fallback_seasonality_from_scan(result):
@@ -692,14 +702,14 @@ def generate_stock_report(result, sector_info=None, seasonality_info=None):
     if not seasonality_info or (isinstance(seasonality_info, dict) and not seasonality_info.get("stats") and not seasonality_info.get("current_month")):
         ticker = result.get("ticker", "")
         sector = result.get("sector", "")
-        # Try 1: yfinance max
+        # Try 1: yfinance (cached 24h)
         fetched = _fetch_stock_seasonality(ticker, sector)
-        if fetched:
+        if fetched and not fetched.get("error") and fetched.get("current_month"):
             seasonality_info = fetched
         else:
             # Try 2: fallback from scan data
             fallback = _fallback_seasonality_from_scan(result)
-            if fallback:
+            if fallback and fallback.get("current_month"):
                 seasonality_info = fallback
 
     data = _prepare_stock_data(result, sector_info, seasonality_info)
