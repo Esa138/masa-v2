@@ -529,28 +529,53 @@ def _prepare_stock_data(result, sector_info=None, seasonality_info=None):
         data["sector_dist"] = sector_info.get("n_dist", 0)
         data["sector_total"] = sector_info.get("n", 0)
 
-    # Seasonality
+    # Seasonality — supports both formats: stats dict or current_month dict
     if seasonality_info:
         from datetime import datetime
         mo = datetime.now().month
+        ms = None
+
+        # Format 1: from build_seasonality_for_sectors (has "stats" key)
         if mo in seasonality_info.get("stats", {}):
             ms = seasonality_info["stats"][mo]
+
+        # Format 2: from _fetch_stock_seasonality (has "current_month" key)
+        elif seasonality_info.get("current_month"):
+            ms = seasonality_info["current_month"]
+
+        if ms:
+            _avg_ret = ms.get("avg_return", 0)
+            _win_rate = ms.get("win_rate", 0)
+            _phase = ms.get("phase", "")
+            _month_name = ms.get("month_ar", ms.get("name", ""))
+
             data["seasonality"] = {
-                "month": ms.get("month_ar", ""),
-                "avg_return": ms.get("avg_return", 0),
-                "win_rate": ms.get("win_rate", 0),
-                "phase": ms.get("phase", ""),
+                "month": _month_name,
+                "avg_return": _avg_ret,
+                "win_rate": _win_rate,
+                "phase": _phase,
                 "sharpe": ms.get("sharpe", 0),
                 "profit_factor": ms.get("profit_factor", 0),
+                "best": ms.get("best", 0),
+                "worst": ms.get("worst", 0),
+                "n_years": seasonality_info.get("n_years", 0),
+                "years_range": f"{min(seasonality_info.get('years_covered', [0]))}—{max(seasonality_info.get('years_covered', [0]))}" if seasonality_info.get("years_covered") else "",
             }
+
+            # Add catalysts if available
+            _cat = seasonality_info.get("catalysts", {})
+            if isinstance(_cat, dict) and _cat:
+                data["seasonality"]["catalyst"] = _cat.get("note", "")
+                data["seasonality"]["catalyst_events"] = _cat.get("events", [])
+
             # Seasonality vs OF contradiction
-            if ms.get("avg_return", 0) < -1 and result.get("flow_bias", 0) > 15:
+            if _avg_ret < -1 and result.get("flow_bias", 0) > 15:
                 data["contradictions"].append(
-                    f"تناقض موسمي: {ms['month_ar']} تاريخياً سلبي ({ms['avg_return']:+.1f}%) لكن OF إيجابي — حذر!"
+                    f"تناقض موسمي: {_month_name} تاريخياً سلبي ({_avg_ret:+.1f}%) لكن OF إيجابي — حذر!"
                 )
-            elif ms.get("avg_return", 0) > 1 and result.get("flow_bias", 0) < -10:
+            elif _avg_ret > 1 and result.get("flow_bias", 0) < -10:
                 data["contradictions"].append(
-                    f"تناقض موسمي: {ms['month_ar']} تاريخياً إيجابي ({ms['avg_return']:+.1f}%) لكن OF سلبي — غريب!"
+                    f"تناقض موسمي: {_month_name} تاريخياً إيجابي ({_avg_ret:+.1f}%) لكن OF سلبي — غريب!"
                 )
 
     return json.dumps(data, ensure_ascii=False, indent=2)
