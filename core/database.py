@@ -165,25 +165,51 @@ def compute_signal_quality(signal: dict) -> int:
     return min(score, 100)
 
 
-def log_signal(signal: dict) -> bool:
-    """Log a signal to the database with quality score."""
+def _get_platform_tag():
+    """Detect if running on V3-TEST or V2."""
     try:
-        # Add quality_score column if not exists
+        import streamlit as st
+        # Check if V3-TEST badge exists in session or app title
+        app_url = os.environ.get("STREAMLIT_SERVER_ADDRESS", "")
+        if "v3-test" in app_url or "v3-test" in os.environ.get("HOSTNAME", ""):
+            return "V3"
+    except Exception:
+        pass
+    # Check git branch
+    try:
+        import subprocess
+        branch = subprocess.check_output(["git", "branch", "--show-current"], text=True).strip()
+        if "v3" in branch:
+            return "V3"
+    except Exception:
+        pass
+    # Check for V3-TEST marker file or env
+    if os.path.exists(".v3_test_marker"):
+        return "V3"
+    return "V2"
+
+
+def log_signal(signal: dict) -> bool:
+    """Log a signal to the database with quality score + platform tag."""
+    try:
         with sqlite3.connect(DB_FILE) as conn:
-            try:
-                conn.execute("ALTER TABLE signals ADD COLUMN quality_score INTEGER DEFAULT 0")
-            except Exception:
-                pass  # Column already exists
+            # Add new columns if not exists
+            for col, typ in [("quality_score", "INTEGER DEFAULT 0"), ("platform", "TEXT DEFAULT 'V2'")]:
+                try:
+                    conn.execute(f"ALTER TABLE signals ADD COLUMN {col} {typ}")
+                except Exception:
+                    pass
 
             quality = compute_signal_quality(signal)
+            platform = signal.get("platform", _get_platform_tag())
 
             conn.execute("""
                 INSERT OR IGNORE INTO signals
                 (date_logged, ticker, company, sector, decision,
                  accum_level, accum_days, location, cmf,
                  entry_price, stop_loss, target, rr_ratio,
-                 reasons_for, reasons_against, quality_score)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 reasons_for, reasons_against, quality_score, platform)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 signal.get("date_logged", ""),
                 signal.get("ticker", ""),
@@ -201,6 +227,7 @@ def log_signal(signal: dict) -> bool:
                 "|".join(signal.get("reasons_for", [])),
                 "|".join(signal.get("reasons_against", [])),
                 quality,
+                platform,
             ))
             return True
     except Exception:
