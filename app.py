@@ -5568,6 +5568,59 @@ elif page == "📊 أداء النظام":
             unsafe_allow_html=True
         )
 
+    # ── Signal Quality Breakdown ──
+    if _period and _n_completed > 5:
+        st.divider()
+        st.subheader("🎯 جودة الإشارات vs نسبة النجاح")
+        st.caption("هل الإشارات القوية فعلاً تنجح أكثر؟")
+
+        _quality_tiers = {"🟢 قوية (70+)": [], "🟡 متوسطة (40-69)": [], "🔴 ضعيفة (0-39)": []}
+        for _s in _completed:
+            _qs = _s.get("quality_score", 0) or 0
+            _ret = _s.get(_return_col, 0) or 0
+            _outcome = _s.get(_outcome_col, "")
+            _entry = {"name": _s.get("company", ""), "return": _ret, "outcome": _outcome, "score": _qs}
+            if _qs >= 70:
+                _quality_tiers["🟢 قوية (70+)"].append(_entry)
+            elif _qs >= 40:
+                _quality_tiers["🟡 متوسطة (40-69)"].append(_entry)
+            else:
+                _quality_tiers["🔴 ضعيفة (0-39)"].append(_entry)
+
+        _qt_rows = []
+        for _tier_name, _tier_data in _quality_tiers.items():
+            if not _tier_data:
+                _qt_rows.append({"الفئة": _tier_name, "عدد": 0, "نجاح": "—", "عائد": "—", "التوصية": "—"})
+                continue
+            _t_total = len(_tier_data)
+            _t_wins = sum(1 for t in _tier_data if t["outcome"] == "win")
+            _t_wr = _t_wins / _t_total * 100
+            _t_avg = sum(t["return"] for t in _tier_data) / _t_total
+            _rec = "✅ ابقِها" if _t_wr >= 50 else "⚠️ شدد" if _t_wr >= 35 else "❌ أوقفها"
+            _qt_rows.append({
+                "الفئة": _tier_name,
+                "عدد": _t_total,
+                "نجاح": f"{_t_wr:.0f}%",
+                "عائد": f"{_t_avg:+.2f}%",
+                "التوصية": _rec,
+            })
+
+        st.dataframe(pd.DataFrame(_qt_rows), use_container_width=True, hide_index=True)
+
+        # Insight
+        _strong = _quality_tiers["🟢 قوية (70+)"]
+        _weak = _quality_tiers["🔴 ضعيفة (0-39)"]
+        if _strong and _weak:
+            _s_wr = sum(1 for t in _strong if t["outcome"] == "win") / len(_strong) * 100
+            _w_wr = sum(1 for t in _weak if t["outcome"] == "win") / len(_weak) * 100
+            _diff = _s_wr - _w_wr
+            if _diff > 15:
+                st.success(f"💡 الإشارات القوية تنجح **{_diff:.0f}%** أكثر من الضعيفة — الفلتر يشتغل!")
+            elif _diff > 0:
+                st.info(f"💡 فرق بسيط ({_diff:.0f}%) — يحتاج بيانات أكثر للتأكد")
+            else:
+                st.warning(f"⚠️ الإشارات الضعيفة تنجح أكثر ({abs(_diff):.0f}%) — الـ scoring يحتاج مراجعة")
+
     st.divider()
     st.subheader("🏛 بيانات الملكية المؤسساتية")
     inst_summary = get_ownership_summary(get_all_tickers())
