@@ -3208,7 +3208,7 @@ with st.sidebar:
     st.divider()
 
     # Handle navigation from sector map → company analysis
-    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "🤖 تقارير AI", "📊 أداء النظام"]
+    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "📅 تقويم النتائج", "🤖 تقارير AI", "📊 أداء النظام"]
     if st.session_state.get("_goto_page"):
         st.session_state["page_nav"] = st.session_state.pop("_goto_page")
 
@@ -5099,6 +5099,246 @@ elif page == "🔍 تحليل شركة":
 
 
 # ══════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════
+# PAGE: Earnings Calendar — تقويم النتائج
+# ══════════════════════════════════════════════════════════════
+
+elif page == "📅 تقويم النتائج":
+    from core.earnings import _fetch_earnings_info, check_earnings_proximity, check_ex_dividend
+    from core.earnings_tracker import get_earnings_history, compute_earnings_stats
+    from data.markets import SAUDI_STOCKS, US_STOCKS, get_stock_name
+
+    results = st.session_state.get("scan_results")
+    _market_key = st.session_state.get("market_key", "saudi")
+
+    st.markdown('''
+    <div style="text-align:center;padding:20px 0 10px 0">
+        <span style="font-size:1.8em;font-weight:800;color:#fff">📅 تقويم النتائج</span>
+        <div style="color:#6b7280;font-size:0.92em;margin-top:6px">
+            إعلانات النتائج والتوزيعات القادمة — مع إحصائيات تاريخية
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # Get tickers based on market
+    _cal_stocks = SAUDI_STOCKS if _market_key == "saudi" else US_STOCKS
+    _cal_tickers = list(_cal_stocks.keys())
+
+    # Limit to scanned stocks if available
+    if results:
+        _cal_tickers = [r["ticker"] for r in results]
+
+    with st.spinner("📅 جاري جلب تواريخ النتائج..."):
+        _upcoming = []
+        for _tk in _cal_tickers:
+            _info = _fetch_earnings_info(_tk)
+            if _info and "earnings_date" in _info:
+                try:
+                    from datetime import datetime
+                    _ed = datetime.strptime(_info["earnings_date"], "%Y-%m-%d")
+                    _days = (_ed - datetime.now()).days
+                    if -7 <= _days <= 90:  # Past week to 3 months ahead
+                        _name = get_stock_name(_tk)
+                        # Check if accumulating
+                        _flow = 0
+                        _phase = ""
+                        _cdv = ""
+                        if results:
+                            _r = next((r for r in results if r["ticker"] == _tk), None)
+                            if _r:
+                                _flow = _r.get("flow_bias", 0)
+                                _phase = _r.get("phase", "")
+                                _cdv = _r.get("cdv_trend", "")
+
+                        _upcoming.append({
+                            "ticker": _tk,
+                            "name": _name,
+                            "earnings_date": _info["earnings_date"],
+                            "days": _days,
+                            "eps_est": _info.get("earnings_eps_est"),
+                            "ex_div": _info.get("ex_dividend_date"),
+                            "flow": _flow,
+                            "phase": _phase,
+                            "cdv": _cdv,
+                        })
+                except Exception:
+                    pass
+
+    _upcoming.sort(key=lambda x: x["days"])
+
+    if not _upcoming:
+        st.info("لا توجد إعلانات نتائج قادمة في الأسهم المسحوبة")
+    else:
+        # Summary cards
+        _imminent = [u for u in _upcoming if 0 <= u["days"] <= 7]
+        _near = [u for u in _upcoming if 7 < u["days"] <= 30]
+        _later = [u for u in _upcoming if u["days"] > 30]
+        _past = [u for u in _upcoming if u["days"] < 0]
+
+        _sc1, _sc2, _sc3, _sc4 = st.columns(4)
+        _sc1.metric("🔴 خلال أسبوع", len(_imminent))
+        _sc2.metric("🟡 خلال شهر", len(_near))
+        _sc3.metric("📅 بعد شهر+", len(_later))
+        _sc4.metric("✅ أعلنت مؤخراً", len(_past))
+
+        # Alert for imminent
+        for _u in _imminent:
+            _accum_badge = ""
+            if _u["flow"] > 15 and _u["cdv"] == "rising":
+                _accum_badge = " | 📈 **تجميع مؤسسي قبل النتائج!**"
+            st.error(
+                f"🔴 **{_u['name']}** ({_u['ticker']}) — النتائج خلال **{_u['days']} يوم** "
+                f"({_u['earnings_date']}){_accum_badge}"
+            )
+
+        # Table
+        st.markdown("### 📋 جميع الإعلانات القادمة")
+        _cal_rows = []
+        for _u in _upcoming:
+            if _u["days"] < 0:
+                _urgency = "✅ أعلنت"
+            elif _u["days"] <= 3:
+                _urgency = "🔴 وشيك!"
+            elif _u["days"] <= 7:
+                _urgency = "🟡 قريب"
+            elif _u["days"] <= 30:
+                _urgency = "📅 خلال شهر"
+            else:
+                _urgency = "⏳ بعيد"
+
+            _accum_status = ""
+            if _u["flow"] > 20 and _u["cdv"] == "rising" and _u["phase"] in ("accumulation", "spring"):
+                _accum_status = "📈 تجميع قوي"
+            elif _u["flow"] > 10 and _u["cdv"] == "rising":
+                _accum_status = "📊 تجميع خفيف"
+            elif _u["flow"] < -10:
+                _accum_status = "📉 تصريف"
+            else:
+                _accum_status = "➡️ محايد"
+
+            _cal_rows.append({
+                "السهم": _u["name"],
+                "الرمز": _u["ticker"],
+                "تاريخ النتائج": _u["earnings_date"],
+                "باقي": f"{_u['days']} يوم" if _u["days"] >= 0 else f"قبل {abs(_u['days'])} يوم",
+                "الحالة": _urgency,
+                "EPS المتوقع": f"{_u['eps_est']:.2f}" if _u["eps_est"] else "—",
+                "التدفق": _accum_status,
+                "توزيعات": _u.get("ex_div", "—") or "—",
+            })
+
+        if _cal_rows:
+            st.dataframe(pd.DataFrame(_cal_rows), use_container_width=True, hide_index=True)
+
+        # Historical earnings performance
+        st.markdown("---")
+        st.markdown("### 📊 إحصائية ما بعد النتائج")
+        st.caption("كيف يتحرك السهم تاريخياً بعد إعلان النتائج")
+
+        _sel_stock = st.selectbox(
+            "اختر سهم:",
+            [f"{u['name']} ({u['ticker']})" for u in _upcoming],
+            key="_earn_sel"
+        )
+
+        if _sel_stock:
+            _sel_tk = _sel_stock.split("(")[-1].replace(")", "").strip()
+
+            with st.spinner(f"📊 جاري تحليل {_sel_stock}..."):
+                _hist = get_earnings_history(_sel_tk, max_events=12)
+
+            if _hist:
+                _stats = compute_earnings_stats(_hist)
+
+                # Stats cards
+                _e1, _e2, _e3, _e4 = st.columns(4)
+                _wr_c = "#00E676" if _stats["win_rate_5d"] >= 50 else "#FF5252"
+                _e1.markdown(f'''
+                <div style="background:#131a2e;border:1px solid #192035;border-radius:10px;padding:12px;text-align:center">
+                    <div style="color:#6b7280;font-size:0.75em">نسبة الارتفاع بعد 5d</div>
+                    <div style="color:{_wr_c};font-size:1.6em;font-weight:800">{_stats["win_rate_5d"]:.0f}%</div>
+                    <div style="color:#4b5563;font-size:0.7em">{_stats["rose_5d"]}/{_stats["total"]}</div>
+                </div>''', unsafe_allow_html=True)
+                _avg_c = "#00E676" if _stats["avg_post_5d"] > 0 else "#FF5252"
+                _e2.markdown(f'''
+                <div style="background:#131a2e;border:1px solid #192035;border-radius:10px;padding:12px;text-align:center">
+                    <div style="color:#6b7280;font-size:0.75em">متوسط العائد بعد 5d</div>
+                    <div style="color:{_avg_c};font-size:1.6em;font-weight:800">{_stats["avg_post_5d"]:+.2f}%</div>
+                </div>''', unsafe_allow_html=True)
+                _e3.markdown(f'''
+                <div style="background:#131a2e;border:1px solid #192035;border-radius:10px;padding:12px;text-align:center">
+                    <div style="color:#6b7280;font-size:0.75em">أفضل / أسوأ</div>
+                    <div style="font-size:1em"><span style="color:#00E676">{_stats["best_post_5d"]:+.1f}%</span> / <span style="color:#FF5252">{_stats["worst_post_5d"]:+.1f}%</span></div>
+                </div>''', unsafe_allow_html=True)
+                _e4.markdown(f'''
+                <div style="background:#131a2e;border:1px solid #192035;border-radius:10px;padding:12px;text-align:center">
+                    <div style="color:#6b7280;font-size:0.75em">متوسط الحجم</div>
+                    <div style="color:#AB47BC;font-size:1.6em;font-weight:800">{_stats["avg_volume_ratio"]:.1f}x</div>
+                </div>''', unsafe_allow_html=True)
+
+                # Pre-accumulation insight
+                if _stats["pre_accum_count"] > 0 and _stats["no_accum_count"] > 0:
+                    _diff = _stats["pre_accum_win_rate"] - _stats["no_accum_win_rate"]
+                    if _diff > 10:
+                        st.success(
+                            f"📈 **التجميع قبل النتائج يرفع النجاح!** "
+                            f"مع تجميع: **{_stats['pre_accum_win_rate']:.0f}%** ({_stats['pre_accum_count']} مرة) | "
+                            f"بدون: **{_stats['no_accum_win_rate']:.0f}%** ({_stats['no_accum_count']} مرة)"
+                        )
+                    elif _diff < -10:
+                        st.warning(
+                            f"⚠️ **التجميع قبل النتائج ما يساعد هالسهم!** "
+                            f"مع تجميع: **{_stats['pre_accum_win_rate']:.0f}%** | "
+                            f"بدون: **{_stats['no_accum_win_rate']:.0f}%**"
+                        )
+
+                # History table
+                st.markdown("#### 📅 سجل النتائج السابقة")
+                _h_rows = []
+                for _h in _hist:
+                    _icon = "🟢" if _h["return_post_5d"] > 0 else "🔴"
+                    _h_rows.append({
+                        "التاريخ": _h["date"],
+                        "قبل 5d": f"{_h['return_pre_5d']:+.1f}%",
+                        "الفجوة": f"{_h['gap_pct']:+.1f}%",
+                        "بعد 1d": f"{_h['return_post_1d']:+.1f}%",
+                        "بعد 5d": f"{_icon} {_h['return_post_5d']:+.1f}%",
+                        "بعد 10d": f"{_h['return_post_10d']:+.1f}%",
+                        "الحجم": f"{_h['volume_ratio']}x",
+                        "تجميع قبل": "📈" if _h["pre_accum"] else "📉",
+                    })
+                st.dataframe(pd.DataFrame(_h_rows), use_container_width=True, hide_index=True)
+
+                # Chart
+                _h_dates = [h["date"] for h in _hist]
+                _h_post5 = [h["return_post_5d"] for h in _hist]
+                _h_pre5 = [h["return_pre_5d"] for h in _hist]
+
+                import plotly.graph_objects as go
+                _earn_fig = go.Figure()
+                _earn_fig.add_trace(go.Bar(
+                    x=_h_dates, y=_h_post5, name="بعد النتائج (5d)",
+                    marker_color=["#00E676" if v > 0 else "#FF5252" for v in _h_post5],
+                ))
+                _earn_fig.add_trace(go.Scatter(
+                    x=_h_dates, y=_h_pre5, name="قبل النتائج (5d)",
+                    mode="lines+markers", line=dict(color="#FFD700", width=2),
+                ))
+                _earn_fig.add_hline(y=0, line_dash="dash", line_color="#374151")
+                _earn_fig.update_layout(
+                    template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    height=350, margin=dict(l=40, r=20, t=30, b=30),
+                    legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"),
+                    yaxis=dict(title="العائد %", ticksuffix="%"),
+                    barmode="group",
+                )
+                st.plotly_chart(_earn_fig, use_container_width=True, config={"displayModeBar": False})
+
+            else:
+                st.info("لا توجد بيانات نتائج سابقة كافية لهذا السهم")
+
+
 # PAGE: AI Reports — تقارير AI
 # ══════════════════════════════════════════════════════════════
 
