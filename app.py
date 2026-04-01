@@ -5125,50 +5125,45 @@ elif page == "📅 تقويم النتائج":
     if results:
         _cal_tickers = [r["ticker"] for r in results]
 
-    # Limit to avoid rate limiting on Streamlit Cloud
-    _cal_tickers = _cal_tickers[:50]
+    # Load from static JSON file (generated locally — no rate limit)
+    import json as _json, os as _os
+    _cal_file = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "data", "earnings_calendar.json")
+    _cal_data = {}
+    try:
+        with open(_cal_file, "r") as _f:
+            _cal_data = _json.load(_f)
+    except Exception:
+        pass
 
-    _progress = st.progress(0, text="📅 جاري جلب تواريخ النتائج...")
     _upcoming = []
-    for _ci, _tk in enumerate(_cal_tickers):
-        _progress.progress((_ci + 1) / len(_cal_tickers), text=f"📅 {_ci+1}/{len(_cal_tickers)}...")
+    from datetime import datetime as _dt_cls
+    for _tk in _cal_tickers:
+        _info = _cal_data.get(_tk)
+        if not _info or "earnings_date" not in _info:
+            continue
         try:
-            _info = _fetch_earnings_info(_tk)
-            if _info and "earnings_date" in _info:
-                try:
-                    from datetime import datetime
-                    _ed = datetime.strptime(_info["earnings_date"], "%Y-%m-%d")
-                    _days = (_ed - datetime.now()).days
-                    if -7 <= _days <= 90:  # Past week to 3 months ahead
-                        _name = get_stock_name(_tk)
-                        # Check if accumulating
-                        _flow = 0
-                        _phase = ""
-                        _cdv = ""
-                        if results:
-                            _r = next((r for r in results if r["ticker"] == _tk), None)
-                            if _r:
-                                _flow = _r.get("flow_bias", 0)
-                                _phase = _r.get("phase", "")
-                                _cdv = _r.get("cdv_trend", "")
-
-                        _upcoming.append({
-                            "ticker": _tk,
-                            "name": _name,
-                            "earnings_date": _info["earnings_date"],
-                            "days": _days,
-                            "eps_est": _info.get("earnings_eps_est"),
-                            "ex_div": _info.get("ex_dividend_date"),
-                            "flow": _flow,
-                            "phase": _phase,
-                            "cdv": _cdv,
-                        })
-                except Exception:
-                    pass
+            _ed = _dt_cls.strptime(_info["earnings_date"], "%Y-%m-%d")
+            _days = (_ed - _dt_cls.now()).days
+            if -7 <= _days <= 90:
+                _name = _info.get("name", get_stock_name(_tk))
+                _flow = 0
+                _phase = ""
+                _cdv = ""
+                if results:
+                    _r = next((r for r in results if r["ticker"] == _tk), None)
+                    if _r:
+                        _flow = _r.get("flow_bias", 0)
+                        _phase = _r.get("phase", "")
+                        _cdv = _r.get("cdv_trend", "")
+                _upcoming.append({
+                    "ticker": _tk, "name": _name,
+                    "earnings_date": _info["earnings_date"], "days": _days,
+                    "eps_est": _info.get("eps_est"),
+                    "ex_div": _info.get("ex_dividend_date"),
+                    "flow": _flow, "phase": _phase, "cdv": _cdv,
+                })
         except Exception:
             pass
-
-    _progress.empty()
     _upcoming.sort(key=lambda x: x["days"])
 
     if not _upcoming:
