@@ -5125,9 +5125,14 @@ elif page == "📅 تقويم النتائج":
     if results:
         _cal_tickers = [r["ticker"] for r in results]
 
-    with st.spinner("📅 جاري جلب تواريخ النتائج..."):
-        _upcoming = []
-        for _tk in _cal_tickers:
+    # Limit to avoid rate limiting on Streamlit Cloud
+    _cal_tickers = _cal_tickers[:50]
+
+    _progress = st.progress(0, text="📅 جاري جلب تواريخ النتائج...")
+    _upcoming = []
+    for _ci, _tk in enumerate(_cal_tickers):
+        _progress.progress((_ci + 1) / len(_cal_tickers), text=f"📅 {_ci+1}/{len(_cal_tickers)}...")
+        try:
             _info = _fetch_earnings_info(_tk)
             if _info and "earnings_date" in _info:
                 try:
@@ -5160,7 +5165,10 @@ elif page == "📅 تقويم النتائج":
                         })
                 except Exception:
                     pass
+        except Exception:
+            pass
 
+    _progress.empty()
     _upcoming.sort(key=lambda x: x["days"])
 
     if not _upcoming:
