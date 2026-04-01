@@ -5692,6 +5692,103 @@ elif page == "📊 أداء النظام":
             else:
                 st.warning(f"⚠️ الإشارات الضعيفة تنجح أكثر ({abs(_diff):.0f}%) — الـ scoring يحتاج مراجعة")
 
+    # ── Signal Type + Location Breakdown ──
+    if _period and _n_completed > 5:
+        st.divider()
+        st.subheader("🏆 أفضل نوع إشارة")
+
+        _type_tab1, _type_tab2 = st.tabs(["📊 حسب نوع التجميع", "📍 حسب الموقع"])
+
+        with _type_tab1:
+            _type_perf = {}
+            for _s in _completed:
+                _al = _s.get("accum_level", "") or "غير محدد"
+                if _al not in _type_perf:
+                    _type_perf[_al] = {"total": 0, "wins": 0, "returns": [], "best": -999, "worst": 999}
+                _type_perf[_al]["total"] += 1
+                _ret = _s.get(_return_col, 0) or 0
+                if _s.get(_outcome_col) == "win":
+                    _type_perf[_al]["wins"] += 1
+                _type_perf[_al]["returns"].append(_ret)
+                if _ret > _type_perf[_al]["best"]:
+                    _type_perf[_al]["best"] = _ret
+                if _ret < _type_perf[_al]["worst"]:
+                    _type_perf[_al]["worst"] = _ret
+
+            _type_names = {
+                "accumulation": "🟢 تجميع (Accumulation)",
+                "spring": "💎 سبرنق (Spring)",
+                "markup": "🚀 صعود (Markup)",
+                "distribution": "🔴 تصريف (Distribution)",
+                "markdown": "📉 هبوط (Markdown)",
+            }
+
+            _type_rows = []
+            for _al, _td in sorted(_type_perf.items(), key=lambda x: sum(x[1]["returns"]) / len(x[1]["returns"]) if x[1]["returns"] else 0, reverse=True):
+                _wr = _td["wins"] / _td["total"] * 100 if _td["total"] > 0 else 0
+                _avg = sum(_td["returns"]) / len(_td["returns"]) if _td["returns"] else 0
+                _pf_gains = sum(r for r in _td["returns"] if r > 0)
+                _pf_losses = abs(sum(r for r in _td["returns"] if r < 0)) or 0.01
+                _pf = round(_pf_gains / _pf_losses, 2)
+                _rec = "✅ ابقِ" if _wr >= 50 else "⚠️ شدد" if _wr >= 30 else "❌ أوقف"
+                _type_rows.append({
+                    "النوع": _type_names.get(_al, _al),
+                    "إشارات": _td["total"],
+                    "نجاح": f"{_wr:.0f}%",
+                    "عائد": f"{_avg:+.2f}%",
+                    "PF": _pf,
+                    "أفضل": f"{_td['best']:+.1f}%",
+                    "أسوأ": f"{_td['worst']:+.1f}%",
+                    "التوصية": _rec,
+                })
+            if _type_rows:
+                st.dataframe(pd.DataFrame(_type_rows), use_container_width=True, hide_index=True)
+
+        with _type_tab2:
+            _loc_perf = {}
+            for _s in _completed:
+                _loc = _s.get("location", "") or "غير محدد"
+                if _loc not in _loc_perf:
+                    _loc_perf[_loc] = {"total": 0, "wins": 0, "returns": []}
+                _loc_perf[_loc]["total"] += 1
+                _ret = _s.get(_return_col, 0) or 0
+                if _s.get(_outcome_col) == "win":
+                    _loc_perf[_loc]["wins"] += 1
+                _loc_perf[_loc]["returns"].append(_ret)
+
+            _loc_names = {
+                "bottom": "📉 قاع القناة",
+                "support": "🟢 منطقة دعم",
+                "middle": "➡️ وسط المدى",
+                "above": "🚀 فوق المقاومة",
+                "resistance": "🔴 عند المقاومة",
+            }
+
+            _loc_rows = []
+            for _loc, _ld in sorted(_loc_perf.items(), key=lambda x: sum(x[1]["returns"]) / len(x[1]["returns"]) if x[1]["returns"] else 0, reverse=True):
+                _wr = _ld["wins"] / _ld["total"] * 100 if _ld["total"] > 0 else 0
+                _avg = sum(_ld["returns"]) / len(_ld["returns"]) if _ld["returns"] else 0
+                _rec = "✅ ابقِ" if _wr >= 50 else "⚠️ شدد" if _wr >= 30 else "❌ أوقف"
+                _loc_rows.append({
+                    "الموقع": _loc_names.get(_loc, _loc),
+                    "إشارات": _ld["total"],
+                    "نجاح": f"{_wr:.0f}%",
+                    "عائد": f"{_avg:+.2f}%",
+                    "التوصية": _rec,
+                })
+            if _loc_rows:
+                st.dataframe(pd.DataFrame(_loc_rows), use_container_width=True, hide_index=True)
+
+                # Insight
+                _best_loc = max(_loc_perf.items(), key=lambda x: sum(x[1]["returns"]) / len(x[1]["returns"]) if x[1]["returns"] else 0)
+                _worst_loc = min(_loc_perf.items(), key=lambda x: sum(x[1]["returns"]) / len(x[1]["returns"]) if x[1]["returns"] else 0)
+                st.info(
+                    f"💡 أفضل موقع: **{_loc_names.get(_best_loc[0], _best_loc[0])}** "
+                    f"({sum(_best_loc[1]['returns'])/len(_best_loc[1]['returns']):+.2f}%) | "
+                    f"أسوأ موقع: **{_loc_names.get(_worst_loc[0], _worst_loc[0])}** "
+                    f"({sum(_worst_loc[1]['returns'])/len(_worst_loc[1]['returns']):+.2f}%)"
+                )
+
     st.divider()
     st.subheader("🏛 بيانات الملكية المؤسساتية")
     inst_summary = get_ownership_summary(get_all_tickers())
