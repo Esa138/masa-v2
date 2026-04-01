@@ -7,10 +7,20 @@ import sqlite3
 import os
 
 DB_FILE = "masa_v2.db"
+SEED_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "masa_v2_seed.db")
+
+
+def _ensure_db():
+    """Copy seed DB if main DB doesn't exist or is empty."""
+    if not os.path.exists(DB_FILE) or os.path.getsize(DB_FILE) < 1024:
+        if os.path.exists(SEED_FILE):
+            import shutil
+            shutil.copy2(SEED_FILE, DB_FILE)
 
 
 def init_database():
     """Create tables if they don't exist."""
+    _ensure_db()
     with sqlite3.connect(DB_FILE) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
