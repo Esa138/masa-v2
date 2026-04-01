@@ -1,0 +1,2243 @@
+{
+  "1010.SR": {
+    "eps_est": 0.83449,
+    "ex_dividend_date": "2026-04-06",
+    "name": "الرياض"
+  },
+  "1020.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-02-09",
+    "name": "الجزيرة"
+  },
+  "1030.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-08-05",
+    "name": "الاستثمار"
+  },
+  "1050.SR": {
+    "earnings_date": "2026-04-27",
+    "eps_est": 0.51,
+    "ex_dividend_date": "2025-07-28",
+    "name": "السعودي الفرنسي"
+  },
+  "1060.SR": {
+    "eps_est": 0.9957,
+    "ex_dividend_date": "2025-08-21",
+    "name": "الأول"
+  },
+  "1080.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-02-05",
+    "name": "العربي"
+  },
+  "1111.SR": {
+    "earnings_date": "2026-04-27",
+    "eps_est": 0.88058,
+    "ex_dividend_date": "2025-05-08",
+    "name": "تداول"
+  },
+  "1120.SR": {
+    "earnings_date": "2026-04-22",
+    "eps_est": 1.57866,
+    "ex_dividend_date": "2026-04-21",
+    "name": "الراجحي"
+  },
+  "1140.SR": {
+    "eps_est": 0.50506,
+    "ex_dividend_date": "2026-05-06",
+    "name": "البلاد"
+  },
+  "1150.SR": {
+    "eps_est": 0.60388,
+    "ex_dividend_date": "2025-11-05",
+    "name": "الإنماء"
+  },
+  "1180.SR": {
+    "eps_est": 1.01303,
+    "ex_dividend_date": "2026-04-16",
+    "name": "الأهلي"
+  },
+  "1182.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2023-05-03",
+    "name": "أملاك"
+  },
+  "1183.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2023-06-22",
+    "name": "سهل"
+  },
+  "1201.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2014-04-03",
+    "name": "تكوين"
+  },
+  "1202.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2023-07-03",
+    "name": "مبكو"
+  },
+  "1210.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-05-26",
+    "name": "بي سي آي"
+  },
+  "1211.SR": {
+    "earnings_date": "2026-05-06",
+    "eps_est": 0.54,
+    "name": "معادن"
+  },
+  "1212.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-04-21",
+    "name": "أسترا الصناعية"
+  },
+  "1213.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2014-04-08",
+    "name": "نسيج"
+  },
+  "1214.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-05-19",
+    "name": "شاكر"
+  },
+  "1301.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-11-18",
+    "name": "أسلاك"
+  },
+  "1302.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2024-09-29",
+    "name": "بوان"
+  },
+  "1303.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-16",
+    "name": "الصناعات الكهربائية"
+  },
+  "1304.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-03-05",
+    "name": "اليمامة للحديد"
+  },
+  "1320.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-06-04",
+    "name": "أنابيب السعودية"
+  },
+  "1321.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-10-30",
+    "name": "أنابيب الشرق"
+  },
+  "1322.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-10-01",
+    "name": "أماك"
+  },
+  "1323.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-12-01",
+    "name": "الكرتون المتحدة"
+  },
+  "1810.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2018-02-19",
+    "name": "سيرا القابضة"
+  },
+  "1820.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2017-02-05",
+    "name": "بان القابضة"
+  },
+  "1830.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-02-24",
+    "name": "لجام للرياضة"
+  },
+  "1831.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-08-17",
+    "name": "مهارة للموارد"
+  },
+  "1832.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2021-04-28",
+    "name": "صدر"
+  },
+  "1833.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-12",
+    "name": "الموارد"
+  },
+  "1834.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-06",
+    "name": "حلول القوى"
+  },
+  "1835.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-02-23",
+    "name": "تمكين"
+  },
+  "2001.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2014-05-08",
+    "name": "كيمانول"
+  },
+  "2010.SR": {
+    "eps_est": 0.35744,
+    "ex_dividend_date": "2026-03-09",
+    "name": "سابك"
+  },
+  "2020.SR": {
+    "earnings_date": "2026-04-26",
+    "eps_est": 2.27,
+    "ex_dividend_date": "2026-03-09",
+    "name": "المغذيات"
+  },
+  "2030.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2023-07-02",
+    "name": "المصافي"
+  },
+  "2040.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-01",
+    "name": "الخزف السعودي"
+  },
+  "2050.SR": {
+    "eps_est": 0.68914,
+    "ex_dividend_date": "2023-05-11",
+    "name": "مجموعة صافولا"
+  },
+  "2060.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2015-04-09",
+    "name": "التصنيع"
+  },
+  "2070.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2022-06-09",
+    "name": "الدوائية"
+  },
+  "2080.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-01",
+    "name": "الغاز"
+  },
+  "2081.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-01-05",
+    "name": "الخريف"
+  },
+  "2082.SR": {
+    "earnings_date": "2026-05-07",
+    "eps_est": null,
+    "ex_dividend_date": "2024-04-30",
+    "name": "أكوا باور"
+  },
+  "2083.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-11",
+    "name": "مرافق"
+  },
+  "2084.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-06-29",
+    "name": "مياهنا"
+  },
+  "2090.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2022-05-29",
+    "name": "الجبس الوطنية"
+  },
+  "2100.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2014-06-03",
+    "name": "وفرة"
+  },
+  "2110.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2011-06-08",
+    "name": "الكابلات"
+  },
+  "2120.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-06-26",
+    "name": "المتطورة"
+  },
+  "2150.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-13",
+    "name": "زجاج"
+  },
+  "2160.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2016-04-05",
+    "name": "أميانتيت السعودية"
+  },
+  "2170.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-01-08",
+    "name": "اللجين"
+  },
+  "2180.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2017-05-02",
+    "name": "فيبكو"
+  },
+  "2190.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-06-30",
+    "name": "سيسكو"
+  },
+  "2200.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-06-04",
+    "name": "أنابيب"
+  },
+  "2220.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2018-05-13",
+    "name": "معدنية"
+  },
+  "2222.SR": {
+    "earnings_date": "2026-05-10",
+    "eps_est": 0.435,
+    "ex_dividend_date": "2026-03-24",
+    "name": "أرامكو"
+  },
+  "2223.SR": {
+    "eps_est": 1.358,
+    "ex_dividend_date": "2026-04-14",
+    "name": "لوبريف"
+  },
+  "2230.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-05-25",
+    "name": "الكيميائية"
+  },
+  "2240.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2018-04-17",
+    "name": "الزامل"
+  },
+  "2250.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-12-14",
+    "name": "المجموعة السعودية"
+  },
+  "2270.SR": {
+    "earnings_date": "2026-05-06",
+    "eps_est": null,
+    "ex_dividend_date": "2026-02-23",
+    "name": "سدافكو"
+  },
+  "2280.SR": {
+    "earnings_date": "2026-04-16",
+    "eps_est": 0.66328,
+    "ex_dividend_date": "2026-04-22",
+    "name": "المراعي"
+  },
+  "2281.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-06-16",
+    "name": "تنمية"
+  },
+  "2282.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2024-05-19",
+    "name": "المطاحن الأولى"
+  },
+  "2283.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-06",
+    "name": "المطاحن الحديثة"
+  },
+  "2284.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-15",
+    "name": "المطاحن العربية"
+  },
+  "2285.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-06-03",
+    "name": "مطاحن صافية"
+  },
+  "2286.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-24",
+    "name": "المطاحن الرابعة"
+  },
+  "2287.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-06-26",
+    "name": "رغوة"
+  },
+  "2288.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-06-02",
+    "name": "نفوذ الغذائية"
+  },
+  "2290.SR": {
+    "eps_est": 0.06,
+    "ex_dividend_date": "2026-02-18",
+    "name": "ينساب"
+  },
+  "2300.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2024-09-11",
+    "name": "صناعة الورق"
+  },
+  "2310.SR": {
+    "eps_est": -0.03317,
+    "ex_dividend_date": "2025-12-02",
+    "name": "سبكيم"
+  },
+  "2320.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-12-01",
+    "name": "البابطين"
+  },
+  "2330.SR": {
+    "eps_est": 0.45121,
+    "ex_dividend_date": "2023-05-21",
+    "name": "المتقدمة"
+  },
+  "2340.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2019-03-28",
+    "name": "العالمية"
+  },
+  "2350.SR": {
+    "earnings_date": "2026-04-27",
+    "eps_est": -0.28,
+    "name": "كيان السعودية"
+  },
+  "2360.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2020-12-01",
+    "name": "الفخارية"
+  },
+  "2370.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-12-01",
+    "name": "مسك"
+  },
+  "2380.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2018-04-25",
+    "name": "بترورابغ"
+  },
+  "2381.SR": {
+    "eps_est": 0.66849,
+    "ex_dividend_date": "2025-03-16",
+    "name": "الحفر العربية"
+  },
+  "2382.SR": {
+    "eps_est": 0.266,
+    "ex_dividend_date": "2026-04-15",
+    "name": "أديس"
+  },
+  "3002.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2023-04-12",
+    "name": "أسمنت نجران"
+  },
+  "3003.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-31",
+    "name": "أسمنت المدينة"
+  },
+  "3004.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-10-05",
+    "name": "أسمنت الشمالية"
+  },
+  "3005.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2022-05-11",
+    "name": "أسمنت أم القرى"
+  },
+  "3007.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-06-11",
+    "name": "الواحة"
+  },
+  "3010.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-16",
+    "name": "أسمنت العربية"
+  },
+  "3020.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-14",
+    "name": "أسمنت اليمامة"
+  },
+  "3030.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-30",
+    "name": "أسمنت السعودية"
+  },
+  "3040.SR": {
+    "earnings_date": "2026-05-07",
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-02",
+    "name": "أسمنت القصيم"
+  },
+  "3050.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-01-01",
+    "name": "أسمنت الجنوبية"
+  },
+  "3060.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-12-10",
+    "name": "أسمنت ينبع"
+  },
+  "3080.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-06",
+    "name": "أسمنت الشرقية"
+  },
+  "3090.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-08-31",
+    "name": "أسمنت تبوك"
+  },
+  "3091.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2013-05-07",
+    "name": "أسمنت الجوف"
+  },
+  "3092.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-09-09",
+    "name": "أسمنت المدينة المنورة"
+  },
+  "4001.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-29",
+    "name": "أسواق العثيم"
+  },
+  "4002.SR": {
+    "eps_est": 0.84,
+    "ex_dividend_date": "2025-12-07",
+    "name": "المواساة"
+  },
+  "4003.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-05",
+    "name": "إكسترا"
+  },
+  "4004.SR": {
+    "earnings_date": "2026-05-07",
+    "eps_est": 1.32,
+    "ex_dividend_date": "2026-03-25",
+    "name": "دله الصحية"
+  },
+  "4005.SR": {
+    "eps_est": 2.34,
+    "ex_dividend_date": "2025-05-20",
+    "name": "رعاية"
+  },
+  "4006.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2023-05-21",
+    "name": "التسويق السعودية"
+  },
+  "4007.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-30",
+    "name": "الحمادي"
+  },
+  "4008.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-24",
+    "name": "ساكو"
+  },
+  "4009.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-07-09",
+    "name": "السعودي الألماني الصحية"
+  },
+  "4011.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2024-05-22",
+    "name": "لازوردي"
+  },
+  "4012.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-02-24",
+    "name": "ثوب الأصيل"
+  },
+  "4013.SR": {
+    "eps_est": 1.74913,
+    "ex_dividend_date": "2026-02-23",
+    "name": "سليمان الحبيب"
+  },
+  "4014.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-09-10",
+    "name": "دار المعدات"
+  },
+  "4015.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-02",
+    "name": "جمجوم فارما"
+  },
+  "4016.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-30",
+    "name": "صناعة الأدوية"
+  },
+  "4017.SR": {
+    "eps_est": 0.35,
+    "ex_dividend_date": "2025-06-26",
+    "name": "فقيه الطبية"
+  },
+  "4018.SR": {
+    "eps_est": 1.5,
+    "ex_dividend_date": "2026-03-30",
+    "name": "الموسى الصحية"
+  },
+  "4019.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-01-07",
+    "name": "المتخصصة الطبية"
+  },
+  "4020.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2018-07-01",
+    "name": "العقارية"
+  },
+  "4021.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-05-11",
+    "name": "المركز الكندي الطبي"
+  },
+  "4030.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-06-30",
+    "name": "البحري"
+  },
+  "4031.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-10-08",
+    "name": "مهارة"
+  },
+  "4040.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2018-04-30",
+    "name": "سابتكو"
+  },
+  "4050.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2024-09-16",
+    "name": "ساسكو"
+  },
+  "4051.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-08-24",
+    "name": "بازعيم"
+  },
+  "4070.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2011-08-09",
+    "name": "تهامة"
+  },
+  "4071.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2023-06-22",
+    "name": "العربية"
+  },
+  "4080.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2017-04-24",
+    "name": "سيناد القابضة"
+  },
+  "4081.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-07-13",
+    "name": "النايفات"
+  },
+  "4082.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2024-08-05",
+    "name": "مرابحة مارينا"
+  },
+  "4084.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-12-09",
+    "name": "دراية المالية"
+  },
+  "4090.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-05-14",
+    "name": "طيبة"
+  },
+  "4100.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-05-20",
+    "name": "مكة"
+  },
+  "4110.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2017-06-07",
+    "name": "باتك"
+  },
+  "4140.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2014-04-03",
+    "name": "الصادرات"
+  },
+  "4141.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2022-06-20",
+    "name": "العمران"
+  },
+  "4142.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-09-30",
+    "name": "كابلات الرياض"
+  },
+  "4143.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-06-26",
+    "name": "التيسير"
+  },
+  "4144.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-30",
+    "name": "روم للتجارة"
+  },
+  "4145.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-09-10",
+    "name": "العبيكان للزجاج"
+  },
+  "4146.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-02",
+    "name": "خدمات الغاز العربية"
+  },
+  "4148.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-04-29",
+    "name": "الوسائل الصناعية"
+  },
+  "4150.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-09-29",
+    "name": "التعمير"
+  },
+  "4161.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-12-07",
+    "name": "بن داود"
+  },
+  "4162.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-12-07",
+    "name": "المنجم"
+  },
+  "4163.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-02-11",
+    "name": "الدواء"
+  },
+  "4164.SR": {
+    "earnings_date": "2026-05-07",
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-30",
+    "name": "النهدي"
+  },
+  "4165.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-05-06",
+    "name": "الماجد للعود"
+  },
+  "4180.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-11-12",
+    "name": "مجموعة فتيحي"
+  },
+  "4190.SR": {
+    "earnings_date": "2026-05-11",
+    "eps_est": null,
+    "ex_dividend_date": "2025-11-11",
+    "name": "جرير"
+  },
+  "4191.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-12-02",
+    "name": "أبو معطي"
+  },
+  "4192.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2023-10-08",
+    "name": "السيف غاليري"
+  },
+  "4194.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-12-08",
+    "name": "بيت التسويق"
+  },
+  "4200.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-03",
+    "name": "الدريس"
+  },
+  "4210.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2013-03-18",
+    "name": "الأبحاث والإعلام"
+  },
+  "4230.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2017-05-22",
+    "name": "البحر الأحمر"
+  },
+  "4240.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2015-07-01",
+    "name": "سينومي ريتيل"
+  },
+  "4260.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-08-17",
+    "name": "بدجت"
+  },
+  "4261.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-12-14",
+    "name": "ذيب"
+  },
+  "4263.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-02",
+    "name": "سال للخدمات"
+  },
+  "4270.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2013-03-17",
+    "name": "تغليف وتعبئة"
+  },
+  "4280.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-01-01",
+    "name": "المملكة"
+  },
+  "4290.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2021-05-26",
+    "name": "الخليج للتدريب"
+  },
+  "4291.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-01-04",
+    "name": "التعلم الوطنية"
+  },
+  "4292.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-07",
+    "name": "عطاء التعليمية"
+  },
+  "4300.SR": {
+    "earnings_date": "2026-05-04",
+    "eps_est": null,
+    "ex_dividend_date": "2018-05-16",
+    "name": "دار الأركان"
+  },
+  "4320.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-08-25",
+    "name": "الأندلس"
+  },
+  "4321.SR": {
+    "earnings_date": "2026-05-12",
+    "eps_est": 0.34,
+    "ex_dividend_date": "2025-10-01",
+    "name": "سينومي سنترز"
+  },
+  "4322.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-09-30",
+    "name": "ريتال"
+  },
+  "4323.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-05-11",
+    "name": "سمو العقارية"
+  },
+  "4324.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-01-12",
+    "name": "بنان العقارية"
+  },
+  "5110.SR": {
+    "earnings_date": "2026-05-13",
+    "eps_est": -0.22133,
+    "ex_dividend_date": "2025-05-14",
+    "name": "الكهرباء"
+  },
+  "6001.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2022-04-20",
+    "name": "حلواني إخوان"
+  },
+  "6002.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2023-05-09",
+    "name": "هرفي"
+  },
+  "6004.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-19",
+    "name": "كاتريون"
+  },
+  "6010.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2016-04-10",
+    "name": "نادك"
+  },
+  "6012.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2018-06-27",
+    "name": "ريدان"
+  },
+  "6014.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-04-15",
+    "name": "الآمار"
+  },
+  "6015.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-05-10",
+    "name": "أمريكانا"
+  },
+  "6016.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2024-04-03",
+    "name": "شاورمر"
+  },
+  "6020.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2017-07-05",
+    "name": "القصيم"
+  },
+  "6040.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2016-05-17",
+    "name": "تبوك الزراعية"
+  },
+  "6070.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-24",
+    "name": "الجوف"
+  },
+  "6090.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2017-05-03",
+    "name": "جازادكو"
+  },
+  "7010.SR": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 0.65062,
+    "ex_dividend_date": "2026-02-24",
+    "name": "STC"
+  },
+  "7020.SR": {
+    "earnings_date": "2026-04-20",
+    "eps_est": 1.09868,
+    "ex_dividend_date": "2026-02-25",
+    "name": "موبايلي"
+  },
+  "7030.SR": {
+    "earnings_date": "2026-05-06",
+    "eps_est": 0.1752,
+    "ex_dividend_date": "2025-04-27",
+    "name": "زين السعودية"
+  },
+  "7040.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-09-25",
+    "name": "قو للاتصالات"
+  },
+  "7200.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-11-12",
+    "name": "ام آي اس"
+  },
+  "7202.SR": {
+    "eps_est": 2.78852,
+    "ex_dividend_date": "2025-05-07",
+    "name": "سلوشنز"
+  },
+  "7203.SR": {
+    "earnings_date": "2026-05-06",
+    "eps_est": 5.85903,
+    "ex_dividend_date": "2026-03-05",
+    "name": "علم"
+  },
+  "7204.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2022-12-18",
+    "name": "توبي"
+  },
+  "8010.SR": {
+    "earnings_date": "2026-04-30",
+    "eps_est": null,
+    "ex_dividend_date": "2025-05-28",
+    "name": "التعاونية"
+  },
+  "8012.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-06-17",
+    "name": "الجزيرة تكافل"
+  },
+  "8030.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2012-04-01",
+    "name": "ميدغلف"
+  },
+  "8060.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2019-05-22",
+    "name": "ولاء"
+  },
+  "8070.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2017-04-02",
+    "name": "الدرع العربي"
+  },
+  "8170.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-05-22",
+    "name": "الاتحاد للتأمين"
+  },
+  "8180.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2018-07-01",
+    "name": "الصقر للتأمين"
+  },
+  "8190.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2012-05-15",
+    "name": "المتحدة للتأمين"
+  },
+  "8210.SR": {
+    "eps_est": 2.9051,
+    "ex_dividend_date": "2025-07-01",
+    "name": "بوبا"
+  },
+  "8240.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2020-05-14",
+    "name": "تشب"
+  },
+  "8250.SR": {
+    "eps_est": null,
+    "ex_dividend_date": "2025-06-01",
+    "name": "عناية"
+  },
+  "AAPL": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 1.95606,
+    "ex_dividend_date": "2026-02-09",
+    "name": "Apple"
+  },
+  "MSFT": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 4.06451,
+    "ex_dividend_date": "2026-05-21",
+    "name": "Microsoft"
+  },
+  "NVDA": {
+    "earnings_date": "2026-05-20",
+    "eps_est": 1.77513,
+    "ex_dividend_date": "2026-03-11",
+    "name": "NVIDIA"
+  },
+  "GOOG": {
+    "earnings_date": "2026-04-23",
+    "eps_est": 2.61638,
+    "ex_dividend_date": "2026-03-09",
+    "name": "Alphabet (Google)"
+  },
+  "GOOGL": {
+    "earnings_date": "2026-04-23",
+    "eps_est": 2.61638,
+    "ex_dividend_date": "2026-03-09",
+    "name": "Alphabet Class A"
+  },
+  "META": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 6.72545,
+    "ex_dividend_date": "2026-03-16",
+    "name": "Meta (Facebook)"
+  },
+  "AVGO": {
+    "earnings_date": "2026-06-03",
+    "eps_est": 2.38838,
+    "ex_dividend_date": "2026-03-23",
+    "name": "Broadcom"
+  },
+  "ORCL": {
+    "earnings_date": "2026-06-10",
+    "eps_est": 1.9631,
+    "ex_dividend_date": "2026-04-09",
+    "name": "Oracle"
+  },
+  "CRM": {
+    "earnings_date": "2026-05-27",
+    "eps_est": 3.12713,
+    "ex_dividend_date": "2026-04-09",
+    "name": "Salesforce"
+  },
+  "CSCO": {
+    "earnings_date": "2026-05-13",
+    "eps_est": 1.03488,
+    "ex_dividend_date": "2026-04-02",
+    "name": "Cisco"
+  },
+  "ADBE": {
+    "earnings_date": "2026-06-11",
+    "eps_est": 5.82827,
+    "ex_dividend_date": "2005-03-24",
+    "name": "Adobe"
+  },
+  "ACN": {
+    "earnings_date": "2026-06-18",
+    "eps_est": 3.72668,
+    "ex_dividend_date": "2026-04-09",
+    "name": "Accenture"
+  },
+  "IBM": {
+    "earnings_date": "2026-04-22",
+    "eps_est": 1.80893,
+    "ex_dividend_date": "2026-02-10",
+    "name": "IBM"
+  },
+  "INTC": {
+    "earnings_date": "2026-04-23",
+    "eps_est": 0.002,
+    "ex_dividend_date": "2024-08-07",
+    "name": "Intel"
+  },
+  "TXN": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 1.37145,
+    "ex_dividend_date": "2026-01-30",
+    "name": "Texas Instruments"
+  },
+  "QCOM": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 2.55696,
+    "ex_dividend_date": "2026-03-05",
+    "name": "Qualcomm"
+  },
+  "AMAT": {
+    "earnings_date": "2026-05-14",
+    "eps_est": 2.67792,
+    "ex_dividend_date": "2026-05-21",
+    "name": "Applied Materials"
+  },
+  "NOW": {
+    "earnings_date": "2026-04-22",
+    "eps_est": 0.96695,
+    "name": "ServiceNow"
+  },
+  "INTU": {
+    "earnings_date": "2026-05-21",
+    "eps_est": 12.5368,
+    "ex_dividend_date": "2026-04-09",
+    "name": "Intuit"
+  },
+  "AMD": {
+    "earnings_date": "2026-05-05",
+    "eps_est": 1.2728,
+    "ex_dividend_date": "1995-04-27",
+    "name": "AMD"
+  },
+  "PANW": {
+    "earnings_date": "2026-05-20",
+    "eps_est": 0.79731,
+    "name": "Palo Alto Networks"
+  },
+  "MU": {
+    "earnings_date": "2026-06-24",
+    "eps_est": 18.90635,
+    "ex_dividend_date": "2026-03-30",
+    "name": "Micron"
+  },
+  "LRCX": {
+    "earnings_date": "2026-04-22",
+    "eps_est": 1.35091,
+    "ex_dividend_date": "2026-03-04",
+    "name": "Lam Research"
+  },
+  "ADI": {
+    "earnings_date": "2026-05-21",
+    "eps_est": 2.89937,
+    "ex_dividend_date": "2026-03-03",
+    "name": "Analog Devices"
+  },
+  "KLAC": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 9.16683,
+    "ex_dividend_date": "2026-02-17",
+    "name": "KLA Corp"
+  },
+  "SNPS": {
+    "earnings_date": "2026-05-27",
+    "eps_est": 3.15016,
+    "name": "Synopsys"
+  },
+  "CDNS": {
+    "earnings_date": "2026-04-27",
+    "eps_est": 1.88429,
+    "name": "Cadence Design"
+  },
+  "CRWD": {
+    "earnings_date": "2026-06-09",
+    "eps_est": 1.06809,
+    "name": "CrowdStrike"
+  },
+  "MRVL": {
+    "earnings_date": "2026-05-28",
+    "eps_est": 0.79549,
+    "ex_dividend_date": "2026-04-10",
+    "name": "Marvell Technology"
+  },
+  "FTNT": {
+    "earnings_date": "2026-05-07",
+    "eps_est": 0.6185,
+    "name": "Fortinet"
+  },
+  "MSI": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 3.24054,
+    "ex_dividend_date": "2026-03-20",
+    "name": "Motorola Solutions"
+  },
+  "NXPI": {
+    "earnings_date": "2026-04-27",
+    "eps_est": 2.98234,
+    "ex_dividend_date": "2026-03-25",
+    "name": "NXP Semiconductors"
+  },
+  "ROP": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 4.981,
+    "ex_dividend_date": "2026-04-06",
+    "name": "Roper Technologies"
+  },
+  "ADSK": {
+    "earnings_date": "2026-05-21",
+    "eps_est": 2.84298,
+    "ex_dividend_date": "2005-03-22",
+    "name": "Autodesk"
+  },
+  "WDAY": {
+    "earnings_date": "2026-05-21",
+    "eps_est": 2.51534,
+    "name": "Workday"
+  },
+  "TEAM": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 1.33269,
+    "name": "Atlassian"
+  },
+  "MCHP": {
+    "earnings_date": "2026-05-07",
+    "eps_est": 0.50405,
+    "ex_dividend_date": "2026-02-23",
+    "name": "Microchip Technology"
+  },
+  "ON": {
+    "earnings_date": "2026-05-04",
+    "eps_est": 0.61403,
+    "name": "ON Semiconductor"
+  },
+  "HPE": {
+    "earnings_date": "2026-06-02",
+    "eps_est": 0.53334,
+    "ex_dividend_date": "2026-03-24",
+    "name": "HP Enterprise"
+  },
+  "HPQ": {
+    "earnings_date": "2026-05-27",
+    "eps_est": 0.71437,
+    "ex_dividend_date": "2026-03-11",
+    "name": "HP Inc"
+  },
+  "DELL": {
+    "earnings_date": "2026-05-28",
+    "eps_est": 2.93284,
+    "ex_dividend_date": "2026-04-21",
+    "name": "Dell Technologies"
+  },
+  "AMZN": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 1.64064,
+    "name": "Amazon"
+  },
+  "TSLA": {
+    "earnings_date": "2026-04-21",
+    "eps_est": 0.40162,
+    "name": "Tesla"
+  },
+  "HD": {
+    "earnings_date": "2026-05-19",
+    "eps_est": 3.41835,
+    "ex_dividend_date": "2026-03-12",
+    "name": "Home Depot"
+  },
+  "COST": {
+    "earnings_date": "2026-05-28",
+    "eps_est": 4.9457,
+    "ex_dividend_date": "2026-01-30",
+    "name": "Costco"
+  },
+  "NKE": {
+    "earnings_date": "2026-06-25",
+    "eps_est": 0.28155,
+    "ex_dividend_date": "2026-03-02",
+    "name": "Nike"
+  },
+  "MCD": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 2.75742,
+    "ex_dividend_date": "2026-03-03",
+    "name": "McDonald's"
+  },
+  "SBUX": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 0.4047,
+    "ex_dividend_date": "2026-02-13",
+    "name": "Starbucks"
+  },
+  "TGT": {
+    "earnings_date": "2026-05-20",
+    "eps_est": 1.34113,
+    "ex_dividend_date": "2026-05-13",
+    "name": "Target"
+  },
+  "LOW": {
+    "earnings_date": "2026-05-20",
+    "eps_est": 2.9694,
+    "ex_dividend_date": "2026-04-22",
+    "name": "Lowe's"
+  },
+  "TJX": {
+    "earnings_date": "2026-05-20",
+    "eps_est": 1.00586,
+    "ex_dividend_date": "2026-05-14",
+    "name": "TJX Companies"
+  },
+  "BKNG": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 27.47135,
+    "ex_dividend_date": "2026-03-06",
+    "name": "Booking Holdings"
+  },
+  "MAR": {
+    "earnings_date": "2026-05-05",
+    "eps_est": 2.53324,
+    "ex_dividend_date": "2026-02-26",
+    "name": "Marriott"
+  },
+  "CMG": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 0.23513,
+    "name": "Chipotle"
+  },
+  "ORLY": {
+    "earnings_date": "2026-04-22",
+    "eps_est": 0.69653,
+    "name": "O'Reilly Auto"
+  },
+  "AZO": {
+    "earnings_date": "2026-05-26",
+    "eps_est": 36.06134,
+    "name": "AutoZone"
+  },
+  "ROST": {
+    "earnings_date": "2026-05-21",
+    "eps_est": 1.67396,
+    "ex_dividend_date": "2026-03-13",
+    "name": "Ross Stores"
+  },
+  "DHI": {
+    "earnings_date": "2026-04-21",
+    "eps_est": 2.14527,
+    "ex_dividend_date": "2026-02-05",
+    "name": "D.R. Horton"
+  },
+  "LEN": {
+    "earnings_date": "2026-03-12",
+    "eps_est": 1.24752,
+    "ex_dividend_date": "2026-02-04",
+    "name": "Lennar"
+  },
+  "YUM": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 1.37696,
+    "ex_dividend_date": "2026-02-20",
+    "name": "Yum! Brands"
+  },
+  "DG": {
+    "earnings_date": "2026-06-02",
+    "eps_est": 1.91078,
+    "ex_dividend_date": "2026-04-07",
+    "name": "Dollar General"
+  },
+  "DLTR": {
+    "earnings_date": "2026-06-03",
+    "eps_est": 1.55884,
+    "name": "Dollar Tree"
+  },
+  "EBAY": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 1.57484,
+    "ex_dividend_date": "2026-03-06",
+    "name": "eBay"
+  },
+  "ABNB": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 0.31,
+    "name": "Airbnb"
+  },
+  "DASH": {
+    "earnings_date": "2026-05-11",
+    "eps_est": 1.08299,
+    "name": "DoorDash"
+  },
+  "GM": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 2.58186,
+    "ex_dividend_date": "2026-03-06",
+    "name": "General Motors"
+  },
+  "F": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 0.1767,
+    "ex_dividend_date": "2026-02-13",
+    "name": "Ford Motor"
+  },
+  "RIVN": {
+    "earnings_date": "2026-05-05",
+    "eps_est": -0.59605,
+    "name": "Rivian"
+  },
+  "V": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 3.09165,
+    "ex_dividend_date": "2026-02-10",
+    "name": "Visa"
+  },
+  "MA": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 4.40061,
+    "ex_dividend_date": "2026-04-09",
+    "name": "Mastercard"
+  },
+  "PYPL": {
+    "earnings_date": "2026-05-05",
+    "eps_est": 1.27836,
+    "ex_dividend_date": "2026-03-04",
+    "name": "PayPal"
+  },
+  "SPGI": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 4.82488,
+    "ex_dividend_date": "2026-02-25",
+    "name": "S&P Global"
+  },
+  "MCO": {
+    "earnings_date": "2026-04-21",
+    "eps_est": 4.36367,
+    "ex_dividend_date": "2026-03-02",
+    "name": "Moody's"
+  },
+  "ICE": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 1.97586,
+    "ex_dividend_date": "2026-06-15",
+    "name": "Intercontinental Exchange"
+  },
+  "CME": {
+    "earnings_date": "2026-04-22",
+    "eps_est": 3.10657,
+    "ex_dividend_date": "2026-03-10",
+    "name": "CME Group"
+  },
+  "UNH": {
+    "earnings_date": "2026-04-21",
+    "eps_est": 6.73417,
+    "ex_dividend_date": "2026-03-09",
+    "name": "UnitedHealth"
+  },
+  "JNJ": {
+    "earnings_date": "2026-04-14",
+    "eps_est": 2.68424,
+    "ex_dividend_date": "2026-02-24",
+    "name": "Johnson & Johnson"
+  },
+  "LLY": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 7.25105,
+    "ex_dividend_date": "2026-02-13",
+    "name": "Eli Lilly"
+  },
+  "PFE": {
+    "earnings_date": "2026-05-05",
+    "eps_est": 0.72807,
+    "ex_dividend_date": "2026-01-23",
+    "name": "Pfizer"
+  },
+  "ABBV": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 3.01491,
+    "ex_dividend_date": "2026-04-15",
+    "name": "AbbVie"
+  },
+  "MRK": {
+    "earnings_date": "2026-04-30",
+    "eps_est": -1.3109,
+    "ex_dividend_date": "2026-03-16",
+    "name": "Merck"
+  },
+  "TMO": {
+    "earnings_date": "2026-04-22",
+    "eps_est": 5.27653,
+    "ex_dividend_date": "2026-03-13",
+    "name": "Thermo Fisher"
+  },
+  "ABT": {
+    "earnings_date": "2026-04-16",
+    "eps_est": 1.15064,
+    "ex_dividend_date": "2026-04-15",
+    "name": "Abbott Labs"
+  },
+  "DHR": {
+    "earnings_date": "2026-04-21",
+    "eps_est": 1.9382,
+    "ex_dividend_date": "2026-03-27",
+    "name": "Danaher"
+  },
+  "AMGN": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 4.75725,
+    "ex_dividend_date": "2026-05-15",
+    "name": "Amgen"
+  },
+  "BMY": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 1.44869,
+    "ex_dividend_date": "2026-04-02",
+    "name": "Bristol-Myers"
+  },
+  "MDT": {
+    "earnings_date": "2026-05-20",
+    "eps_est": 1.63393,
+    "ex_dividend_date": "2026-03-27",
+    "name": "Medtronic"
+  },
+  "ISRG": {
+    "earnings_date": "2026-04-21",
+    "eps_est": 2.12587,
+    "name": "Intuitive Surgical"
+  },
+  "GILD": {
+    "earnings_date": "2026-04-23",
+    "eps_est": 1.90749,
+    "ex_dividend_date": "2026-03-13",
+    "name": "Gilead Sciences"
+  },
+  "VRTX": {
+    "earnings_date": "2026-05-04",
+    "eps_est": 4.4219,
+    "name": "Vertex Pharma"
+  },
+  "REGN": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 9.10063,
+    "ex_dividend_date": "2026-02-20",
+    "name": "Regeneron"
+  },
+  "SYK": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 2.99669,
+    "ex_dividend_date": "2026-03-31",
+    "name": "Stryker"
+  },
+  "ZTS": {
+    "earnings_date": "2026-05-05",
+    "eps_est": 1.6223,
+    "ex_dividend_date": "2026-04-20",
+    "name": "Zoetis"
+  },
+  "BSX": {
+    "earnings_date": "2026-04-22",
+    "eps_est": 0.79127,
+    "name": "Boston Scientific"
+  },
+  "BDX": {
+    "earnings_date": "2026-05-07",
+    "eps_est": 2.7773,
+    "ex_dividend_date": "2026-03-10",
+    "name": "Becton Dickinson"
+  },
+  "EW": {
+    "earnings_date": "2026-04-22",
+    "eps_est": 0.72743,
+    "name": "Edwards Lifesciences"
+  },
+  "CI": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 7.62133,
+    "ex_dividend_date": "2026-03-05",
+    "name": "Cigna"
+  },
+  "HCA": {
+    "earnings_date": "2026-04-24",
+    "eps_est": 7.17378,
+    "ex_dividend_date": "2026-03-17",
+    "name": "HCA Healthcare"
+  },
+  "ELV": {
+    "earnings_date": "2026-04-22",
+    "eps_est": 10.6812,
+    "ex_dividend_date": "2026-03-10",
+    "name": "Elevance Health"
+  },
+  "HUM": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 10.0008,
+    "ex_dividend_date": "2026-03-27",
+    "name": "Humana"
+  },
+  "DXCM": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 0.46967,
+    "name": "DexCom"
+  },
+  "IDXX": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 3.42749,
+    "name": "IDEXX Labs"
+  },
+  "A": {
+    "earnings_date": "2026-05-27",
+    "eps_est": 1.40813,
+    "ex_dividend_date": "2026-03-31",
+    "name": "Agilent Technologies"
+  },
+  "BIIB": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 3.04288,
+    "name": "Biogen"
+  },
+  "MRNA": {
+    "earnings_date": "2026-04-30",
+    "eps_est": -2.08991,
+    "name": "Moderna"
+  },
+  "XOM": {
+    "earnings_date": "2026-05-01",
+    "eps_est": 1.82645,
+    "ex_dividend_date": "2026-02-12",
+    "name": "ExxonMobil"
+  },
+  "CVX": {
+    "earnings_date": "2026-05-01",
+    "eps_est": 1.94448,
+    "ex_dividend_date": "2026-02-17",
+    "name": "Chevron"
+  },
+  "COP": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 1.55293,
+    "ex_dividend_date": "2026-02-18",
+    "name": "ConocoPhillips"
+  },
+  "SLB": {
+    "earnings_date": "2026-04-24",
+    "eps_est": 0.57131,
+    "ex_dividend_date": "2026-02-11",
+    "name": "Schlumberger"
+  },
+  "EOG": {
+    "earnings_date": "2026-05-05",
+    "eps_est": 2.72607,
+    "ex_dividend_date": "2026-04-16",
+    "name": "EOG Resources"
+  },
+  "MPC": {
+    "earnings_date": "2026-05-05",
+    "eps_est": 1.94434,
+    "ex_dividend_date": "2026-02-18",
+    "name": "Marathon Petroleum"
+  },
+  "PSX": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 2.10221,
+    "ex_dividend_date": "2026-02-23",
+    "name": "Phillips 66"
+  },
+  "VLO": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 2.53711,
+    "ex_dividend_date": "2026-02-05",
+    "name": "Valero Energy"
+  },
+  "OXY": {
+    "earnings_date": "2026-05-06",
+    "eps_est": 0.62643,
+    "ex_dividend_date": "2026-03-10",
+    "name": "Occidental Petroleum"
+  },
+  "WMB": {
+    "earnings_date": "2026-05-04",
+    "eps_est": 0.61381,
+    "ex_dividend_date": "2026-03-13",
+    "name": "Williams Companies"
+  },
+  "KMI": {
+    "earnings_date": "2026-04-15",
+    "eps_est": 0.38756,
+    "ex_dividend_date": "2026-02-02",
+    "name": "Kinder Morgan"
+  },
+  "HAL": {
+    "earnings_date": "2026-04-21",
+    "eps_est": 0.50609,
+    "ex_dividend_date": "2026-03-04",
+    "name": "Halliburton"
+  },
+  "DVN": {
+    "earnings_date": "2026-05-05",
+    "eps_est": 1.01403,
+    "ex_dividend_date": "2026-03-13",
+    "name": "Devon Energy"
+  },
+  "BKR": {
+    "earnings_date": "2026-04-23",
+    "eps_est": 0.53267,
+    "ex_dividend_date": "2026-02-17",
+    "name": "Baker Hughes"
+  },
+  "CAT": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 4.59663,
+    "ex_dividend_date": "2026-01-20",
+    "name": "Caterpillar"
+  },
+  "GE": {
+    "earnings_date": "2026-04-21",
+    "eps_est": 1.58508,
+    "ex_dividend_date": "2026-03-09",
+    "name": "GE Aerospace"
+  },
+  "HON": {
+    "earnings_date": "2026-04-23",
+    "eps_est": 2.32316,
+    "ex_dividend_date": "2026-02-27",
+    "name": "Honeywell"
+  },
+  "UNP": {
+    "earnings_date": "2026-04-23",
+    "eps_est": 2.83936,
+    "ex_dividend_date": "2026-02-27",
+    "name": "Union Pacific"
+  },
+  "DE": {
+    "earnings_date": "2026-05-21",
+    "eps_est": 5.73598,
+    "ex_dividend_date": "2026-03-31",
+    "name": "Deere & Co"
+  },
+  "UPS": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 1.10131,
+    "ex_dividend_date": "2026-02-17",
+    "name": "United Parcel Service"
+  },
+  "MMM": {
+    "earnings_date": "2026-04-21",
+    "eps_est": 1.99244,
+    "ex_dividend_date": "2026-02-13",
+    "name": "3M"
+  },
+  "ITW": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 2.56166,
+    "ex_dividend_date": "2026-03-31",
+    "name": "Illinois Tool Works"
+  },
+  "EMR": {
+    "earnings_date": "2026-05-06",
+    "eps_est": 1.53712,
+    "ex_dividend_date": "2026-02-13",
+    "name": "Emerson Electric"
+  },
+  "ETN": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 2.74422,
+    "ex_dividend_date": "2026-03-10",
+    "name": "Eaton Corp"
+  },
+  "FDX": {
+    "earnings_date": "2026-06-23",
+    "eps_est": 5.86868,
+    "ex_dividend_date": "2026-03-09",
+    "name": "FedEx"
+  },
+  "CSX": {
+    "earnings_date": "2026-04-22",
+    "eps_est": 0.39401,
+    "ex_dividend_date": "2026-02-27",
+    "name": "CSX Corp"
+  },
+  "NSC": {
+    "earnings_date": "2026-04-24",
+    "eps_est": 2.6067,
+    "ex_dividend_date": "2026-02-06",
+    "name": "Norfolk Southern"
+  },
+  "WM": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 1.75468,
+    "ex_dividend_date": "2026-03-13",
+    "name": "Waste Management"
+  },
+  "JCI": {
+    "earnings_date": "2026-05-06",
+    "eps_est": 1.11608,
+    "ex_dividend_date": "2026-03-16",
+    "name": "Johnson Controls"
+  },
+  "CARR": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 0.50832,
+    "ex_dividend_date": "2026-01-20",
+    "name": "Carrier Global"
+  },
+  "FAST": {
+    "earnings_date": "2026-04-13",
+    "eps_est": 0.29695,
+    "ex_dividend_date": "2026-01-29",
+    "name": "Fastenal"
+  },
+  "IR": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 0.74346,
+    "ex_dividend_date": "2026-03-04",
+    "name": "Ingersoll Rand"
+  },
+  "PCAR": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 1.15622,
+    "ex_dividend_date": "2026-02-11",
+    "name": "PACCAR"
+  },
+  "CMI": {
+    "earnings_date": "2026-05-04",
+    "eps_est": 5.67994,
+    "ex_dividend_date": "2026-02-20",
+    "name": "Cummins"
+  },
+  "ROK": {
+    "earnings_date": "2026-05-06",
+    "eps_est": 2.87329,
+    "ex_dividend_date": "2026-02-23",
+    "name": "Rockwell Automation"
+  },
+  "UBER": {
+    "earnings_date": "2026-05-06",
+    "eps_est": 0.69194,
+    "name": "Uber Technologies"
+  },
+  "PG": {
+    "earnings_date": "2026-04-24",
+    "eps_est": 1.56788,
+    "ex_dividend_date": "2026-01-23",
+    "name": "Procter & Gamble"
+  },
+  "KO": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 0.81279,
+    "ex_dividend_date": "2026-03-13",
+    "name": "Coca-Cola"
+  },
+  "PEP": {
+    "earnings_date": "2026-04-16",
+    "eps_est": 1.54448,
+    "ex_dividend_date": "2026-03-06",
+    "name": "PepsiCo"
+  },
+  "WMT": {
+    "earnings_date": "2026-05-21",
+    "eps_est": 0.66095,
+    "ex_dividend_date": "2026-05-08",
+    "name": "Walmart"
+  },
+  "CL": {
+    "earnings_date": "2026-05-01",
+    "eps_est": 0.94526,
+    "ex_dividend_date": "2026-04-20",
+    "name": "Colgate-Palmolive"
+  },
+  "MDLZ": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 0.61093,
+    "ex_dividend_date": "2026-03-31",
+    "name": "Mondelez"
+  },
+  "GIS": {
+    "earnings_date": "2026-03-18",
+    "eps_est": 0.82485,
+    "ex_dividend_date": "2026-04-10",
+    "name": "General Mills"
+  },
+  "KDP": {
+    "earnings_date": "2026-04-23",
+    "eps_est": 0.36789,
+    "ex_dividend_date": "2026-03-27",
+    "name": "Keurig Dr Pepper"
+  },
+  "KHC": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 0.49928,
+    "ex_dividend_date": "2026-03-06",
+    "name": "Kraft Heinz"
+  },
+  "SYY": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 0.9455,
+    "ex_dividend_date": "2026-04-02",
+    "name": "Sysco"
+  },
+  "HSY": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 2.04431,
+    "ex_dividend_date": "2026-02-17",
+    "name": "Hershey"
+  },
+  "KR": {
+    "earnings_date": "2026-03-05",
+    "eps_est": 1.58528,
+    "ex_dividend_date": "2026-05-15",
+    "name": "Kroger"
+  },
+  "ADM": {
+    "earnings_date": "2026-05-05",
+    "eps_est": 0.66879,
+    "ex_dividend_date": "2026-02-17",
+    "name": "Archer-Daniels"
+  },
+  "EL": {
+    "earnings_date": "2026-05-01",
+    "eps_est": 0.64803,
+    "ex_dividend_date": "2026-02-27",
+    "name": "Estée Lauder"
+  },
+  "NFLX": {
+    "earnings_date": "2026-04-16",
+    "eps_est": 0.76595,
+    "name": "Netflix"
+  },
+  "DIS": {
+    "earnings_date": "2026-05-06",
+    "eps_est": 1.4907,
+    "ex_dividend_date": "2026-06-30",
+    "name": "Walt Disney"
+  },
+  "CMCSA": {
+    "earnings_date": "2026-04-23",
+    "eps_est": 0.76327,
+    "ex_dividend_date": "2026-04-01",
+    "name": "Comcast"
+  },
+  "T": {
+    "earnings_date": "2026-04-22",
+    "eps_est": 0.55159,
+    "ex_dividend_date": "2026-04-10",
+    "name": "AT&T"
+  },
+  "VZ": {
+    "earnings_date": "2026-04-27",
+    "eps_est": 1.21912,
+    "ex_dividend_date": "2026-04-10",
+    "name": "Verizon"
+  },
+  "TMUS": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 2.154,
+    "ex_dividend_date": "2026-05-29",
+    "name": "T-Mobile"
+  },
+  "CHTR": {
+    "earnings_date": "2026-04-24",
+    "eps_est": 10.08928,
+    "name": "Charter Communications"
+  },
+  "EA": {
+    "earnings_date": "2026-05-06",
+    "eps_est": 2.33514,
+    "ex_dividend_date": "2026-02-25",
+    "name": "Electronic Arts"
+  },
+  "TTWO": {
+    "earnings_date": "2026-05-14",
+    "eps_est": 0.56109,
+    "name": "Take-Two Interactive"
+  },
+  "WBD": {
+    "earnings_date": "2026-05-07",
+    "eps_est": -0.0925,
+    "name": "Warner Bros Discovery"
+  },
+  "SPOT": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 2.8581,
+    "name": "Spotify"
+  },
+  "NEE": {
+    "earnings_date": "2026-04-22",
+    "eps_est": 0.91668,
+    "ex_dividend_date": "2026-02-27",
+    "name": "NextEra Energy"
+  },
+  "DUK": {
+    "earnings_date": "2026-05-05",
+    "eps_est": 1.73264,
+    "ex_dividend_date": "2026-02-13",
+    "name": "Duke Energy"
+  },
+  "SO": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 1.23855,
+    "ex_dividend_date": "2026-02-17",
+    "name": "Southern Co"
+  },
+  "D": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 0.8283,
+    "ex_dividend_date": "2026-02-27",
+    "name": "Dominion Energy"
+  },
+  "AEP": {
+    "earnings_date": "2026-05-05",
+    "eps_est": 1.57664,
+    "ex_dividend_date": "2026-02-10",
+    "name": "American Electric Power"
+  },
+  "SRE": {
+    "earnings_date": "2026-05-07",
+    "eps_est": 1.48315,
+    "ex_dividend_date": "2026-03-19",
+    "name": "Sempra"
+  },
+  "EXC": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 0.88101,
+    "ex_dividend_date": "2026-03-02",
+    "name": "Exelon"
+  },
+  "XEL": {
+    "earnings_date": "2026-04-23",
+    "eps_est": 0.94677,
+    "ex_dividend_date": "2026-03-13",
+    "name": "Xcel Energy"
+  },
+  "WEC": {
+    "earnings_date": "2026-05-05",
+    "eps_est": 2.26496,
+    "ex_dividend_date": "2026-02-13",
+    "name": "WEC Energy"
+  },
+  "ED": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 2.26672,
+    "ex_dividend_date": "2026-02-18",
+    "name": "Consolidated Edison"
+  },
+  "AMT": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 1.56706,
+    "ex_dividend_date": "2026-04-14",
+    "name": "American Tower"
+  },
+  "PLD": {
+    "earnings_date": "2026-04-16",
+    "eps_est": 0.7422,
+    "ex_dividend_date": "2026-03-17",
+    "name": "Prologis"
+  },
+  "CCI": {
+    "earnings_date": "2026-04-22",
+    "eps_est": 0.47092,
+    "ex_dividend_date": "2026-03-13",
+    "name": "Crown Castle"
+  },
+  "EQIX": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 4.36778,
+    "ex_dividend_date": "2026-02-25",
+    "name": "Equinix"
+  },
+  "PSA": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 2.41873,
+    "ex_dividend_date": "2026-03-16",
+    "name": "Public Storage"
+  },
+  "SPG": {
+    "earnings_date": "2026-05-11",
+    "eps_est": 1.48667,
+    "ex_dividend_date": "2026-03-10",
+    "name": "Simon Property"
+  },
+  "O": {
+    "earnings_date": "2026-05-04",
+    "eps_est": 0.40059,
+    "ex_dividend_date": "2026-03-31",
+    "name": "Realty Income"
+  },
+  "WELL": {
+    "earnings_date": "2026-04-27",
+    "eps_est": 0.495,
+    "ex_dividend_date": "2026-02-25",
+    "name": "Welltower"
+  },
+  "DLR": {
+    "earnings_date": "2026-04-23",
+    "eps_est": null,
+    "ex_dividend_date": "2026-03-13",
+    "name": "Digital Realty"
+  },
+  "LIN": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 4.26742,
+    "ex_dividend_date": "2026-03-11",
+    "name": "Linde"
+  },
+  "APD": {
+    "earnings_date": "2026-04-30",
+    "eps_est": 3.0556,
+    "ex_dividend_date": "2026-04-01",
+    "name": "Air Products"
+  },
+  "ECL": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 1.69988,
+    "ex_dividend_date": "2026-03-17",
+    "name": "Ecolab"
+  },
+  "SHW": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 2.26611,
+    "ex_dividend_date": "2026-03-02",
+    "name": "Sherwin-Williams"
+  },
+  "NEM": {
+    "earnings_date": "2026-04-23",
+    "eps_est": 2.17763,
+    "ex_dividend_date": "2026-03-03",
+    "name": "Newmont"
+  },
+  "FCX": {
+    "earnings_date": "2026-04-23",
+    "eps_est": 0.49742,
+    "ex_dividend_date": "2026-04-15",
+    "name": "Freeport-McMoRan"
+  },
+  "NUE": {
+    "earnings_date": "2026-04-27",
+    "eps_est": 2.78301,
+    "ex_dividend_date": "2026-03-31",
+    "name": "Nucor"
+  },
+  "DOW": {
+    "earnings_date": "2026-04-23",
+    "eps_est": -0.31037,
+    "ex_dividend_date": "2026-02-27",
+    "name": "Dow Inc"
+  },
+  "DD": {
+    "earnings_date": "2026-05-01",
+    "eps_est": 0.48963,
+    "ex_dividend_date": "2026-03-02",
+    "name": "DuPont"
+  },
+  "PPG": {
+    "earnings_date": "2026-04-28",
+    "eps_est": 1.70282,
+    "ex_dividend_date": "2026-02-20",
+    "name": "PPG Industries"
+  },
+  "CTAS": {
+    "earnings_date": "2026-03-25",
+    "eps_est": 1.23806,
+    "ex_dividend_date": "2026-02-13",
+    "name": "Cintas"
+  },
+  "CEG": {
+    "earnings_date": "2026-05-11",
+    "eps_est": 2.4532,
+    "ex_dividend_date": "2026-03-09",
+    "name": "Constellation Energy"
+  },
+  "VRSK": {
+    "earnings_date": "2026-05-06",
+    "eps_est": 1.73746,
+    "ex_dividend_date": "2026-03-13",
+    "name": "Verisk Analytics"
+  },
+  "MELI": {
+    "earnings_date": "2026-05-07",
+    "eps_est": 9.99182,
+    "ex_dividend_date": "2017-12-28",
+    "name": "MercadoLibre"
+  },
+  "GEHC": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 1.04753,
+    "ex_dividend_date": "2026-04-02",
+    "name": "GE HealthCare"
+  },
+  "MNST": {
+    "earnings_date": "2026-05-07",
+    "eps_est": 0.52461,
+    "name": "Monster Beverage"
+  },
+  "ADP": {
+    "earnings_date": "2026-04-29",
+    "eps_est": 3.29755,
+    "ex_dividend_date": "2026-03-13",
+    "name": "ADP"
+  },
+  "ASML": {
+    "earnings_date": "2026-04-15",
+    "eps_est": 6.64915,
+    "ex_dividend_date": "2026-04-27",
+    "name": "ASML"
+  },
+  "ZS": {
+    "earnings_date": "2026-05-28",
+    "eps_est": 1.01036,
+    "name": "Zscaler"
+  },
+  "FER": {
+    "earnings_date": "2026-05-12",
+    "eps_est": null,
+    "ex_dividend_date": "2025-12-05",
+    "name": "Ferrovial"
+  }
+}
