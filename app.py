@@ -5496,34 +5496,62 @@ elif page == "📊 أداء النظام":
                     unsafe_allow_html=True
                 )
 
-    # ── Sector breakdown ──
+    # ── Sector breakdown — split by market ──
     if _period and _n_completed > 0:
         st.divider()
         st.subheader("🏭 الأداء حسب القطاع")
-        _sector_perf = {}
-        for _s in _completed:
-            _sec = _s.get("sector", "غير مصنف")
-            if _sec not in _sector_perf:
-                _sector_perf[_sec] = {"total": 0, "wins": 0, "returns": []}
-            _sector_perf[_sec]["total"] += 1
-            if _s.get(_outcome_col) == "win":
-                _sector_perf[_sec]["wins"] += 1
-            _sector_perf[_sec]["returns"].append(_s.get(_return_col, 0) or 0)
 
-        _sec_rows = []
-        for _sec, _sd in sorted(_sector_perf.items(), key=lambda x: sum(x[1]["returns"]) / len(x[1]["returns"]) if x[1]["returns"] else 0, reverse=True):
-            _wr = _sd["wins"] / _sd["total"] * 100 if _sd["total"] > 0 else 0
-            _avg = sum(_sd["returns"]) / len(_sd["returns"]) if _sd["returns"] else 0
-            _sec_rows.append({
-                "القطاع": _sec,
-                "إشارات": _sd["total"],
-                "نجاح": f"{_wr:.0f}%",
-                "عائد": f"{_avg:+.2f}%",
-                "حكم": "🟢" if _wr >= 55 else "🔴" if _wr < 40 else "🟡",
-            })
+        # Split signals by market
+        _sa_signals = [s for s in _completed if ".SR" in s.get("ticker", "")]
+        _us_signals = [s for s in _completed if ".SR" not in s.get("ticker", "")]
 
-        if _sec_rows:
-            st.dataframe(pd.DataFrame(_sec_rows), use_container_width=True, hide_index=True)
+        def _build_sector_table(signals, market_label):
+            if not signals:
+                return
+            _sector_perf = {}
+            for _s in signals:
+                _sec = _s.get("sector", "غير مصنف")
+                if _sec not in _sector_perf:
+                    _sector_perf[_sec] = {"total": 0, "wins": 0, "returns": []}
+                _sector_perf[_sec]["total"] += 1
+                if _s.get(_outcome_col) == "win":
+                    _sector_perf[_sec]["wins"] += 1
+                _sector_perf[_sec]["returns"].append(_s.get(_return_col, 0) or 0)
+
+            _sec_rows = []
+            for _sec, _sd in sorted(_sector_perf.items(), key=lambda x: sum(x[1]["returns"]) / len(x[1]["returns"]) if x[1]["returns"] else 0, reverse=True):
+                _wr = _sd["wins"] / _sd["total"] * 100 if _sd["total"] > 0 else 0
+                _avg = sum(_sd["returns"]) / len(_sd["returns"]) if _sd["returns"] else 0
+                _sec_rows.append({
+                    "القطاع": _sec,
+                    "إشارات": _sd["total"],
+                    "نجاح": f"{_wr:.0f}%",
+                    "عائد": f"{_avg:+.2f}%",
+                    "حكم": "🟢" if _wr >= 55 else "🔴" if _wr < 40 else "🟡",
+                })
+            if _sec_rows:
+                # Market summary
+                _total = len(signals)
+                _wins = sum(1 for s in signals if s.get(_outcome_col) == "win")
+                _wr_all = _wins / _total * 100 if _total > 0 else 0
+                _avg_all = sum(s.get(_return_col, 0) or 0 for s in signals) / _total if _total > 0 else 0
+                st.markdown(
+                    f"**{market_label}** — {_total} إشارة | "
+                    f"نجاح **{_wr_all:.0f}%** | "
+                    f"عائد **{_avg_all:+.2f}%**"
+                )
+                st.dataframe(pd.DataFrame(_sec_rows), use_container_width=True, hide_index=True)
+
+        if _sa_signals and _us_signals:
+            _mkt_tab1, _mkt_tab2 = st.tabs(["🇸🇦 السوق السعودي", "🇺🇸 السوق الأمريكي"])
+            with _mkt_tab1:
+                _build_sector_table(_sa_signals, "🇸🇦 السوق السعودي")
+            with _mkt_tab2:
+                _build_sector_table(_us_signals, "🇺🇸 السوق الأمريكي")
+        elif _sa_signals:
+            _build_sector_table(_sa_signals, "🇸🇦 السوق السعودي")
+        elif _us_signals:
+            _build_sector_table(_us_signals, "🇺🇸 السوق الأمريكي")
 
     # ── Equity Curve ──
     if _period and _n_completed > 5:
