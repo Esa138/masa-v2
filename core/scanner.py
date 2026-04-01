@@ -517,7 +517,30 @@ def scan_market(
                 "vp_location": vp_loc["vp_location"],
                 "vp_location_label": vp_loc["vp_location_label"],
                 "vp_location_color": vp_loc["vp_location_color"],
+                "stock_events": [],
             })
+
+            # ── Earnings + Dividend events ──
+            try:
+                from core.earnings import get_stock_events
+                _events = get_stock_events(
+                    ticker, flow_bias=orderflow["flow_bias"],
+                    cdv_trend=orderflow["cdv_trend"],
+                    days=maturity["current_days"],
+                    phase=phase, rsi=orderflow["rsi"]
+                )
+                results[-1]["stock_events"] = _events
+                for _ev in _events:
+                    if _ev["type"] == "earnings" and _ev["level"] == "imminent":
+                        results[-1]["reasons_against"].append(
+                            f"⚠️ إعلان نتائج خلال {_ev['data']['days_to_earnings']} يوم — تذبذب عالي"
+                        )
+                    elif _ev["type"] == "pre_earnings_accumulation":
+                        results[-1]["reasons_for"].append(
+                            f"📈 تجميع مؤسسي قبل النتائج ({_ev['data']['days_to_earnings']} يوم)"
+                        )
+            except Exception:
+                pass
 
         except Exception:
             continue
