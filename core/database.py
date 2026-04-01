@@ -11,11 +11,45 @@ SEED_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "ma
 
 
 def _ensure_db():
-    """Copy seed DB if main DB doesn't exist or is empty."""
-    if not os.path.exists(DB_FILE) or os.path.getsize(DB_FILE) < 1024:
-        if os.path.exists(SEED_FILE):
-            import shutil
-            shutil.copy2(SEED_FILE, DB_FILE)
+    """Merge seed signals into main DB if seed has more data."""
+    if not os.path.exists(SEED_FILE):
+        return
+    if not os.path.exists(DB_FILE):
+        import shutil
+        shutil.copy2(SEED_FILE, DB_FILE)
+        return
+    try:
+        seed_conn = sqlite3.connect(SEED_FILE)
+        main_conn = sqlite3.connect(DB_FILE)
+        seed_count = seed_conn.execute("SELECT COUNT(*) FROM signals").fetchone()[0]
+        main_count = main_conn.execute("SELECT COUNT(*) FROM signals").fetchone()[0]
+        if seed_count > main_count:
+            seed_rows = seed_conn.execute("SELECT * FROM signals").fetchall()
+            seed_cols = [d[0] for d in seed_conn.execute("SELECT * FROM signals LIMIT 1").description]
+            for row in seed_rows:
+                rd = dict(zip(seed_cols, row))
+                try:
+                    main_conn.execute(
+                        "INSERT OR IGNORE INTO signals (date_logged,ticker,company,sector,decision,"
+                        "accum_level,accum_days,location,cmf,entry_price,stop_loss,target,rr_ratio,"
+                        "reasons_for,reasons_against,price_5d,price_10d,price_20d,"
+                        "return_5d,return_10d,return_20d,outcome_5d,outcome_10d,outcome_20d,last_updated)"
+                        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (rd.get("date_logged",""),rd.get("ticker",""),rd.get("company",""),rd.get("sector",""),
+                         rd.get("decision",""),rd.get("accum_level",""),rd.get("accum_days",0),rd.get("location",""),
+                         rd.get("cmf",0),rd.get("entry_price",0),rd.get("stop_loss",0),rd.get("target",0),
+                         rd.get("rr_ratio",0),rd.get("reasons_for",""),rd.get("reasons_against",""),
+                         rd.get("price_5d"),rd.get("price_10d"),rd.get("price_20d"),
+                         rd.get("return_5d"),rd.get("return_10d"),rd.get("return_20d"),
+                         rd.get("outcome_5d"),rd.get("outcome_10d"),rd.get("outcome_20d"),
+                         rd.get("last_updated")))
+                except Exception:
+                    pass
+            main_conn.commit()
+        seed_conn.close()
+        main_conn.close()
+    except Exception:
+        pass
 
 
 def init_database():
