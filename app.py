@@ -5296,6 +5296,51 @@ elif page == "📊 أداء النظام":
             result = update_signal_outcomes()
         if result["updated"] > 0:
             st.success(f"تم تحديث {result['updated']} إشارة")
+            # ── Mature signal alerts ──
+            try:
+                import sqlite3 as _sq3
+                with _sq3.connect("masa_v2.db") as _alert_conn:
+                    _alert_conn.row_factory = _sq3.Row
+                    _today_str = datetime.now().strftime("%Y-%m-%d")
+                    _recent_matured = _alert_conn.execute("""
+                        SELECT company, ticker, sector, entry_price, outcome_5d, return_5d, price_5d,
+                               outcome_10d, return_10d, price_10d, last_updated
+                        FROM signals
+                        WHERE decision='enter' AND last_updated LIKE ?
+                        ORDER BY return_5d DESC
+                    """, (f"{_today_str}%",)).fetchall()
+
+                    if _recent_matured:
+                        _matured_wins = [dict(r) for r in _recent_matured if r["outcome_5d"] == "win" and r["return_5d"] is not None]
+                        _matured_losses = [dict(r) for r in _recent_matured if r["outcome_5d"] == "loss" and r["return_5d"] is not None]
+
+                        if _matured_wins or _matured_losses:
+                            st.markdown("### 🔔 إشارات نضجت اليوم")
+                            _alert_cols = st.columns(2)
+                            with _alert_cols[0]:
+                                if _matured_wins:
+                                    for _mw in _matured_wins[:5]:
+                                        st.success(
+                                            f"🟢 **{_mw['company']}** ({_mw['ticker']}) "
+                                            f"**{_mw['return_5d']:+.1f}%** — "
+                                            f"{_mw['entry_price']:.2f} → {_mw['price_5d']:.2f}"
+                                        )
+                                else:
+                                    st.info("لا توجد إشارات ناجحة اليوم")
+                            with _alert_cols[1]:
+                                if _matured_losses:
+                                    for _ml in _matured_losses[:5]:
+                                        st.error(
+                                            f"🔴 **{_ml['company']}** ({_ml['ticker']}) "
+                                            f"**{_ml['return_5d']:+.1f}%** — "
+                                            f"{_ml['entry_price']:.2f} → {_ml['price_5d']:.2f}"
+                                        )
+                                else:
+                                    st.info("لا توجد إشارات فاشلة اليوم")
+                            st.divider()
+            except Exception:
+                pass
+
             with st.expander("تفاصيل التحديث"):
                 for detail in result["details"]:
                     st.markdown(detail)
