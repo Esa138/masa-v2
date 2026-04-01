@@ -5433,7 +5433,47 @@ elif page == "📊 أداء النظام":
         _avg_c = "normal" if _avg_return > 0 else "inverse"
         c2.metric(f"نسبة النجاح ({_period_label})", f"{_win_rate:.1f}%", delta_color=_wr_color)
         c3.metric(f"متوسط العائد ({_period_label})", f"{_avg_return:+.2f}%", delta_color=_avg_c)
-        c4.metric("Profit Factor", f"{_profit_factor:.2f}")
+        _pf_color = "normal" if _profit_factor >= 1.5 else "inverse" if _profit_factor < 1.0 else "off"
+        c4.metric("Profit Factor", f"{_profit_factor:.2f}", delta_color=_pf_color)
+
+        # ── Profit Factor breakdown ──
+        _avg_win_ret = sum(s.get(_return_col, 0) or 0 for s in _wins) / len(_wins) if _wins else 0
+        _avg_loss_ret = sum(s.get(_return_col, 0) or 0 for s in _losses) / len(_losses) if _losses else 0
+        _best_trade = max(_completed, key=lambda x: x.get(_return_col, 0) or 0)
+        _worst_trade = min(_completed, key=lambda x: x.get(_return_col, 0) or 0)
+
+        _pf_verdict = "🟢 مربحة" if _profit_factor >= 1.5 else "🟡 على الحد" if _profit_factor >= 1.0 else "🔴 خاسرة"
+
+        st.markdown(f'''
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0;direction:rtl">
+            <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
+                <div style="color:#6b7280;font-size:0.72em">🟢 متوسط الربح</div>
+                <div style="color:#00E676;font-weight:700;font-size:1.2em">{_avg_win_ret:+.2f}%</div>
+                <div style="color:#4b5563;font-size:0.7em">{len(_wins)} صفقة</div>
+            </div>
+            <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
+                <div style="color:#6b7280;font-size:0.72em">🔴 متوسط الخسارة</div>
+                <div style="color:#FF5252;font-weight:700;font-size:1.2em">{_avg_loss_ret:+.2f}%</div>
+                <div style="color:#4b5563;font-size:0.7em">{len(_losses)} صفقة</div>
+            </div>
+            <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
+                <div style="color:#6b7280;font-size:0.72em">📊 Profit Factor</div>
+                <div style="color:{"#00E676" if _profit_factor >= 1.5 else "#FF5252" if _profit_factor < 1.0 else "#FFD700"};font-weight:700;font-size:1.2em">{_profit_factor:.2f}</div>
+                <div style="color:#4b5563;font-size:0.7em">{_pf_verdict}</div>
+            </div>
+            <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
+                <div style="color:#6b7280;font-size:0.72em">🏆 أفضل صفقة</div>
+                <div style="color:#00E676;font-weight:700;font-size:1em">{(_best_trade.get(_return_col, 0) or 0):+.1f}%</div>
+                <div style="color:#4b5563;font-size:0.7em">{_best_trade.get("company", "")[:12]}</div>
+            </div>
+            <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
+                <div style="color:#6b7280;font-size:0.72em">💀 أسوأ صفقة</div>
+                <div style="color:#FF5252;font-weight:700;font-size:1em">{(_worst_trade.get(_return_col, 0) or 0):+.1f}%</div>
+                <div style="color:#4b5563;font-size:0.7em">{_worst_trade.get("company", "")[:12]}</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+
     else:
         c2.metric("نسبة النجاح", "⏳ انتظار")
         c3.metric("متوسط العائد", "⏳ انتظار")
