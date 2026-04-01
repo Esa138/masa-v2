@@ -60,17 +60,86 @@ def init_database():
         """)
 
 
+def compute_signal_quality(signal: dict) -> int:
+    """
+    Compute signal quality score 0-100 based on:
+    - flow_bias (0-25 pts)
+    - CDV trend (0-20 pts)
+    - divergence (0-20 pts)
+    - location (0-20 pts)
+    - RSI zone (0-15 pts)
+    """
+    score = 0
+
+    # Flow bias (0-25)
+    flow = abs(signal.get("flow_bias", 0))
+    if flow >= 40:
+        score += 25
+    elif flow >= 25:
+        score += 20
+    elif flow >= 15:
+        score += 15
+    elif flow >= 5:
+        score += 8
+
+    # CDV trend (0-20)
+    cdv = signal.get("cdv_trend", "")
+    if cdv == "rising":
+        score += 20
+    elif cdv == "flat":
+        score += 10
+    # falling = 0
+
+    # Divergence (0-20)
+    div = abs(signal.get("divergence", 0))
+    if div >= 30:
+        score += 20
+    elif div >= 20:
+        score += 15
+    elif div >= 10:
+        score += 8
+
+    # Location (0-20)
+    loc = signal.get("location", "")
+    if loc in ("bottom", "support"):
+        score += 20
+    elif loc == "middle":
+        score += 10
+    elif loc in ("resistance", "above"):
+        score += 5
+
+    # RSI zone (0-15)
+    rsi = signal.get("rsi", 50)
+    if 30 <= rsi <= 50:
+        score += 15  # ideal buying zone
+    elif 25 <= rsi < 30 or 50 < rsi <= 60:
+        score += 10
+    elif rsi < 25:
+        score += 5  # oversold — risky
+    # overbought = 0
+
+    return min(score, 100)
+
+
 def log_signal(signal: dict) -> bool:
-    """Log a signal to the database."""
+    """Log a signal to the database with quality score."""
     try:
+        # Add quality_score column if not exists
         with sqlite3.connect(DB_FILE) as conn:
+            try:
+                conn.execute("ALTER TABLE signals ADD COLUMN quality_score INTEGER DEFAULT 0")
+            except Exception:
+                pass  # Column already exists
+
+            quality = compute_signal_quality(signal)
+
             conn.execute("""
                 INSERT OR IGNORE INTO signals
                 (date_logged, ticker, company, sector, decision,
                  accum_level, accum_days, location, cmf,
                  entry_price, stop_loss, target, rr_ratio,
-                 reasons_for, reasons_against)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 reasons_for, reasons_against, quality_score)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 signal.get("date_logged", ""),
                 signal.get("ticker", ""),
@@ -87,6 +156,7 @@ def log_signal(signal: dict) -> bool:
                 signal.get("rr_ratio", 0),
                 "|".join(signal.get("reasons_for", [])),
                 "|".join(signal.get("reasons_against", [])),
+                quality,
             ))
             return True
     except Exception:
