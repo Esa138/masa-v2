@@ -5789,6 +5789,125 @@ elif page == "📊 أداء النظام":
                     f"({sum(_worst_loc[1]['returns'])/len(_worst_loc[1]['returns']):+.2f}%)"
                 )
 
+    # ── Weekly AI Report ──
+    if _n_completed > 10:
+        st.divider()
+        st.subheader("📱 تقرير أسبوعي بالذكاء الاصطناعي")
+        st.caption("تحليل شامل لأداء المنصة — مدعوم بـ Claude Sonnet")
+
+        if st.button("🚀 أنشئ التقرير الأسبوعي", key="weekly_ai_btn", type="primary", use_container_width=True):
+            # Build performance summary for AI
+            _weekly_data = {
+                "period": _period,
+                "total_signals": len(_all_signals),
+                "completed": _n_completed,
+                "win_rate": round(sum(1 for s in _completed if s.get(_outcome_col) == "win") / _n_completed * 100, 1) if _n_completed > 0 else 0,
+                "avg_return": round(sum(s.get(_return_col, 0) or 0 for s in _completed) / _n_completed, 2) if _n_completed > 0 else 0,
+                "best_trades": [],
+                "worst_trades": [],
+                "sector_performance": {},
+                "signal_type_performance": {},
+                "platform_version": "V3-TEST" if "v3" in st.session_state.get("_app_url", "") else "V2",
+            }
+
+            # Best/worst
+            _sorted_trades = sorted(_completed, key=lambda x: x.get(_return_col, 0) or 0, reverse=True)
+            for _t in _sorted_trades[:5]:
+                _weekly_data["best_trades"].append({
+                    "name": _t.get("company", _t.get("ticker", "")),
+                    "sector": _t.get("sector", ""),
+                    "return": _t.get(_return_col, 0),
+                    "accum_level": _t.get("accum_level", ""),
+                    "location": _t.get("location", ""),
+                })
+            for _t in _sorted_trades[-5:]:
+                _weekly_data["worst_trades"].append({
+                    "name": _t.get("company", _t.get("ticker", "")),
+                    "sector": _t.get("sector", ""),
+                    "return": _t.get(_return_col, 0),
+                    "accum_level": _t.get("accum_level", ""),
+                    "location": _t.get("location", ""),
+                })
+
+            # Sector performance
+            for _s in _completed:
+                _sec = _s.get("sector", "غير مصنف")
+                _is_sr = ".SR" in (_s.get("ticker", ""))
+                _mkt = "🇸🇦" if _is_sr else "🇺🇸"
+                _key = f"{_mkt} {_sec}"
+                if _key not in _weekly_data["sector_performance"]:
+                    _weekly_data["sector_performance"][_key] = {"total": 0, "wins": 0, "returns": []}
+                _weekly_data["sector_performance"][_key]["total"] += 1
+                if _s.get(_outcome_col) == "win":
+                    _weekly_data["sector_performance"][_key]["wins"] += 1
+                _weekly_data["sector_performance"][_key]["returns"].append(_s.get(_return_col, 0) or 0)
+
+            # Summarize sectors
+            for _k, _v in _weekly_data["sector_performance"].items():
+                _v["win_rate"] = round(_v["wins"] / _v["total"] * 100, 1) if _v["total"] > 0 else 0
+                _v["avg_return"] = round(sum(_v["returns"]) / len(_v["returns"]), 2) if _v["returns"] else 0
+                del _v["returns"]
+
+            # Signal type performance
+            for _s in _completed:
+                _al = _s.get("accum_level", "") or "غير محدد"
+                if _al not in _weekly_data["signal_type_performance"]:
+                    _weekly_data["signal_type_performance"][_al] = {"total": 0, "wins": 0, "avg_return": 0, "returns": []}
+                _weekly_data["signal_type_performance"][_al]["total"] += 1
+                if _s.get(_outcome_col) == "win":
+                    _weekly_data["signal_type_performance"][_al]["wins"] += 1
+                _weekly_data["signal_type_performance"][_al]["returns"].append(_s.get(_return_col, 0) or 0)
+            for _k, _v in _weekly_data["signal_type_performance"].items():
+                _v["win_rate"] = round(_v["wins"] / _v["total"] * 100, 1) if _v["total"] > 0 else 0
+                _v["avg_return"] = round(sum(_v["returns"]) / len(_v["returns"]), 2) if _v["returns"] else 0
+                del _v["returns"]
+
+            import json
+            _weekly_prompt = f"""حلل أداء منصة MASA QUANT وأعطني تقرير أسبوعي شامل:
+
+{json.dumps(_weekly_data, ensure_ascii=False, indent=2)}
+
+## الهيكل المطلوب:
+
+### 📊 ملخص الأسبوع (3 أسطر)
+إجمالي، نسبة نجاح، ربح/خسارة، هل المنصة مربحة؟
+
+### 🏆 أفضل 3 صفقات ولماذا نجحت
+اربط النجاح بنوع الإشارة والقطاع والموقع
+
+### 💀 أسوأ 3 صفقات ولماذا فشلت
+اكتشف النمط — هل فيه قطاع أو نوع إشارة يتكرر في الفشل؟
+
+### 📈 القطاعات: أين نركز وأين نبتعد
+رتب القطاعات من الأفضل للأسوأ. حدد: أي قطاعات لازم نشدد عليها أو نمنعها.
+
+### 🎯 نوع الإشارة: أي نوع ينجح وأي نوع يفشل
+Spring vs Accumulation vs Markup — مين الأفضل؟
+
+### 🔧 توصيات التحسين
+3 توصيات محددة قابلة للتنفيذ بناءً على البيانات.
+مثال: "أوقف إشارات Healthcare" أو "شدد Spring يحتاج flow>30"
+
+### 🇸🇦 vs 🇺🇸 المقارنة
+أي سوق أفضل؟ بكم؟ ولماذا؟
+
+درجة ثقة المنصة الحالية: X/100
+لا تتجاوز 800 كلمة."""
+
+            _weekly_system = """أنت محلل أداء أنظمة تداول — مستوى risk manager في hedge fund.
+تكتب بالعربية (سعودي مهني). تحلل الأرقام بصرامة وبدون تجميل.
+لو المنصة خاسرة قلها خاسرة. لو فيها مشكلة وضحها. الصراحة أهم من التفاؤل.
+كل توصية لازم تكون مبنية على رقم حقيقي من البيانات."""
+
+            try:
+                from core.ai_reports import _call_sonnet
+                with st.spinner("🤖 Claude يحلل الأداء..."):
+                    _weekly_report = _call_sonnet(_weekly_system, _weekly_prompt, 4000)
+                st.markdown("---")
+                st.markdown(_weekly_report)
+            except Exception as _e:
+                st.error(f"خطأ: {_e}")
+
     st.divider()
     st.subheader("🏛 بيانات الملكية المؤسساتية")
     inst_summary = get_ownership_summary(get_all_tickers())
