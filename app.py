@@ -5252,7 +5252,7 @@ elif page == "⭐ قائمة المتابعة":
             }
             _phase_label = _phase_icons.get(_wl_phase, "⚪ محايد")
 
-            _wcol1, _wcol2 = st.columns([10, 1])
+            _wcol1, _wcol2, _wcol3 = st.columns([9, 1, 1])
             with _wcol1:
                 st.markdown(f'''
                 <div style="background:linear-gradient(135deg,#131a2e,#0e1424);border:1px solid {_wl_dec_color}30;
@@ -5279,6 +5279,12 @@ elif page == "⭐ قائمة المتابعة":
                 </div>
                 ''', unsafe_allow_html=True)
             with _wcol2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("📊", key=f"_wl_detail_{_wi}", help="تفاصيل السهم"):
+                    st.session_state.selected_ticker = _wl_ticker
+                    st.session_state["_goto_page"] = "🔬 Order Flow"
+                    st.rerun()
+            with _wcol3:
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("🗑️", key=f"_wl_del_{_wi}", help="حذف من القائمة"):
                     _wl_to_remove = _wi
