@@ -3208,7 +3208,7 @@ with st.sidebar:
     st.divider()
 
     # Handle navigation from sector map → company analysis
-    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "📅 تقويم النتائج", "🤖 تقارير AI", "📊 أداء النظام"]
+    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "📅 تقويم النتائج", "🤖 تقارير AI", "📊 أداء النظام"]
     if st.session_state.get("_goto_page"):
         st.session_state["page_nav"] = st.session_state.pop("_goto_page")
 
@@ -5128,6 +5128,207 @@ elif page == "🔍 تحليل شركة":
 # ══════════════════════════════════════════════════════════════
 # ══════════════════════════════════════════════════════════════
 # PAGE: Earnings Calendar — تقويم النتائج
+# ══════════════════════════════════════════════════════════════
+# PAGE: Watchlist — قائمة المتابعة
+# ══════════════════════════════════════════════════════════════
+
+elif page == "⭐ قائمة المتابعة":
+    st.markdown('''
+    <div style="text-align:center;padding:20px 0 10px 0">
+        <span style="font-size:1.6em;font-weight:800;color:#fff">⭐ قائمة المتابعة</span>
+        <div style="color:#6b7280;font-size:0.92em;margin-top:6px">
+            تابع أسهمك المفضلة — أضف أي سهم وراقب أداءه
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # Initialize watchlist in session state
+    if "watchlist" not in st.session_state:
+        st.session_state.watchlist = []
+
+    # Load from file if exists
+    import json as _wl_json, os as _wl_os
+    _wl_file = _wl_os.path.join(_wl_os.path.dirname(_wl_os.path.abspath(__file__)), "data", "watchlist.json")
+    if not st.session_state.watchlist:
+        try:
+            with open(_wl_file, "r") as _f:
+                st.session_state.watchlist = _wl_json.load(_f)
+        except Exception:
+            pass
+
+    # Add stock section
+    results = st.session_state.get("scan_results")
+    _wl_col1, _wl_col2 = st.columns([3, 1])
+    with _wl_col1:
+        _available = []
+        if results:
+            _available = sorted(set(f"{r.get('name', r['ticker'])} ({r['ticker']})" for r in results))
+        _wl_input = st.selectbox("🔍 أضف سهم للمتابعة", [""] + _available, key="_wl_add_input")
+    with _wl_col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("➕ أضف", key="_wl_add_btn", type="primary", use_container_width=True):
+            if _wl_input:
+                # Extract ticker from "Name (TICKER)"
+                _wl_ticker = _wl_input.split("(")[-1].replace(")", "").strip()
+                _wl_name = _wl_input.split("(")[0].strip()
+                if _wl_ticker not in [w["ticker"] for w in st.session_state.watchlist]:
+                    _wl_entry = {
+                        "ticker": _wl_ticker,
+                        "name": _wl_name,
+                        "added_date": datetime.datetime.now().strftime("%Y-%m-%d"),
+                        "added_price": 0,
+                        "notes": "",
+                    }
+                    # Get current price + data from scan
+                    if results:
+                        _wr = next((r for r in results if r["ticker"] == _wl_ticker), None)
+                        if _wr:
+                            _wl_entry["added_price"] = _wr.get("last_close", _wr.get("price", 0))
+                            _wl_entry["sector"] = _wr.get("sector", "")
+                    st.session_state.watchlist.append(_wl_entry)
+                    # Save to file
+                    try:
+                        with open(_wl_file, "w") as _f:
+                            _wl_json.dump(st.session_state.watchlist, _f, ensure_ascii=False)
+                    except Exception:
+                        pass
+                    st.toast(f"✅ تم إضافة {_wl_name}", icon="⭐")
+                    st.rerun()
+
+    # Display watchlist
+    if not st.session_state.watchlist:
+        st.info("📋 القائمة فارغة — أضف أسهم من القائمة أعلاه أو من Order Flow")
+    else:
+        st.markdown(f"### 📋 أسهمك ({len(st.session_state.watchlist)})")
+
+        _wl_to_remove = None
+        for _wi, _w in enumerate(st.session_state.watchlist):
+            _wl_ticker = _w["ticker"]
+            _wl_name = _w.get("name", _wl_ticker)
+            _wl_sector = _w.get("sector", "")
+            _wl_added = _w.get("added_date", "")
+            _wl_added_price = _w.get("added_price", 0)
+
+            # Get current data from scan
+            _wl_current = None
+            _wl_price = 0
+            _wl_change = 0
+            _wl_decision = ""
+            _wl_dec_color = "#9ca3af"
+            _wl_flow = 0
+            _wl_phase = ""
+            _wl_cdv = ""
+            _wl_rsi = 0
+            _wl_pnl = 0
+
+            if results:
+                _wl_current = next((r for r in results if r["ticker"] == _wl_ticker), None)
+                if _wl_current:
+                    _wl_price = _wl_current.get("last_close", _wl_current.get("price", 0))
+                    _wl_change = _wl_current.get("change_pct", 0)
+                    _wl_decision = _wl_current.get("decision", "")
+                    _wl_flow = _wl_current.get("flow_bias", 0)
+                    _wl_phase = _wl_current.get("phase", "")
+                    _wl_cdv = _wl_current.get("cdv_trend", "")
+                    _wl_rsi = _wl_current.get("rsi", 0)
+                    if _wl_added_price > 0 and _wl_price > 0:
+                        _wl_pnl = (_wl_price - _wl_added_price) / _wl_added_price * 100
+
+            _dec_labels = {"enter": "✅ ادخل", "watch": "⚠️ راقب", "avoid": "❌ تجنب"}
+            _dec_colors = {"enter": "#00E676", "watch": "#FFD700", "avoid": "#FF5252"}
+            _wl_dec_label = _dec_labels.get(_wl_decision, "—")
+            _wl_dec_color = _dec_colors.get(_wl_decision, "#9ca3af")
+
+            _pnl_color = "#00E676" if _wl_pnl > 0 else "#FF5252" if _wl_pnl < 0 else "#9ca3af"
+            _change_color = "#00E676" if _wl_change > 0 else "#FF5252" if _wl_change < 0 else "#9ca3af"
+            _flow_color = "#00E676" if _wl_flow > 15 else "#FF5252" if _wl_flow < -15 else "#FFD700"
+
+            _cdv_icons = {"rising": "📈 صاعد", "falling": "📉 هابط", "flat": "➡️ مستقر"}
+            _cdv_label = _cdv_icons.get(_wl_cdv, "—")
+
+            _phase_icons = {
+                "accumulation": "🟢 تجميع", "spring": "💎 سبرنق", "markup": "🚀 صعود",
+                "distribution": "🔴 تصريف", "markdown": "📉 هبوط", "upthrust": "⚠️ أبثرست",
+            }
+            _phase_label = _phase_icons.get(_wl_phase, "⚪ محايد")
+
+            _wcol1, _wcol2 = st.columns([10, 1])
+            with _wcol1:
+                st.markdown(f'''
+                <div style="background:linear-gradient(135deg,#131a2e,#0e1424);border:1px solid {_wl_dec_color}30;
+                            border-radius:12px;padding:14px 18px;margin:6px 0;direction:rtl">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <div>
+                            <span style="font-size:1.15em;font-weight:800;color:#fff">{_wl_name}</span>
+                            <span style="color:#4b5563;font-size:0.8em;margin-right:8px">{_wl_ticker} • {_wl_sector}</span>
+                        </div>
+                        <div style="display:flex;gap:12px;align-items:center">
+                            <span style="color:{_change_color};font-weight:600;font-size:0.9em">{_wl_change:+.1f}%</span>
+                            <span style="font-size:1.3em;font-weight:800;color:#fff">{_wl_price:.2f}</span>
+                            <span style="background:{_wl_dec_color};color:#000;padding:3px 10px;border-radius:15px;font-weight:700;font-size:0.8em">{_wl_dec_label}</span>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:16px;font-size:0.82em;color:#9ca3af;flex-wrap:wrap">
+                        <span>📊 Flow: <b style="color:{_flow_color}">{_wl_flow:+.0f}</b></span>
+                        <span>📈 CDV: <b>{_cdv_label}</b></span>
+                        <span>🔄 المرحلة: <b>{_phase_label}</b></span>
+                        <span>📉 RSI: <b style="color:{'#FF5252' if _wl_rsi > 70 else '#00E676' if _wl_rsi < 30 else '#9ca3af'}">{_wl_rsi:.0f}</b></span>
+                        <span style="color:{_pnl_color};font-weight:700">💰 الربح/الخسارة: {_wl_pnl:+.1f}%</span>
+                        <span style="color:#4b5563">📅 أضيف: {_wl_added} بسعر {_wl_added_price:.2f}</span>
+                    </div>
+                </div>
+                ''', unsafe_allow_html=True)
+            with _wcol2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("🗑️", key=f"_wl_del_{_wi}", help="حذف من القائمة"):
+                    _wl_to_remove = _wi
+
+        if _wl_to_remove is not None:
+            _removed = st.session_state.watchlist.pop(_wl_to_remove)
+            try:
+                with open(_wl_file, "w") as _f:
+                    _wl_json.dump(st.session_state.watchlist, _f, ensure_ascii=False)
+            except Exception:
+                pass
+            st.toast(f"🗑️ تم حذف {_removed.get('name', '')}", icon="❌")
+            st.rerun()
+
+        # Summary stats
+        if results and st.session_state.watchlist:
+            _wl_enters = sum(1 for w in st.session_state.watchlist
+                           if any(r["ticker"] == w["ticker"] and r.get("decision") == "enter" for r in results))
+            _wl_avoids = sum(1 for w in st.session_state.watchlist
+                           if any(r["ticker"] == w["ticker"] and r.get("decision") == "avoid" for r in results))
+            _wl_total_pnl = sum(
+                (_wl_price - w.get("added_price", 0)) / w.get("added_price", 1) * 100
+                for w in st.session_state.watchlist
+                if w.get("added_price", 0) > 0
+                for r in results if r["ticker"] == w["ticker"]
+                for _wl_price in [r.get("last_close", r.get("price", 0))]
+            ) / max(len(st.session_state.watchlist), 1)
+
+            st.markdown(f'''
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px;direction:rtl">
+                <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
+                    <div style="color:#6b7280;font-size:0.75em">إجمالي</div>
+                    <div style="color:#fff;font-weight:800;font-size:1.3em">{len(st.session_state.watchlist)}</div>
+                </div>
+                <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
+                    <div style="color:#6b7280;font-size:0.75em">✅ ادخل</div>
+                    <div style="color:#00E676;font-weight:800;font-size:1.3em">{_wl_enters}</div>
+                </div>
+                <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
+                    <div style="color:#6b7280;font-size:0.75em">❌ تجنب</div>
+                    <div style="color:#FF5252;font-weight:800;font-size:1.3em">{_wl_avoids}</div>
+                </div>
+                <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
+                    <div style="color:#6b7280;font-size:0.75em">💰 متوسط PnL</div>
+                    <div style="color:{'#00E676' if _wl_total_pnl > 0 else '#FF5252'};font-weight:800;font-size:1.3em">{_wl_total_pnl:+.1f}%</div>
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
+
+
 # ══════════════════════════════════════════════════════════════
 
 elif page == "📅 تقويم النتائج":
