@@ -11,12 +11,12 @@ SEED_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "ma
 
 
 def _ensure_db():
-    """Force-copy seed DB to ensure clean sector names."""
+    """Copy seed if no DB exists. Never overwrite — preserve new signals."""
     if not os.path.exists(SEED_FILE):
         return
-    # Always replace with seed to ensure sector names are correct
-    import shutil
-    shutil.copy2(SEED_FILE, DB_FILE)
+    if not os.path.exists(DB_FILE):
+        import shutil
+        shutil.copy2(SEED_FILE, DB_FILE)
 
 
 def init_database():
