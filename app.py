@@ -3398,6 +3398,33 @@ if page == "🔬 Order Flow":
     </div>
     ''', unsafe_allow_html=True)
 
+    # ── Today's New Signals Banner ────────────────────────
+    _today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+    _today_enters = [r for r in results if r.get("decision") == "enter"]
+    _today_new_count = len(_today_enters)
+    if _today_new_count > 0:
+        _new_names = [f"**{r.get('name', r['ticker'])}** ({r.get('sector','')})" for r in _today_enters[:8]]
+        _more = f" +{_today_new_count - 8} أخرى" if _today_new_count > 8 else ""
+        st.markdown(f'''
+        <div style="background:linear-gradient(135deg,rgba(0,230,118,0.08),rgba(0,230,118,0.02));
+                    border:1px solid #00E67630;border-radius:12px;padding:14px 18px;margin:10px 0;direction:rtl">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span style="font-size:1.1em;font-weight:700;color:#00E676">
+                    🔔 إشارات اليوم: {_today_new_count} سهم "ادخل"
+                </span>
+                <span style="color:#4b5563;font-size:0.8em">{_today_str}</span>
+            </div>
+            <div style="color:#9ca3af;font-size:0.85em;line-height:1.8">
+                {" • ".join(_new_names)}{_more}
+            </div>
+            <div style="color:#4b5563;font-size:0.75em;margin-top:6px">
+                ✅ تم تسجيلها تلقائياً — المتابعة في 📊 أداء النظام
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+    else:
+        st.info("🔍 لا توجد إشارات دخول في هالمسح — السوق حذر")
+
     # ── Filters ───────────────────────────────────────────
     fcol1, fcol2, fcol3, fcol4, fcol5 = st.columns(5)
     with fcol1:
