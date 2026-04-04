@@ -156,12 +156,39 @@ def _get_platform_tag():
     return "V2"
 
 
+def _is_golden_signal(signal: dict) -> bool:
+    """Check if signal matches the golden filter formula."""
+    is_accum = signal.get("accum_level", "") in ("accumulation", "spring")
+    reasons_for = signal.get("reasons_for", [])
+    reasons_against = signal.get("reasons_against", [])
+    if isinstance(reasons_for, str):
+        reasons_for = reasons_for.split("|") if reasons_for else []
+    if isinstance(reasons_against, str):
+        reasons_against = reasons_against.split("|") if reasons_against else []
+
+    has_buyer = any("المشتري هو المهاجم" in r for r in reasons_for)
+    has_div = any("دايفرجنس شرائي" in r for r in reasons_for)
+    zero_against = len([r for r in reasons_against if r.strip()]) == 0
+
+    # Check divergence >= 25
+    div_val = 0
+    for r in reasons_for:
+        if "دايفرجنس" in r:
+            import re
+            m = re.search(r'\+(\d+)', r)
+            if m:
+                div_val = int(m.group(1))
+    strong_div = div_val >= 25
+
+    return is_accum and has_buyer and strong_div and zero_against
+
+
 def log_signal(signal: dict) -> bool:
-    """Log a signal to the database with quality score + platform tag."""
+    """Log a signal to the database with quality score + platform tag + golden flag."""
     try:
         with sqlite3.connect(DB_FILE) as conn:
             # Add new columns if not exists
-            for col, typ in [("quality_score", "INTEGER DEFAULT 0"), ("platform", "TEXT DEFAULT 'V2'")]:
+            for col, typ in [("quality_score", "INTEGER DEFAULT 0"), ("platform", "TEXT DEFAULT 'V2'"), ("is_golden", "INTEGER DEFAULT 0")]:
                 try:
                     conn.execute(f"ALTER TABLE signals ADD COLUMN {col} {typ}")
                 except Exception:
@@ -169,14 +196,15 @@ def log_signal(signal: dict) -> bool:
 
             quality = compute_signal_quality(signal)
             platform = signal.get("platform", _get_platform_tag())
+            golden = 1 if _is_golden_signal(signal) else 0
 
             conn.execute("""
                 INSERT OR IGNORE INTO signals
                 (date_logged, ticker, company, sector, decision,
                  accum_level, accum_days, location, cmf,
                  entry_price, stop_loss, target, rr_ratio,
-                 reasons_for, reasons_against, quality_score, platform)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 reasons_for, reasons_against, quality_score, platform, is_golden)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 signal.get("date_logged", ""),
                 signal.get("ticker", ""),
@@ -195,6 +223,7 @@ def log_signal(signal: dict) -> bool:
                 "|".join(signal.get("reasons_against", [])),
                 quality,
                 platform,
+                golden,
             ))
             return True
     except Exception:
