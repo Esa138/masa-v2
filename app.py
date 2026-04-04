@@ -3208,7 +3208,7 @@ with st.sidebar:
     st.divider()
 
     # Handle navigation from sector map → company analysis
-    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "📅 تقويم النتائج", "🤖 تقارير AI", "📊 أداء النظام"]
+    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "📅 تقويم النتائج", "🤖 تقارير AI", "📊 أداء النظام"]
     if st.session_state.get("_goto_page"):
         st.session_state["page_nav"] = st.session_state.pop("_goto_page")
 
@@ -5336,6 +5336,192 @@ elif page == "⭐ قائمة المتابعة":
 
 
 # ══════════════════════════════════════════════════════════════
+
+# ══════════════════════════════════════════════════════════════
+# PAGE: Golden Filter — الفلتر الذهبي
+# ══════════════════════════════════════════════════════════════
+
+elif page == "🥇 الفلتر الذهبي":
+
+    st.markdown('''
+    <div style="text-align:center;padding:20px 0">
+        <span style="font-size:2em;font-weight:800;color:#FFD700">🥇 الفلتر الذهبي</span>
+        <div style="color:#6b7280;font-size:0.9em;margin-top:6px">
+            الأسهم اللي تحقق الوصفة الناجحة — تجميع + مهاجم + divergence + صفر حذر
+        </div>
+        <div style="color:#374151;font-size:0.78em;margin-top:4px">
+            نسبة نجاح تاريخية: 79% (30/38) | متوسط عائد: +2.06% (10 أيام) | ⚠️ تحت المراقبة
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    results = st.session_state.scan_results
+
+    if results is None:
+        st.info("امسح من Order Flow أولاً عشان يظهر الفلتر الذهبي")
+    else:
+        # Apply golden filter
+        _golden = []
+        _normal = []
+
+        for r in results:
+            if r.get("decision") != "enter":
+                continue
+
+            _is_accum = r.get("phase") in ("accumulation", "spring")
+            _is_buyer = r.get("aggressor") == "buyers"
+            _div = abs(r.get("divergence", 0))
+            _has_div = _div >= 25
+            _reasons_against = r.get("reasons_against", [])
+            _zero_against = len(_reasons_against) == 0
+
+            _entry = {
+                "ticker": r["ticker"],
+                "name": r.get("name", r["ticker"]),
+                "sector": r.get("sector", ""),
+                "price": r.get("last_close", 0),
+                "change": r.get("change_pct", 0),
+                "flow": r.get("flow_bias", 0),
+                "div": r.get("divergence", 0),
+                "rsi": r.get("rsi", 0),
+                "phase": r.get("phase", ""),
+                "cdv": r.get("cdv_trend", ""),
+                "location": r.get("location", ""),
+                "days": r.get("days", 0),
+                "stop": r.get("stop_loss", 0),
+                "target": r.get("target", 0),
+                "rr": r.get("rr_ratio", 0),
+                "reasons_for": r.get("reasons_for", []),
+                "reasons_against": _reasons_against,
+                "is_accum": _is_accum,
+                "is_buyer": _is_buyer,
+                "has_div": _has_div,
+                "zero_against": _zero_against,
+            }
+
+            if _is_accum and _is_buyer and _has_div and _zero_against:
+                _golden.append(_entry)
+            else:
+                _normal.append(_entry)
+
+        # Summary
+        _total_enter = len(_golden) + len(_normal)
+        _g_pct = len(_golden) / _total_enter * 100 if _total_enter > 0 else 0
+
+        st.markdown(f'''
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0;direction:rtl">
+            <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid #FFD70040;
+                        border-radius:12px;padding:16px;text-align:center">
+                <div style="color:#FFD700;font-size:0.8em">🥇 إشارات ذهبية</div>
+                <div style="color:#FFD700;font-size:2em;font-weight:800">{len(_golden)}</div>
+            </div>
+            <div style="background:linear-gradient(135deg,#131a2e,#0e1424);border:1px solid #192035;
+                        border-radius:12px;padding:16px;text-align:center">
+                <div style="color:#6b7280;font-size:0.8em">🔵 إشارات عادية</div>
+                <div style="color:#9ca3af;font-size:2em;font-weight:800">{len(_normal)}</div>
+            </div>
+            <div style="background:linear-gradient(135deg,#131a2e,#0e1424);border:1px solid #192035;
+                        border-radius:12px;padding:16px;text-align:center">
+                <div style="color:#6b7280;font-size:0.8em">📊 إجمالي "ادخل"</div>
+                <div style="color:#fff;font-size:2em;font-weight:800">{_total_enter}</div>
+            </div>
+            <div style="background:linear-gradient(135deg,#131a2e,#0e1424);border:1px solid #192035;
+                        border-radius:12px;padding:16px;text-align:center">
+                <div style="color:#6b7280;font-size:0.8em">🎯 نسبة الذهبي</div>
+                <div style="color:#FFD700;font-size:2em;font-weight:800">{_g_pct:.0f}%</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+
+        # Golden filter conditions legend
+        st.markdown('''
+        <div style="background:rgba(255,215,0,0.05);border:1px solid #FFD70030;border-radius:10px;
+                    padding:12px 16px;margin-bottom:16px;direction:rtl;font-size:0.85em;color:#9ca3af">
+            <b style="color:#FFD700">الشروط الأربعة:</b>
+            ✅ تجميع (accumulation/spring) &nbsp;+&nbsp;
+            ✅ المشتري مهاجم (buyers) &nbsp;+&nbsp;
+            ✅ Divergence ≥ 25 &nbsp;+&nbsp;
+            ✅ صفر أسباب حذر
+        </div>
+        ''', unsafe_allow_html=True)
+
+        if not _golden:
+            st.warning("لا توجد إشارات ذهبية في المسح الحالي — كل الإشارات عادية")
+        else:
+            st.markdown("### 🥇 الإشارات الذهبية")
+
+            for _gi, _g in enumerate(sorted(_golden, key=lambda x: -x["div"])):
+                _g_change_c = "#00E676" if _g["change"] >= 0 else "#FF5252"
+                _g_flow_c = "#00E676" if _g["flow"] > 20 else "#FFD700" if _g["flow"] > 0 else "#FF5252"
+                _g_cdv_label = "صاعد ✅" if _g["cdv"] == "rising" else "هابط ❌" if _g["cdv"] == "falling" else "مستقر"
+
+                st.markdown(f'''
+                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid #FFD70040;
+                            border-radius:12px;padding:16px 18px;margin:8px 0;direction:rtl">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                        <div>
+                            <span style="font-size:1.2em;font-weight:800;color:#FFD700">🥇 {_g["name"]}</span>
+                            <span style="color:#4b5563;font-size:0.8em;margin-right:8px">{_g["ticker"]} • {_g["sector"]}</span>
+                        </div>
+                        <div style="display:flex;gap:12px;align-items:center">
+                            <span style="color:{_g_change_c};font-weight:600">{_g["change"]:+.1f}%</span>
+                            <span style="font-size:1.4em;font-weight:800;color:#fff">{_g["price"]:.2f}</span>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:0.82em;color:#9ca3af">
+                        <span style="color:{_g_flow_c}">📈 Flow: <b>{_g["flow"]:+.0f}</b></span>
+                        <span>⭐ Div: <b style="color:#FFD700">{_g["div"]:+.0f}</b></span>
+                        <span>📊 CDV: <b>{_g_cdv_label}</b></span>
+                        <span>📉 RSI: <b>{_g["rsi"]:.0f}</b></span>
+                        <span>🔄 {_g["phase"]}</span>
+                        <span>📍 {_g["location"]}</span>
+                        <span>📅 {_g["days"]} يوم تجميع</span>
+                    </div>
+                    <div style="display:flex;gap:16px;margin-top:8px;font-size:0.82em">
+                        <span style="color:#FF5252">🛑 وقف: <b>{_g["stop"]:.2f}</b></span>
+                        <span style="color:#00E676">🎯 هدف: <b>{_g["target"]:.2f}</b></span>
+                        <span style="color:#4FC3F7">📐 R:R: <b>{_g["rr"]:.1f}</b></span>
+                    </div>
+                    <div style="margin-top:6px;font-size:0.75em;color:#374151">
+                        ✅ أسباب الدخول: {" | ".join(_g["reasons_for"][:3]) if _g["reasons_for"] else "—"}
+                    </div>
+                </div>
+                ''', unsafe_allow_html=True)
+
+                _gcol1, _gcol2 = st.columns([1, 1])
+                with _gcol1:
+                    if st.button("📊 تفاصيل", key=f"_gf_detail_{_gi}"):
+                        st.session_state.selected_ticker = _g["ticker"]
+                        st.session_state["_goto_page"] = "🔬 Order Flow"
+                        st.rerun()
+                with _gcol2:
+                    if st.button("⭐ أضف للمتابعة", key=f"_gf_watch_{_gi}"):
+                        if "watchlist" not in st.session_state:
+                            st.session_state.watchlist = []
+                        _exists = any(w["ticker"] == _g["ticker"] for w in st.session_state.watchlist)
+                        if not _exists:
+                            st.session_state.watchlist.append({
+                                "ticker": _g["ticker"], "name": _g["name"],
+                                "sector": _g["sector"], "added_date": datetime.now().strftime("%Y-%m-%d"),
+                                "added_price": _g["price"],
+                            })
+                            st.success(f"تم إضافة {_g['name']} للمتابعة ⭐")
+
+        # Show normal signals that ALMOST made it
+        if _normal:
+            with st.expander(f"🔵 الإشارات العادية ({len(_normal)}) — لماذا ما حققت الذهبي"):
+                for _ni, _n in enumerate(_normal[:10]):
+                    _missing = []
+                    if not _n["is_accum"]:
+                        _missing.append("❌ مو تجميع")
+                    if not _n["is_buyer"]:
+                        _missing.append("❌ المشتري مو مهاجم")
+                    if not _n["has_div"]:
+                        _missing.append(f"❌ Div ضعيف ({_n['div']:+.0f})")
+                    if not _n["zero_against"]:
+                        _missing.append(f"❌ فيه {len(_n['reasons_against'])} أسباب حذر")
+
+                    st.markdown(f"**{_n['name']}** ({_n['ticker']}) — {_n['price']:.2f} | ينقصه: {' | '.join(_missing)}")
 
 elif page == "📅 تقويم النتائج":
     from core.earnings import _fetch_earnings_info, check_earnings_proximity, check_ex_dividend
