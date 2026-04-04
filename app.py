@@ -6352,6 +6352,83 @@ elif page == "📊 أداء النظام":
             else:
                 st.warning(f"⚠️ الإشارات الضعيفة تنجح أكثر ({abs(_diff):.0f}%) — الـ scoring يحتاج مراجعة")
 
+    # ── Golden vs Normal Comparison ──
+    if _period and _n_completed > 3:
+        st.divider()
+        st.subheader("🥇 الذهبي vs العادي")
+        st.caption("هل الفلتر الذهبي فعلاً أفضل؟ نقارن بالأرقام الحية")
+
+        _golden_sigs = [s for s in _completed if s.get("is_golden") == 1]
+        _normal_sigs = [s for s in _completed if s.get("is_golden", 0) != 1]
+
+        # Also check old signals by formula (before is_golden column existed)
+        if not _golden_sigs and _completed:
+            for _cs in _completed:
+                _rf = _cs.get("reasons_for", "") or ""
+                _ra = _cs.get("reasons_against", "") or ""
+                _al = _cs.get("accum_level", "")
+                _is_a = _al in ("accumulation", "spring")
+                _has_b = "المشتري هو المهاجم" in _rf
+                _has_d = "دايفرجنس شرائي" in _rf
+                _zero_a = len(_ra.strip()) == 0
+
+                import re as _re
+                _dv = 0
+                if "دايفرجنس" in _rf:
+                    _dm = _re.search(r'\+(\d+)', _rf.split("دايفرجنس")[1][:20] if "دايفرجنس" in _rf else "")
+                    if _dm:
+                        _dv = int(_dm.group(1))
+
+                if _is_a and _has_b and _dv >= 25 and _zero_a:
+                    _golden_sigs.append(_cs)
+                else:
+                    _normal_sigs.append(_cs)
+
+        _g_total = len(_golden_sigs)
+        _n_total_sigs = len(_normal_sigs)
+
+        if _g_total >= 2 and _n_total_sigs >= 2:
+            _g_wins = sum(1 for s in _golden_sigs if s.get(_outcome_col) == "win")
+            _n_wins = sum(1 for s in _normal_sigs if s.get(_outcome_col) == "win")
+            _g_wr = _g_wins / _g_total * 100
+            _n_wr = _n_wins / _n_total_sigs * 100
+            _g_avg = sum(s.get(_return_col, 0) or 0 for s in _golden_sigs) / _g_total
+            _n_avg = sum(s.get(_return_col, 0) or 0 for s in _normal_sigs) / _n_total_sigs
+
+            _gc1, _gc2 = st.columns(2)
+            with _gc1:
+                st.markdown(f'''
+                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid #FFD70040;
+                            border-radius:12px;padding:18px;text-align:center">
+                    <div style="color:#FFD700;font-size:1em;margin-bottom:8px">🥇 الذهبي</div>
+                    <div style="color:#FFD700;font-size:2.2em;font-weight:800">{_g_wr:.0f}%</div>
+                    <div style="color:#9ca3af;font-size:0.85em">{_g_wins}/{_g_total} نجاح | عائد {_g_avg:+.2f}%</div>
+                </div>
+                ''', unsafe_allow_html=True)
+            with _gc2:
+                st.markdown(f'''
+                <div style="background:linear-gradient(135deg,#131a2e,#0e1424);border:1px solid #192035;
+                            border-radius:12px;padding:18px;text-align:center">
+                    <div style="color:#6b7280;font-size:1em;margin-bottom:8px">🔵 العادي</div>
+                    <div style="color:#9ca3af;font-size:2.2em;font-weight:800">{_n_wr:.0f}%</div>
+                    <div style="color:#9ca3af;font-size:0.85em">{_n_wins}/{_n_total_sigs} نجاح | عائد {_n_avg:+.2f}%</div>
+                </div>
+                ''', unsafe_allow_html=True)
+
+            _diff_g = _g_wr - _n_wr
+            if _diff_g > 20:
+                st.success(f"🏆 الذهبي أفضل بـ **{_diff_g:.0f}%** — الفلتر يشتغل! (نسبة نجاح {_g_wr:.0f}% vs {_n_wr:.0f}%)")
+            elif _diff_g > 5:
+                st.info(f"💡 الذهبي أفضل بـ **{_diff_g:.0f}%** — مشجع لكن يحتاج بيانات أكثر")
+            elif _diff_g > -5:
+                st.warning(f"⚠️ فرق بسيط ({_diff_g:+.0f}%) — ما نقدر نحكم بعد")
+            else:
+                st.error(f"❌ العادي أفضل بـ **{abs(_diff_g):.0f}%** — الفلتر الذهبي ما يشتغل!")
+        elif _g_total > 0 or _n_total_sigs > 0:
+            st.info(f"🥇 ذهبي: {_g_total} إشارة | 🔵 عادي: {_n_total_sigs} إشارة — يحتاج بيانات أكثر للمقارنة")
+        else:
+            st.info("لا توجد بيانات كافية — امسح يومياً لجمع إشارات")
+
     # ── Signal Type + Location Breakdown ──
     if _period and _n_completed > 5:
         st.divider()
