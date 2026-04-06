@@ -6087,6 +6087,34 @@ elif page == "📊 أداء النظام":
         _avg_return = 0
         _profit_factor = 0
 
+    # ── Market Filter (Saudi vs US vs All) ──
+    _perf_market_tab = st.radio(
+        "السوق", ["🌐 الكل", "🇸🇦 السعودي", "🇺🇸 الأمريكي"],
+        horizontal=True, key="_perf_market_filter", label_visibility="collapsed"
+    )
+    if _perf_market_tab == "🇸🇦 السعودي":
+        _all_signals = [s for s in _all_signals if ".SR" in s.get("ticker", "")]
+        _completed = [s for s in _completed if ".SR" in s.get("ticker", "")]
+        _n_signals = len(_all_signals)
+        _n_completed = len(_completed)
+        if _n_completed > 0:
+            _win_rate = sum(1 for s in _completed if s.get(_outcome_col) == "win") / _n_completed * 100
+            _avg_return = sum(s.get(_return_col, 0) or 0 for s in _completed) / _n_completed
+            _tg = sum(s.get(_return_col, 0) for s in _completed if (s.get(_return_col, 0) or 0) > 0)
+            _tl = abs(sum(s.get(_return_col, 0) for s in _completed if (s.get(_return_col, 0) or 0) < 0)) or 0.01
+            _profit_factor = round(_tg / _tl, 2)
+    elif _perf_market_tab == "🇺🇸 الأمريكي":
+        _all_signals = [s for s in _all_signals if ".SR" not in s.get("ticker", "")]
+        _completed = [s for s in _completed if ".SR" not in s.get("ticker", "")]
+        _n_signals = len(_all_signals)
+        _n_completed = len(_completed)
+        if _n_completed > 0:
+            _win_rate = sum(1 for s in _completed if s.get(_outcome_col) == "win") / _n_completed * 100
+            _avg_return = sum(s.get(_return_col, 0) or 0 for s in _completed) / _n_completed
+            _tg = sum(s.get(_return_col, 0) for s in _completed if (s.get(_return_col, 0) or 0) > 0)
+            _tl = abs(sum(s.get(_return_col, 0) for s in _completed if (s.get(_return_col, 0) or 0) < 0)) or 0.01
+            _profit_factor = round(_tg / _tl, 2)
+
     # ── Top metrics ──
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("إجمالي الإشارات", _n_signals)
