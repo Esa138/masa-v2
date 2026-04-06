@@ -11,12 +11,55 @@ SEED_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "ma
 
 
 def _ensure_db():
-    """Copy seed if no DB exists. Never overwrite — preserve new signals."""
+    """Copy seed if no DB exists, or merge outcomes from seed into existing DB."""
     if not os.path.exists(SEED_FILE):
         return
     if not os.path.exists(DB_FILE):
         import shutil
         shutil.copy2(SEED_FILE, DB_FILE)
+        return
+    # Merge: update outcomes from seed into existing DB (preserves new signals)
+    try:
+        seed_conn = sqlite3.connect(SEED_FILE)
+        main_conn = sqlite3.connect(DB_FILE)
+        # Update outcomes for existing signals
+        seed_rows = seed_conn.execute("""
+            SELECT ticker, date_logged, price_5d, return_5d, outcome_5d,
+                   price_10d, return_10d, outcome_10d,
+                   price_20d, return_20d, outcome_20d
+            FROM signals WHERE outcome_5d IS NOT NULL OR outcome_10d IS NOT NULL OR outcome_20d IS NOT NULL
+        """).fetchall()
+        for row in seed_rows:
+            tk, dl, p5, r5, o5, p10, r10, o10, p20, r20, o20 = row
+            main_conn.execute("""
+                UPDATE signals SET
+                    price_5d=COALESCE(?, price_5d), return_5d=COALESCE(?, return_5d), outcome_5d=COALESCE(?, outcome_5d),
+                    price_10d=COALESCE(?, price_10d), return_10d=COALESCE(?, return_10d), outcome_10d=COALESCE(?, outcome_10d),
+                    price_20d=COALESCE(?, price_20d), return_20d=COALESCE(?, return_20d), outcome_20d=COALESCE(?, outcome_20d)
+                WHERE ticker=? AND date_logged=?
+            """, (p5, r5, o5, p10, r10, o10, p20, r20, o20, tk, dl))
+        main_conn.commit()
+        # Also insert missing signals from seed
+        seed_all = seed_conn.execute("SELECT ticker, date_logged FROM signals").fetchall()
+        main_existing = set(main_conn.execute("SELECT ticker, date_logged FROM signals").fetchall())
+        missing = [(tk, dl) for tk, dl in seed_all if (tk, dl) not in main_existing]
+        if missing:
+            for tk, dl in missing:
+                row = seed_conn.execute("SELECT * FROM signals WHERE ticker=? AND date_logged=?", (tk, dl)).fetchone()
+                if row:
+                    cols = [d[0] for d in seed_conn.execute("SELECT * FROM signals LIMIT 1").description]
+                    vals = list(row)
+                    placeholders = ",".join(["?"] * len(vals))
+                    col_names = ",".join(cols)
+                    try:
+                        main_conn.execute(f"INSERT OR IGNORE INTO signals ({col_names}) VALUES ({placeholders})", vals)
+                    except Exception:
+                        pass
+            main_conn.commit()
+        seed_conn.close()
+        main_conn.close()
+    except Exception:
+        pass
 
 
 def init_database():
