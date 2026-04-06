@@ -51,36 +51,58 @@ SYSTEM_MARKET = """أنت محلل أسواق مالية خبير — مستوى
 تكتب بالعربية (سعودي مهني). تحلل Order Flow بعمق وتكتشف ما لا يراه المتداول العادي.
 
 ## مهمتك:
-اكتب تقرير يومي يكشف **الأسرار** — ليس ملخص أرقام.
+اكتب تقرير يومي **مترابط ومتسق** — كل قسم يبني على اللي قبله. لا تناقض نفسك أبداً.
+
+## قواعد حاسمة (لا تكسرها):
+1. **لا تعطي فرصة في قطاع نسبة نجاحه تحت 40%** — شوف sector_performance في البيانات
+2. **لا تعطي فرصة وتحذير على نفس السهم** — إما فرصة أو خطر
+3. **لو 70%+ من الأسهم "تجنب"** = السوق خطير — لا تعطي أكثر من فرصة واحدة
+4. **كل فرصة لازم تكون من قطاع نسبة نجاحه فوق 50%**
+5. **اربط كل نقطة باللي قبلها** — التقرير قصة واحدة مو أقسام منفصلة
+
+## البيانات المرفقة تشمل:
+- sector_performance: نسبة نجاح كل قطاع تاريخياً (من Performance Tracker) — اعتمد عليها!
+- golden_stats: أداء الفلتر الذهبي vs العادي — استخدمها في التوصيات
+- market_type: سعودي أو أمريكي — لكل سوق خصائص مختلفة
 
 ## الهيكل المطلوب:
 
-### 🔥 الخلاصة (جملة واحدة)
-أهم شي اليوم — الرسالة اللي لو المتداول ما قرأ غيرها يكفيه.
+### 🔥 الخلاصة (3 أسطر)
+- السطر الأول: حالة السوق اليوم بجملة واحدة
+- السطر الثاني: أهم فرصة (لو موجودة) أو أهم تحذير
+- السطر الثالث: التوصية المباشرة (ادخل/انتظر/اخرج)
 
-### 🔍 الأسرار المكتشفة
-ابحث في البيانات عن:
-1. **تناقض CDV vs السعر**: سهم ينزل لكن CDV صاعد = تجميع خفي (سمارت مني يشتري والعامة تبيع)
-2. **تناقض CDV vs السعر (عكسي)**: سهم يرتفع لكن CDV هابط = تصريف خفي (سمارت مني تبيع والعامة تشتري)
-3. **المهاجم vs الاتجاه**: المشتري مهاجم لكن السعر ينزل = امتصاص (absorption) — فرصة ذهبية
-4. **RSI متطرف + تدفق عكسي**: RSI تحت 30 لكن flow_bias إيجابي = ارتداد قادم
-5. **تسارع تجميع**: أسهم عندها days > 5 مع flow_bias فوق 20 = انفجار وشيك
-6. **سبرنق (Spring)**: مرحلة spring = كسر كاذب تحت الدعم ثم ارتداد — أقوى إشارة وايكوف
-7. **القطاع vs السهم**: قطاع يصعد لكن سهم فيه يتخلف مع تجميع = فرصة
-8. **Divergence قوي**: divergence فوق 30 أو تحت -30 = إشارة قوية جداً
-9. **Veto أو كسر دعم**: أي سهم عنده veto أو reasons_against فيها "كسر دعم" = خطر حقيقي
-10. **نسبة تجميع vs تصريف**: لو 70%+ تجميع = السوق يتحضر لصعود. لو 70%+ تصريف = هروب مؤسسي.
+### 📊 صورة السوق
+اربط بين:
+- نسبة التجميع vs التصريف (كم % من الأسهم تجميع؟)
+- المؤشر المركب (صاعد/هابط؟)
+- أداء النظام التاريخي (sector_performance)
+- **خلص بحكم واحد متسق**
 
-### ⚡ أقوى 3 فرص
-لكل فرصة: اسم السهم، السعر، السبب بالتفصيل، نقطة الدخول، وقف الخسارة، الهدف.
-ركز على الأسهم اللي عندها تجميع خفي أو سبرنق أو divergence قوي.
+### 🔍 الاكتشافات (3 أسرار فقط — الأقوى)
+لكل سر:
+- وش اكتشفت بالضبط (سهم + أرقام)
+- ليش هذا مهم (وش يعني للمتداول)
+- وش الإجراء (ادخل/راقب/ابتعد)
+**مهم: لا تذكر سهم هنا وتناقضه في قسم الفرص أو المخاطر**
 
-### 🔴 أخطر 3 مخاطر
-لكل خطر: اسم السهم، السبب، وش يصير لو دخلت.
-ركز على الأسهم اللي عندها صعود كاذب أو كسر دعم مع RSI منخفض.
+### ⚡ الفرص (2 فقط — الأقوى)
+**شروط الفرصة:**
+- القطاع نسبة نجاحه **فوق 50%** (من sector_performance)
+- السهم عنده flow إيجابي + CDV صاعد
+- صفر أسباب حذر أو سبب واحد فقط
+- مو نفس السهم اللي ذكرته في المخاطر
 
-### 📊 نبض القطاعات
-أي قطاع يقود؟ أي قطاع يتأخر؟ أي قطاع فيه تناقض (يبان قوي لكنه ضعيف من الداخل)؟
+لكل فرصة جدول:
+| السهم | الدخول | الوقف | الهدف | R:R | الثقة |
+نسبة نجاح القطاع: X%
+
+### 🔴 المخاطر (2 فقط — الأخطر)
+**مهم: لا تذكر سهم هنا لو ذكرته في الفرص**
+لكل خطر: اسم السهم + السبب + وش يصير لو دخلت
+
+### 🎯 التوصية النهائية
+جملة واحدة تربط كل اللي فوق — متسقة ما تناقض أي قسم.
 
 ### 🎯 التوصية النهائية
 | العنصر | القيمة |
@@ -430,6 +452,67 @@ def _prepare_market_summary(results, composite_data=None, pfi_data=None):
         summary["composite"] = composite_data
     if pfi_data:
         summary["pfi"] = pfi_data
+
+    # Add historical sector performance from Performance Tracker
+    try:
+        import sqlite3, os
+        _db = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "masa_v2_seed.db")
+        if not os.path.exists(_db):
+            _db = "masa_v2.db"
+        conn = sqlite3.connect(_db)
+        _sec_perf = conn.execute("""
+            SELECT sector, COUNT(*) as cnt,
+                   SUM(CASE WHEN outcome_10d='win' THEN 1 ELSE 0 END) as wins,
+                   ROUND(AVG(return_10d), 2) as avg_ret
+            FROM signals WHERE outcome_10d IS NOT NULL AND decision='enter'
+            GROUP BY sector ORDER BY AVG(return_10d) DESC
+        """).fetchall()
+        summary["sector_performance"] = {
+            "description": "نسبة نجاح كل قطاع تاريخياً (10 أيام) — لا تعطي فرصة في قطاع تحت 40%",
+            "data": [
+                {"sector": s, "signals": c, "win_rate": round(w/c*100) if c > 0 else 0,
+                 "avg_return": a, "verdict": "🟢 موثوق" if w/c >= 0.6 else "🟡 متوسط" if w/c >= 0.4 else "🔴 كارثي — لا تدخل"}
+                for s, c, w, a in _sec_perf
+            ]
+        }
+
+        # Golden vs Normal stats
+        import re
+        _all_sigs = conn.execute("""
+            SELECT reasons_for, reasons_against, accum_level, outcome_10d, return_10d
+            FROM signals WHERE outcome_10d IS NOT NULL AND decision='enter'
+        """).fetchall()
+        _g, _n = 0, 0
+        _gw, _nw = 0, 0
+        for rf, ra, al, o, r in _all_sigs:
+            rf, ra = rf or "", ra or ""
+            ia = al in ("accumulation", "spring")
+            hb = "المشتري هو المهاجم" in rf
+            dv = 0
+            if "دايفرجنس" in rf:
+                m = re.search(r'\+(\d+)', rf.split("دايفرجنس")[1][:20])
+                if m: dv = int(m.group(1))
+            za = len(ra.strip()) == 0
+            if ia and hb and dv >= 25 and za:
+                _g += 1
+                if o == "win": _gw += 1
+            else:
+                _n += 1
+                if o == "win": _nw += 1
+
+        summary["golden_stats"] = {
+            "description": "الفلتر الذهبي (تجميع + مهاجم + div≥25 + صفر حذر) — أفضل بـ 33% من العادي",
+            "golden": {"total": _g, "wins": _gw, "win_rate": round(_gw/_g*100) if _g > 0 else 0},
+            "normal": {"total": _n, "wins": _nw, "win_rate": round(_nw/_n*100) if _n > 0 else 0},
+        }
+
+        # Avoid percentage
+        summary["avoid_pct"] = round(len(avoids) / total * 100, 1) if total > 0 else 0
+        summary["market_danger"] = summary["avoid_pct"] > 70
+
+        conn.close()
+    except Exception:
+        pass
 
     return json.dumps(summary, ensure_ascii=False, indent=2)
 
