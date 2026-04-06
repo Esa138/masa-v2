@@ -4074,17 +4074,17 @@ elif page == "🗺️ خريطة القطاعات":
                     if _heat_rows:
                         _heat_df = pd.DataFrame(_heat_rows)
                         st.dataframe(
-                            _heat_df.style.applymap(
+                            _heat_df.style.map(
                                 lambda v: "color: #00E676" if isinstance(v, (int, float)) and v > 0
                                 else "color: #FF5252" if isinstance(v, (int, float)) and v < 0
                                 else "",
                                 subset=["متوسط %", "ربح %", "خسارة %", "أفضل %", "أسوأ %"]
-                            ).applymap(
+                            ).map(
                                 lambda v: "color: #00E676" if isinstance(v, (int, float)) and v >= 60
                                 else "color: #FF5252" if isinstance(v, (int, float)) and v < 40
                                 else "color: #FFD700",
                                 subset=["نجاح %"]
-                            ).applymap(
+                            ).map(
                                 lambda v: "color: #00E676" if isinstance(v, (int, float)) and v > 1
                                 else "color: #FF5252" if isinstance(v, (int, float)) and v < 0
                                 else "color: #FFD700",
