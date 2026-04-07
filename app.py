@@ -5775,13 +5775,13 @@ elif page == "🤖 تقارير AI":
     <div style="text-align:center;padding:20px 0 10px 0">
         <span style="font-size:1.8em;font-weight:800;color:#fff">🤖 تقارير AI</span>
         <div style="color:#6b7280;font-size:0.92em;margin-top:6px">
-            تحليل ذكي شامل بالذكاء الاصطناعي — مدعوم بـ Claude Sonnet
+            تحليل ذكي شامل بالذكاء الاصطناعي — مدعوم بـ MiniMax
         </div>
     </div>
     ''', unsafe_allow_html=True)
 
     if not is_ai_available():
-        st.error("❌ مفتاح API غير موجود. أضف `ANTHROPIC_API_KEY` في Settings → Secrets")
+        st.error("❌ مفتاح API غير موجود. أضف `MINIMAX_API_KEY` في Settings → Secrets")
     else:
         results = st.session_state.get("scan_results")
         if results is None:
@@ -5831,7 +5831,7 @@ elif page == "🤖 تقارير AI":
                 st.markdown("### 📋 تقرير السوق اليومي الشامل")
                 st.caption(f"يحلل {len(results)} سهم — القرارات، القطاعات، التدفقات، الفرص والمخاطر")
                 if st.button("🚀 أنشئ التقرير", key="ai_market_btn", type="primary", use_container_width=True):
-                    with st.spinner("🤖 Claude يحلل السوق..."):
+                    with st.spinner("🤖 MiniMax يحلل السوق..."):
                         report = generate_market_report(results, _ai_comp_data, _ai_pfi_data)
                     st.markdown("---")
                     st.markdown(report)
@@ -5846,7 +5846,7 @@ elif page == "🤖 تقارير AI":
                     _sect_stocks = [r for r in results if r.get("sector") == _ai_sector_sel]
                     st.caption(f"القطاع فيه {len(_sect_stocks)} سهم")
                     if st.button("🚀 حلل القطاع", key="ai_sector_btn", type="primary", use_container_width=True):
-                        with st.spinner(f"🤖 Claude يحلل {_ai_sector_sel}..."):
+                        with st.spinner(f"🤖 MiniMax يحلل {_ai_sector_sel}..."):
                             report = generate_sector_report(results, _ai_sector_sel)
                         st.markdown("---")
                         st.markdown(report)
@@ -5909,7 +5909,7 @@ elif page == "🤖 تقارير AI":
                         except Exception:
                             pass
 
-                        with st.spinner(f"🤖 Claude يحلل {_sel_r.get('name', '')}..."):
+                        with st.spinner(f"🤖 MiniMax يحلل {_sel_r.get('name', '')}..."):
                             report = generate_stock_report(_sel_r, _stock_sector_info, _stock_season_info)
                         st.markdown("---")
                         st.markdown(report)
@@ -5927,7 +5927,7 @@ elif page == "🤖 تقارير AI":
                     </div>
                     """, unsafe_allow_html=True)
                     if st.button("🚀 حلل المؤشر", key="ai_comp_btn", type="primary", use_container_width=True):
-                        with st.spinner("🤖 Claude يحلل المؤشر المركب..."):
+                        with st.spinner("🤖 MiniMax يحلل المؤشر المركب..."):
                             report = generate_composite_report(_ai_comp_data, _ai_pfi_data)
                         st.markdown("---")
                         st.markdown(report)
@@ -6561,7 +6561,7 @@ elif page == "📊 أداء النظام":
     if _n_completed > 10:
         st.divider()
         st.subheader("📱 تقرير أسبوعي بالذكاء الاصطناعي")
-        st.caption("تحليل شامل لأداء المنصة — مدعوم بـ Claude Sonnet")
+        st.caption("تحليل شامل لأداء المنصة — مدعوم بـ MiniMax")
 
         if st.button("🚀 أنشئ التقرير الأسبوعي", key="weekly_ai_btn", type="primary", use_container_width=True):
             # Build performance summary for AI
@@ -6669,7 +6669,7 @@ Spring vs Accumulation vs Markup — مين الأفضل؟
 
             try:
                 from core.ai_reports import _call_sonnet
-                with st.spinner("🤖 Claude يحلل الأداء..."):
+                with st.spinner("🤖 MiniMax يحلل الأداء..."):
                     _weekly_report = _call_sonnet(_weekly_system, _weekly_prompt, 4000)
                 st.markdown("---")
                 st.markdown(_weekly_report)

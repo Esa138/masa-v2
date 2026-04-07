@@ -1,44 +1,52 @@
 """
 MASA QUANT — AI Reports Engine V2
-Powered by Claude Sonnet
+Powered by MiniMax
 
 Deep analysis — discovers hidden patterns, contradictions, and secrets
 """
 
 import streamlit as st
 import json
+import requests
 from datetime import datetime
 
-try:
-    import anthropic
-    HAS_ANTHROPIC = True
-except ImportError:
-    HAS_ANTHROPIC = False
+# MiniMax API configuration
+MINIMAX_BASE_URL = "https://api.minimax.io/v1/chat/completions"
+MINIMAX_MODEL = "MiniMax-M2.7"
 
 
-def _get_client():
-    api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        return None
-    return anthropic.Anthropic(api_key=api_key)
+def _get_api_key():
+    return st.secrets.get("MINIMAX_API_KEY", "")
 
 
 def _call_sonnet(system_prompt: str, user_prompt: str, max_tokens: int = 6000) -> str:
-    client = _get_client()
-    if not client:
-        return "مفتاح API غير موجود. أضف ANTHROPIC_API_KEY في Secrets."
+    """Call MiniMax API (OpenAI-compatible endpoint)."""
+    api_key = _get_api_key()
+    if not api_key:
+        return "مفتاح API غير موجود. أضف MINIMAX_API_KEY في Secrets."
     try:
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=max_tokens,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
-        return response.content[0].text
-    except anthropic.AuthenticationError:
-        return "مفتاح API غير صحيح."
-    except anthropic.RateLimitError:
-        return "تم تجاوز حد الاستخدام. حاول بعد دقيقة."
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": MINIMAX_MODEL,
+            "max_tokens": max_tokens,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        }
+        resp = requests.post(MINIMAX_BASE_URL, headers=headers, json=payload, timeout=120)
+        resp.raise_for_status()
+        data = resp.json()
+        return data["choices"][0]["message"]["content"]
+    except requests.exceptions.HTTPError as e:
+        if resp.status_code == 401:
+            return "مفتاح API غير صحيح."
+        elif resp.status_code == 429:
+            return "تم تجاوز حد الاستخدام. حاول بعد دقيقة."
+        return f"خطأ: {resp.status_code} — {resp.text[:200]}"
     except Exception as e:
         return f"خطأ: {str(e)}"
 
@@ -811,4 +819,4 @@ def generate_opportunities_report(results):
 
 
 def is_ai_available():
-    return HAS_ANTHROPIC and bool(st.secrets.get("ANTHROPIC_API_KEY", ""))
+    return bool(st.secrets.get("MINIMAX_API_KEY", ""))
