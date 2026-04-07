@@ -1,6 +1,6 @@
 """
 MASA QUANT — AI Reports Engine V2
-Powered by MiniMax
+Powered by DeepSeek
 
 Deep analysis — discovers hidden patterns, contradictions, and secrets
 """
@@ -10,34 +10,34 @@ import json
 import requests
 from datetime import datetime
 
-# MiniMax API configuration
-MINIMAX_BASE_URL = "https://api.minimax.io/v1/chat/completions"
-MINIMAX_MODEL = "MiniMax-M2.7"
+# DeepSeek API configuration
+DEEPSEEK_BASE_URL = "https://api.deepseek.com/chat/completions"
+DEEPSEEK_MODEL = "deepseek-chat"
 
 
 def _get_api_key():
-    return st.secrets.get("MINIMAX_API_KEY", "")
+    return st.secrets.get("DEEPSEEK_API_KEY", "")
 
 
 def _call_sonnet(system_prompt: str, user_prompt: str, max_tokens: int = 6000) -> str:
-    """Call MiniMax API (OpenAI-compatible endpoint)."""
+    """Call DeepSeek API (OpenAI-compatible endpoint)."""
     api_key = _get_api_key()
     if not api_key:
-        return "مفتاح API غير موجود. أضف MINIMAX_API_KEY في Secrets."
+        return "مفتاح API غير موجود. أضف DEEPSEEK_API_KEY في Secrets."
     try:
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
         payload = {
-            "model": MINIMAX_MODEL,
+            "model": DEEPSEEK_MODEL,
             "max_tokens": max_tokens,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
         }
-        resp = requests.post(MINIMAX_BASE_URL, headers=headers, json=payload, timeout=120)
+        resp = requests.post(DEEPSEEK_BASE_URL, headers=headers, json=payload, timeout=120)
         resp.raise_for_status()
         data = resp.json()
         return data["choices"][0]["message"]["content"]
@@ -819,4 +819,4 @@ def generate_opportunities_report(results):
 
 
 def is_ai_available():
-    return bool(st.secrets.get("MINIMAX_API_KEY", ""))
+    return bool(st.secrets.get("DEEPSEEK_API_KEY", ""))
