@@ -6084,167 +6084,174 @@ elif page == "📊 أداء النظام":
         _avg_return = 0
         _profit_factor = 0
 
-    # ── Market Filter (Saudi vs US vs All) ──
-    _perf_market_tab = st.radio(
-        "السوق", ["🌐 الكل", "🇸🇦 السعودي", "🇺🇸 الأمريكي"],
-        horizontal=True, key="_perf_market_filter", label_visibility="collapsed"
-    )
-    if _perf_market_tab == "🇸🇦 السعودي":
-        _all_signals = [s for s in _all_signals if ".SR" in s.get("ticker", "")]
-        _completed = [s for s in _completed if ".SR" in s.get("ticker", "")]
-        _n_signals = len(_all_signals)
-        _n_completed = len(_completed)
-        if _n_completed > 0:
-            _win_rate = sum(1 for s in _completed if s.get(_outcome_col) == "win") / _n_completed * 100
-            _avg_return = sum(s.get(_return_col, 0) or 0 for s in _completed) / _n_completed
-            _tg = sum(s.get(_return_col, 0) for s in _completed if (s.get(_return_col, 0) or 0) > 0)
-            _tl = abs(sum(s.get(_return_col, 0) for s in _completed if (s.get(_return_col, 0) or 0) < 0)) or 0.01
-            _profit_factor = round(_tg / _tl, 2)
-    elif _perf_market_tab == "🇺🇸 الأمريكي":
-        _all_signals = [s for s in _all_signals if ".SR" not in s.get("ticker", "")]
-        _completed = [s for s in _completed if ".SR" not in s.get("ticker", "")]
-        _n_signals = len(_all_signals)
-        _n_completed = len(_completed)
-        if _n_completed > 0:
-            _win_rate = sum(1 for s in _completed if s.get(_outcome_col) == "win") / _n_completed * 100
-            _avg_return = sum(s.get(_return_col, 0) or 0 for s in _completed) / _n_completed
-            _tg = sum(s.get(_return_col, 0) for s in _completed if (s.get(_return_col, 0) or 0) > 0)
-            _tl = abs(sum(s.get(_return_col, 0) for s in _completed if (s.get(_return_col, 0) or 0) < 0)) or 0.01
-            _profit_factor = round(_tg / _tl, 2)
+    # ── Split signals by market ──
+    _sa_all = [s for s in _all_signals if ".SR" in s.get("ticker", "")]
+    _us_all = [s for s in _all_signals if ".SR" not in s.get("ticker", "")]
 
-    # ── Top metrics ──
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("إجمالي الإشارات", _n_signals)
+    def _render_market_perf(_mkt_signals, _mkt_label, _tab_key):
+        """Render full performance dashboard for one market."""
+        _m_n_signals = len(_mkt_signals)
+        if _m_n_signals == 0:
+            st.info(f"لا توجد إشارات لـ {_mkt_label}")
+            return
 
-    if _period and _n_completed > 0:
-        _wr_color = "normal" if _win_rate >= 55 else "inverse" if _win_rate < 45 else "off"
-        _avg_c = "normal" if _avg_return > 0 else "inverse"
-        c2.metric(f"نسبة النجاح ({_period_label})", f"{_win_rate:.1f}%", delta_color=_wr_color)
-        c3.metric(f"متوسط العائد ({_period_label})", f"{_avg_return:+.2f}%", delta_color=_avg_c)
-        _pf_color = "normal" if _profit_factor >= 1.5 else "inverse" if _profit_factor < 1.0 else "off"
-        c4.metric("Profit Factor", f"{_profit_factor:.2f}", delta_color=_pf_color)
+        # Determine period
+        _m_has_20d = any(s.get("outcome_20d") is not None for s in _mkt_signals)
+        _m_has_10d = any(s.get("outcome_10d") is not None for s in _mkt_signals)
+        _m_has_5d = any(s.get("outcome_5d") is not None for s in _mkt_signals)
+        if _m_has_20d:
+            _m_period, _m_period_label = "20d", "20 يوم"
+        elif _m_has_10d:
+            _m_period, _m_period_label = "10d", "10 أيام"
+        elif _m_has_5d:
+            _m_period, _m_period_label = "5d", "5 أيام"
+        else:
+            _m_period, _m_period_label = None, ""
 
-        # ── Profit Factor breakdown ──
-        _avg_win_ret = sum(s.get(_return_col, 0) or 0 for s in _wins) / len(_wins) if _wins else 0
-        _avg_loss_ret = sum(s.get(_return_col, 0) or 0 for s in _losses) / len(_losses) if _losses else 0
-        _best_trade = max(_completed, key=lambda x: x.get(_return_col, 0) or 0)
-        _worst_trade = min(_completed, key=lambda x: x.get(_return_col, 0) or 0)
+        if _m_period:
+            _m_outcome_col = f"outcome_{_m_period}"
+            _m_return_col = f"return_{_m_period}"
+            _m_price_col = f"price_{_m_period}"
+            _m_completed = [s for s in _mkt_signals if s.get(_m_outcome_col) is not None]
+            _m_wins = [s for s in _m_completed if s[_m_outcome_col] == "win"]
+            _m_losses = [s for s in _m_completed if s[_m_outcome_col] == "loss"]
+            _m_n_completed = len(_m_completed)
+            _m_win_rate = (len(_m_wins) / _m_n_completed * 100) if _m_n_completed > 0 else 0
+            _m_avg_return = sum(s.get(_m_return_col, 0) or 0 for s in _m_completed) / _m_n_completed if _m_n_completed > 0 else 0
+            _m_total_gains = sum(s.get(_m_return_col, 0) or 0 for s in _m_wins)
+            _m_total_losses = abs(sum(s.get(_m_return_col, 0) or 0 for s in _m_losses))
+            _m_profit_factor = round(_m_total_gains / _m_total_losses, 2) if _m_total_losses > 0.01 else 0
+        else:
+            _m_completed, _m_wins, _m_losses = [], [], []
+            _m_n_completed, _m_win_rate, _m_avg_return, _m_profit_factor = 0, 0, 0, 0
+            _m_outcome_col = _m_return_col = _m_price_col = ""
 
-        _pf_verdict = "🟢 مربحة" if _profit_factor >= 1.5 else "🟡 على الحد" if _profit_factor >= 1.0 else "🔴 خاسرة"
+        # ── Top metrics ──
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("إجمالي الإشارات", _m_n_signals)
 
-        st.markdown(f'''
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0;direction:rtl">
-            <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
-                <div style="color:#6b7280;font-size:0.72em">🟢 متوسط الربح</div>
-                <div style="color:#00E676;font-weight:700;font-size:1.2em">{_avg_win_ret:+.2f}%</div>
-                <div style="color:#4b5563;font-size:0.7em">{len(_wins)} صفقة</div>
+        if _m_period and _m_n_completed > 0:
+            _wr_color = "normal" if _m_win_rate >= 55 else "inverse" if _m_win_rate < 45 else "off"
+            _avg_c = "normal" if _m_avg_return > 0 else "inverse"
+            c2.metric(f"نسبة النجاح ({_m_period_label})", f"{_m_win_rate:.1f}%", delta_color=_wr_color)
+            c3.metric(f"متوسط العائد ({_m_period_label})", f"{_m_avg_return:+.2f}%", delta_color=_avg_c)
+            _pf_color = "normal" if _m_profit_factor >= 1.5 else "inverse" if _m_profit_factor < 1.0 else "off"
+            c4.metric("Profit Factor", f"{_m_profit_factor:.2f}", delta_color=_pf_color)
+
+            # ── Profit Factor breakdown ──
+            _avg_win_ret = sum(s.get(_m_return_col, 0) or 0 for s in _m_wins) / len(_m_wins) if _m_wins else 0
+            _avg_loss_ret = sum(s.get(_m_return_col, 0) or 0 for s in _m_losses) / len(_m_losses) if _m_losses else 0
+            _best_trade = max(_m_completed, key=lambda x: x.get(_m_return_col, 0) or 0)
+            _worst_trade = min(_m_completed, key=lambda x: x.get(_m_return_col, 0) or 0)
+
+            _pf_verdict = "🟢 مربحة" if _m_profit_factor >= 1.5 else "🟡 على الحد" if _m_profit_factor >= 1.0 else "🔴 خاسرة"
+
+            st.markdown(f'''
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0;direction:rtl">
+                <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
+                    <div style="color:#6b7280;font-size:0.72em">🟢 متوسط الربح</div>
+                    <div style="color:#00E676;font-weight:700;font-size:1.2em">{_avg_win_ret:+.2f}%</div>
+                    <div style="color:#4b5563;font-size:0.7em">{len(_m_wins)} صفقة</div>
+                </div>
+                <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
+                    <div style="color:#6b7280;font-size:0.72em">🔴 متوسط الخسارة</div>
+                    <div style="color:#FF5252;font-weight:700;font-size:1.2em">{_avg_loss_ret:+.2f}%</div>
+                    <div style="color:#4b5563;font-size:0.7em">{len(_m_losses)} صفقة</div>
+                </div>
+                <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
+                    <div style="color:#6b7280;font-size:0.72em">📊 Profit Factor</div>
+                    <div style="color:{"#00E676" if _m_profit_factor >= 1.5 else "#FF5252" if _m_profit_factor < 1.0 else "#FFD700"};font-weight:700;font-size:1.2em">{_m_profit_factor:.2f}</div>
+                    <div style="color:#4b5563;font-size:0.7em">{_pf_verdict}</div>
+                </div>
+                <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
+                    <div style="color:#6b7280;font-size:0.72em">🏆 أفضل صفقة</div>
+                    <div style="color:#00E676;font-weight:700;font-size:1em">{(_best_trade.get(_m_return_col, 0) or 0):+.1f}%</div>
+                    <div style="color:#4b5563;font-size:0.7em">{_best_trade.get("company", "")[:12]}</div>
+                </div>
+                <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
+                    <div style="color:#6b7280;font-size:0.72em">💀 أسوأ صفقة</div>
+                    <div style="color:#FF5252;font-weight:700;font-size:1em">{(_worst_trade.get(_m_return_col, 0) or 0):+.1f}%</div>
+                    <div style="color:#4b5563;font-size:0.7em">{_worst_trade.get("company", "")[:12]}</div>
+                </div>
             </div>
-            <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
-                <div style="color:#6b7280;font-size:0.72em">🔴 متوسط الخسارة</div>
-                <div style="color:#FF5252;font-weight:700;font-size:1.2em">{_avg_loss_ret:+.2f}%</div>
-                <div style="color:#4b5563;font-size:0.7em">{len(_losses)} صفقة</div>
-            </div>
-            <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
-                <div style="color:#6b7280;font-size:0.72em">📊 Profit Factor</div>
-                <div style="color:{"#00E676" if _profit_factor >= 1.5 else "#FF5252" if _profit_factor < 1.0 else "#FFD700"};font-weight:700;font-size:1.2em">{_profit_factor:.2f}</div>
-                <div style="color:#4b5563;font-size:0.7em">{_pf_verdict}</div>
-            </div>
-            <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
-                <div style="color:#6b7280;font-size:0.72em">🏆 أفضل صفقة</div>
-                <div style="color:#00E676;font-weight:700;font-size:1em">{(_best_trade.get(_return_col, 0) or 0):+.1f}%</div>
-                <div style="color:#4b5563;font-size:0.7em">{_best_trade.get("company", "")[:12]}</div>
-            </div>
-            <div style="background:rgba(14,20,36,0.6);border:1px solid #192035;border-radius:10px;padding:10px;text-align:center">
-                <div style="color:#6b7280;font-size:0.72em">💀 أسوأ صفقة</div>
-                <div style="color:#FF5252;font-weight:700;font-size:1em">{(_worst_trade.get(_return_col, 0) or 0):+.1f}%</div>
-                <div style="color:#4b5563;font-size:0.7em">{_worst_trade.get("company", "")[:12]}</div>
-            </div>
-        </div>
-        ''', unsafe_allow_html=True)
+            ''', unsafe_allow_html=True)
 
-    else:
-        c2.metric("نسبة النجاح", "⏳ انتظار")
-        c3.metric("متوسط العائد", "⏳ انتظار")
-        c4.metric("Profit Factor", "⏳")
+        else:
+            c2.metric("نسبة النجاح", "⏳ انتظار")
+            c3.metric("متوسط العائد", "⏳ انتظار")
+            c4.metric("Profit Factor", "⏳")
 
-    # ── Progress bars for 5d/10d/20d ──
-    st.divider()
-    st.subheader("📡 شريط التقدم")
-    for _p, _pl in [("5d", "5 أيام"), ("10d", "10 أيام"), ("20d", "20 يوم")]:
-        _oc = f"outcome_{_p}"
-        _done = sum(1 for s in _all_signals if s.get(_oc) is not None)
-        _pct = _done / _n_signals if _n_signals > 0 else 0
-        _wins_p = sum(1 for s in _all_signals if s.get(_oc) == "win")
-        _wr_p = (_wins_p / _done * 100) if _done > 0 else 0
-        _avg_p = sum(s.get(f"return_{_p}", 0) or 0 for s in _all_signals if s.get(_oc) is not None) / _done if _done > 0 else 0
-
-        _status = f"✅ {_done}/{_n_signals}" if _done > 0 else f"⏳ 0/{_n_signals}"
-        _wr_txt = f" | نجاح {_wr_p:.1f}% | عائد {_avg_p:+.2f}%" if _done > 0 else ""
-        st.markdown(f"**{_pl}:** {_status}{_wr_txt}")
-        st.progress(min(_pct, 1.0))
-
-    # ── Best/Worst 5 trades ──
-    if _period and _n_completed > 0:
+        # ── Progress bars for 5d/10d/20d ──
         st.divider()
-        _bc1, _bc2 = st.columns(2)
+        st.subheader("📡 شريط التقدم")
+        for _p, _pl in [("5d", "5 أيام"), ("10d", "10 أيام"), ("20d", "20 يوم")]:
+            _oc = f"outcome_{_p}"
+            _done = sum(1 for s in _mkt_signals if s.get(_oc) is not None)
+            _pct = _done / _m_n_signals if _m_n_signals > 0 else 0
+            _wins_p = sum(1 for s in _mkt_signals if s.get(_oc) == "win")
+            _wr_p = (_wins_p / _done * 100) if _done > 0 else 0
+            _avg_p = sum(s.get(f"return_{_p}", 0) or 0 for s in _mkt_signals if s.get(_oc) is not None) / _done if _done > 0 else 0
 
-        with _bc1:
-            st.subheader("🟢 أفضل 5 صفقات")
-            _sorted_best = sorted(_completed, key=lambda x: x.get(_return_col, 0) or 0, reverse=True)[:5]
-            for _s in _sorted_best:
-                _ret = _s.get(_return_col, 0) or 0
-                _name = _s.get("company", _s.get("ticker", ""))
-                _entry = _s.get("entry_price", 0)
-                _exit = _s.get(_price_col, 0) or 0
-                _sector = _s.get("sector", "")
-                st.markdown(
-                    f'<div style="background:#0a1a0a;border:1px solid #1b5e20;border-radius:8px;padding:8px 12px;margin:4px 0;direction:rtl">'
-                    f'<b style="color:#00E676">{_name}</b> '
-                    f'<span style="color:#4b5563;font-size:0.8em">({_sector})</span><br>'
-                    f'<span style="color:#9ca3af">{_entry:.2f} → {_exit:.2f}</span> '
-                    f'<b style="color:#00E676;font-size:1.1em">{_ret:+.2f}%</b></div>',
-                    unsafe_allow_html=True
-                )
+            _status = f"✅ {_done}/{_m_n_signals}" if _done > 0 else f"⏳ 0/{_m_n_signals}"
+            _wr_txt = f" | نجاح {_wr_p:.1f}% | عائد {_avg_p:+.2f}%" if _done > 0 else ""
+            st.markdown(f"**{_pl}:** {_status}{_wr_txt}")
+            st.progress(min(_pct, 1.0))
 
-        with _bc2:
-            st.subheader("🔴 أسوأ 5 صفقات")
-            _sorted_worst = sorted(_completed, key=lambda x: x.get(_return_col, 0) or 0)[:5]
-            for _s in _sorted_worst:
-                _ret = _s.get(_return_col, 0) or 0
-                _name = _s.get("company", _s.get("ticker", ""))
-                _entry = _s.get("entry_price", 0)
-                _exit = _s.get(_price_col, 0) or 0
-                _sector = _s.get("sector", "")
-                st.markdown(
-                    f'<div style="background:#1a0a0a;border:1px solid #b71c1c;border-radius:8px;padding:8px 12px;margin:4px 0;direction:rtl">'
-                    f'<b style="color:#FF5252">{_name}</b> '
-                    f'<span style="color:#4b5563;font-size:0.8em">({_sector})</span><br>'
-                    f'<span style="color:#9ca3af">{_entry:.2f} → {_exit:.2f}</span> '
-                    f'<b style="color:#FF5252;font-size:1.1em">{_ret:+.2f}%</b></div>',
-                    unsafe_allow_html=True
-                )
+        # ── Best/Worst 5 trades ──
+        if _m_period and _m_n_completed > 0:
+            st.divider()
+            _bc1, _bc2 = st.columns(2)
 
-    # ── Sector breakdown — split by market ──
-    if _period and _n_completed > 0:
-        st.divider()
-        st.subheader("🏭 الأداء حسب القطاع")
+            with _bc1:
+                st.subheader("🟢 أفضل 5 صفقات")
+                _sorted_best = sorted(_m_completed, key=lambda x: x.get(_m_return_col, 0) or 0, reverse=True)[:5]
+                for _s in _sorted_best:
+                    _ret = _s.get(_m_return_col, 0) or 0
+                    _name = _s.get("company", _s.get("ticker", ""))
+                    _entry = _s.get("entry_price", 0)
+                    _exit = _s.get(_m_price_col, 0) or 0
+                    _sector = _s.get("sector", "")
+                    st.markdown(
+                        f'<div style="background:#0a1a0a;border:1px solid #1b5e20;border-radius:8px;padding:8px 12px;margin:4px 0;direction:rtl">'
+                        f'<b style="color:#00E676">{_name}</b> '
+                        f'<span style="color:#4b5563;font-size:0.8em">({_sector})</span><br>'
+                        f'<span style="color:#9ca3af">{_entry:.2f} → {_exit:.2f}</span> '
+                        f'<b style="color:#00E676;font-size:1.1em">{_ret:+.2f}%</b></div>',
+                        unsafe_allow_html=True
+                    )
 
-        # Split signals by market
-        _sa_signals = [s for s in _completed if ".SR" in s.get("ticker", "")]
-        _us_signals = [s for s in _completed if ".SR" not in s.get("ticker", "")]
+            with _bc2:
+                st.subheader("🔴 أسوأ 5 صفقات")
+                _sorted_worst = sorted(_m_completed, key=lambda x: x.get(_m_return_col, 0) or 0)[:5]
+                for _s in _sorted_worst:
+                    _ret = _s.get(_m_return_col, 0) or 0
+                    _name = _s.get("company", _s.get("ticker", ""))
+                    _entry = _s.get("entry_price", 0)
+                    _exit = _s.get(_m_price_col, 0) or 0
+                    _sector = _s.get("sector", "")
+                    st.markdown(
+                        f'<div style="background:#1a0a0a;border:1px solid #b71c1c;border-radius:8px;padding:8px 12px;margin:4px 0;direction:rtl">'
+                        f'<b style="color:#FF5252">{_name}</b> '
+                        f'<span style="color:#4b5563;font-size:0.8em">({_sector})</span><br>'
+                        f'<span style="color:#9ca3af">{_entry:.2f} → {_exit:.2f}</span> '
+                        f'<b style="color:#FF5252;font-size:1.1em">{_ret:+.2f}%</b></div>',
+                        unsafe_allow_html=True
+                    )
 
-        def _build_sector_table(signals, market_label):
-            if not signals:
-                return
+        # ── Sector breakdown ──
+        if _m_period and _m_n_completed > 0:
+            st.divider()
+            st.subheader("🏭 الأداء حسب القطاع")
+
             _sector_perf = {}
-            for _s in signals:
+            for _s in _m_completed:
                 _sec = _s.get("sector", "غير مصنف")
                 if _sec not in _sector_perf:
                     _sector_perf[_sec] = {"total": 0, "wins": 0, "returns": []}
                 _sector_perf[_sec]["total"] += 1
-                if _s.get(_outcome_col) == "win":
+                if _s.get(_m_outcome_col) == "win":
                     _sector_perf[_sec]["wins"] += 1
-                _sector_perf[_sec]["returns"].append(_s.get(_return_col, 0) or 0)
+                _sector_perf[_sec]["returns"].append(_s.get(_m_return_col, 0) or 0)
 
             _sec_rows = []
             for _sec, _sd in sorted(_sector_perf.items(), key=lambda x: sum(x[1]["returns"]) / len(x[1]["returns"]) if x[1]["returns"] else 0, reverse=True):
@@ -6258,303 +6265,277 @@ elif page == "📊 أداء النظام":
                     "حكم": "🟢" if _wr >= 55 else "🔴" if _wr < 40 else "🟡",
                 })
             if _sec_rows:
-                # Market summary
-                _total = len(signals)
-                _wins = sum(1 for s in signals if s.get(_outcome_col) == "win")
-                _wr_all = _wins / _total * 100 if _total > 0 else 0
-                _avg_all = sum(s.get(_return_col, 0) or 0 for s in signals) / _total if _total > 0 else 0
-                st.markdown(
-                    f"**{market_label}** — {_total} إشارة | "
-                    f"نجاح **{_wr_all:.0f}%** | "
-                    f"عائد **{_avg_all:+.2f}%**"
-                )
                 st.dataframe(pd.DataFrame(_sec_rows), use_container_width=True, hide_index=True)
 
-        if _sa_signals and _us_signals:
-            _mkt_tab1, _mkt_tab2 = st.tabs(["🇸🇦 السوق السعودي", "🇺🇸 السوق الأمريكي"])
-            with _mkt_tab1:
-                _build_sector_table(_sa_signals, "🇸🇦 السوق السعودي")
-            with _mkt_tab2:
-                _build_sector_table(_us_signals, "🇺🇸 السوق الأمريكي")
-        elif _sa_signals:
-            _build_sector_table(_sa_signals, "🇸🇦 السوق السعودي")
-        elif _us_signals:
-            _build_sector_table(_us_signals, "🇺🇸 السوق الأمريكي")
+        # ── Equity Curve ──
+        if _m_period and _m_n_completed > 5:
+            st.divider()
+            st.subheader("📈 منحنى رأس المال (Equity Curve)")
+            _sorted_by_date = sorted(_m_completed, key=lambda x: x.get("date_logged", ""))
+            _equity = [100000]
+            _position_size = 0.1
+            for _s in _sorted_by_date:
+                _ret = (_s.get(_m_return_col, 0) or 0) / 100
+                _pnl = _equity[-1] * _position_size * _ret
+                _equity.append(round(_equity[-1] + _pnl, 2))
 
-    # ── Equity Curve ──
-    if _period and _n_completed > 5:
-        st.divider()
-        st.subheader("📈 منحنى رأس المال (Equity Curve)")
-        _sorted_by_date = sorted(_completed, key=lambda x: x.get("date_logged", ""))
-        _equity = [100000]  # Start with 100K
-        _dates_eq = ["البداية"]
-        _position_size = 0.1  # 10% per trade
-        for _s in _sorted_by_date:
-            _ret = (_s.get(_return_col, 0) or 0) / 100
-            _pnl = _equity[-1] * _position_size * _ret
-            _equity.append(round(_equity[-1] + _pnl, 2))
-            _name = _s.get("company", _s.get("ticker", ""))[:15]
-            _dates_eq.append(_s.get("date_logged", "")[:10])
+            _eq_fig = go.Figure()
+            _eq_fig.add_trace(go.Scatter(
+                x=list(range(len(_equity))), y=_equity,
+                mode="lines", line=dict(color="#4FC3F7" if _equity[-1] >= 100000 else "#FF5252", width=2.5),
+                fill="tozeroy", fillcolor="rgba(79,195,247,0.1)" if _equity[-1] >= 100000 else "rgba(255,82,82,0.1)",
+                hovertemplate="الصفقة %{x}: %{y:,.0f} ريال<extra></extra>",
+            ))
+            _eq_fig.add_hline(y=100000, line_dash="dash", line_color="#374151", line_width=1,
+                              annotation_text="رأس المال الأولي 100,000", annotation_position="bottom left",
+                              annotation_font_size=10, annotation_font_color="#4b5563")
+            _eq_fig.update_layout(
+                height=350, margin=dict(l=0, r=0, t=10, b=30),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(20,24,36,0.8)",
+                yaxis=dict(title="ريال", gridcolor="#151d30", tickformat=","),
+                xaxis=dict(title=f"عدد الصفقات ({_m_n_completed})", gridcolor="#151d30"),
+                font=dict(family="Tajawal"),
+            )
+            st.plotly_chart(_eq_fig, use_container_width=True, config={"displayModeBar": False})
 
-        _eq_fig = go.Figure()
-        _eq_fig.add_trace(go.Scatter(
-            x=list(range(len(_equity))), y=_equity,
-            mode="lines", line=dict(color="#4FC3F7" if _equity[-1] >= 100000 else "#FF5252", width=2.5),
-            fill="tozeroy", fillcolor="rgba(79,195,247,0.1)" if _equity[-1] >= 100000 else "rgba(255,82,82,0.1)",
-            hovertemplate="الصفقة %{x}: %{y:,.0f} ريال<extra></extra>",
-        ))
-        _eq_fig.add_hline(y=100000, line_dash="dash", line_color="#374151", line_width=1,
-                          annotation_text="رأس المال الأولي 100,000", annotation_position="bottom left",
-                          annotation_font_size=10, annotation_font_color="#4b5563")
-        _eq_fig.update_layout(
-            height=350, margin=dict(l=0, r=0, t=10, b=30),
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(20,24,36,0.8)",
-            yaxis=dict(title="ريال", gridcolor="#151d30", tickformat=","),
-            xaxis=dict(title=f"عدد الصفقات ({_n_completed})", gridcolor="#151d30"),
-            font=dict(family="Tajawal"),
-        )
-        st.plotly_chart(_eq_fig, use_container_width=True, config={"displayModeBar": False})
+            _final_eq = _equity[-1]
+            _total_pnl = _final_eq - 100000
+            _pnl_pct = _total_pnl / 100000 * 100
+            _pnl_color = "#00E676" if _total_pnl >= 0 else "#FF5252"
+            st.markdown(
+                f'<div style="text-align:center;color:{_pnl_color};font-size:1.2em;font-weight:700">'
+                f'{"📈" if _total_pnl >= 0 else "📉"} '
+                f'لو دخلت كل إشارة بـ 10% من رأس المال: '
+                f'{_total_pnl:+,.0f} ريال ({_pnl_pct:+.2f}%)</div>',
+                unsafe_allow_html=True
+            )
 
-        _final_eq = _equity[-1]
-        _total_pnl = _final_eq - 100000
-        _pnl_pct = _total_pnl / 100000 * 100
-        _pnl_color = "#00E676" if _total_pnl >= 0 else "#FF5252"
-        st.markdown(
-            f'<div style="text-align:center;color:{_pnl_color};font-size:1.2em;font-weight:700">'
-            f'{"📈" if _total_pnl >= 0 else "📉"} '
-            f'لو دخلت كل إشارة بـ 10% من رأس المال: '
-            f'{_total_pnl:+,.0f} ريال ({_pnl_pct:+.2f}%)</div>',
-            unsafe_allow_html=True
-        )
+        # ── Signal Quality Breakdown ──
+        if _m_period and _m_n_completed > 5:
+            st.divider()
+            st.subheader("🎯 جودة الإشارات vs نسبة النجاح")
 
-    # ── Signal Quality Breakdown ──
-    if _period and _n_completed > 5:
-        st.divider()
-        st.subheader("🎯 جودة الإشارات vs نسبة النجاح")
-        st.caption("هل الإشارات القوية فعلاً تنجح أكثر؟")
-
-        _quality_tiers = {"🟢 قوية (70+)": [], "🟡 متوسطة (40-69)": [], "🔴 ضعيفة (0-39)": []}
-        for _s in _completed:
-            _qs = _s.get("quality_score", 0) or 0
-            _ret = _s.get(_return_col, 0) or 0
-            _outcome = _s.get(_outcome_col, "")
-            _entry = {"name": _s.get("company", ""), "return": _ret, "outcome": _outcome, "score": _qs}
-            if _qs >= 70:
-                _quality_tiers["🟢 قوية (70+)"].append(_entry)
-            elif _qs >= 40:
-                _quality_tiers["🟡 متوسطة (40-69)"].append(_entry)
-            else:
-                _quality_tiers["🔴 ضعيفة (0-39)"].append(_entry)
-
-        _qt_rows = []
-        for _tier_name, _tier_data in _quality_tiers.items():
-            if not _tier_data:
-                _qt_rows.append({"الفئة": _tier_name, "عدد": 0, "نجاح": "—", "عائد": "—", "التوصية": "—"})
-                continue
-            _t_total = len(_tier_data)
-            _t_wins = sum(1 for t in _tier_data if t["outcome"] == "win")
-            _t_wr = _t_wins / _t_total * 100
-            _t_avg = sum(t["return"] for t in _tier_data) / _t_total
-            _rec = "✅ ابقِها" if _t_wr >= 50 else "⚠️ شدد" if _t_wr >= 35 else "❌ أوقفها"
-            _qt_rows.append({
-                "الفئة": _tier_name,
-                "عدد": _t_total,
-                "نجاح": f"{_t_wr:.0f}%",
-                "عائد": f"{_t_avg:+.2f}%",
-                "التوصية": _rec,
-            })
-
-        st.dataframe(pd.DataFrame(_qt_rows), use_container_width=True, hide_index=True)
-
-        # Insight
-        _strong = _quality_tiers["🟢 قوية (70+)"]
-        _weak = _quality_tiers["🔴 ضعيفة (0-39)"]
-        if _strong and _weak:
-            _s_wr = sum(1 for t in _strong if t["outcome"] == "win") / len(_strong) * 100
-            _w_wr = sum(1 for t in _weak if t["outcome"] == "win") / len(_weak) * 100
-            _diff = _s_wr - _w_wr
-            if _diff > 15:
-                st.success(f"💡 الإشارات القوية تنجح **{_diff:.0f}%** أكثر من الضعيفة — الفلتر يشتغل!")
-            elif _diff > 0:
-                st.info(f"💡 فرق بسيط ({_diff:.0f}%) — يحتاج بيانات أكثر للتأكد")
-            else:
-                st.warning(f"⚠️ الإشارات الضعيفة تنجح أكثر ({abs(_diff):.0f}%) — الـ scoring يحتاج مراجعة")
-
-    # ── Golden vs Normal Comparison ──
-    if _period and _n_completed > 3:
-        st.divider()
-        st.subheader("🥇 الذهبي vs العادي")
-        st.caption("هل الفلتر الذهبي فعلاً أفضل؟ نقارن بالأرقام الحية")
-
-        _golden_sigs = [s for s in _completed if s.get("is_golden") == 1]
-        _normal_sigs = [s for s in _completed if s.get("is_golden", 0) != 1]
-
-        # Also check old signals by formula (before is_golden column existed)
-        if not _golden_sigs and _completed:
-            for _cs in _completed:
-                _rf = _cs.get("reasons_for", "") or ""
-                _ra = _cs.get("reasons_against", "") or ""
-                _al = _cs.get("accum_level", "")
-                _is_a = _al in ("accumulation", "spring")
-                _has_b = "المشتري هو المهاجم" in _rf
-                _has_d = "دايفرجنس شرائي" in _rf
-                _zero_a = len(_ra.strip()) == 0
-
-                import re as _re
-                _dv = 0
-                if "دايفرجنس" in _rf:
-                    _dm = _re.search(r'\+(\d+)', _rf.split("دايفرجنس")[1][:20] if "دايفرجنس" in _rf else "")
-                    if _dm:
-                        _dv = int(_dm.group(1))
-
-                if _is_a and _has_b and _dv >= 25 and _zero_a:
-                    _golden_sigs.append(_cs)
+            _quality_tiers = {"🟢 قوية (70+)": [], "🟡 متوسطة (40-69)": [], "🔴 ضعيفة (0-39)": []}
+            for _s in _m_completed:
+                _qs = _s.get("quality_score", 0) or 0
+                _ret = _s.get(_m_return_col, 0) or 0
+                _outcome = _s.get(_m_outcome_col, "")
+                _entry = {"name": _s.get("company", ""), "return": _ret, "outcome": _outcome, "score": _qs}
+                if _qs >= 70:
+                    _quality_tiers["🟢 قوية (70+)"].append(_entry)
+                elif _qs >= 40:
+                    _quality_tiers["🟡 متوسطة (40-69)"].append(_entry)
                 else:
-                    _normal_sigs.append(_cs)
+                    _quality_tiers["🔴 ضعيفة (0-39)"].append(_entry)
 
-        _g_total = len(_golden_sigs)
-        _n_total_sigs = len(_normal_sigs)
-
-        if _g_total >= 2 and _n_total_sigs >= 2:
-            _g_wins = sum(1 for s in _golden_sigs if s.get(_outcome_col) == "win")
-            _n_wins = sum(1 for s in _normal_sigs if s.get(_outcome_col) == "win")
-            _g_wr = _g_wins / _g_total * 100
-            _n_wr = _n_wins / _n_total_sigs * 100
-            _g_avg = sum(s.get(_return_col, 0) or 0 for s in _golden_sigs) / _g_total
-            _n_avg = sum(s.get(_return_col, 0) or 0 for s in _normal_sigs) / _n_total_sigs
-
-            _gc1, _gc2 = st.columns(2)
-            with _gc1:
-                st.markdown(f'''
-                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid #FFD70040;
-                            border-radius:12px;padding:18px;text-align:center">
-                    <div style="color:#FFD700;font-size:1em;margin-bottom:8px">🥇 الذهبي</div>
-                    <div style="color:#FFD700;font-size:2.2em;font-weight:800">{_g_wr:.0f}%</div>
-                    <div style="color:#9ca3af;font-size:0.85em">{_g_wins}/{_g_total} نجاح | عائد {_g_avg:+.2f}%</div>
-                </div>
-                ''', unsafe_allow_html=True)
-            with _gc2:
-                st.markdown(f'''
-                <div style="background:linear-gradient(135deg,#131a2e,#0e1424);border:1px solid #192035;
-                            border-radius:12px;padding:18px;text-align:center">
-                    <div style="color:#6b7280;font-size:1em;margin-bottom:8px">🔵 العادي</div>
-                    <div style="color:#9ca3af;font-size:2.2em;font-weight:800">{_n_wr:.0f}%</div>
-                    <div style="color:#9ca3af;font-size:0.85em">{_n_wins}/{_n_total_sigs} نجاح | عائد {_n_avg:+.2f}%</div>
-                </div>
-                ''', unsafe_allow_html=True)
-
-            _diff_g = _g_wr - _n_wr
-            if _diff_g > 20:
-                st.success(f"🏆 الذهبي أفضل بـ **{_diff_g:.0f}%** — الفلتر يشتغل! (نسبة نجاح {_g_wr:.0f}% vs {_n_wr:.0f}%)")
-            elif _diff_g > 5:
-                st.info(f"💡 الذهبي أفضل بـ **{_diff_g:.0f}%** — مشجع لكن يحتاج بيانات أكثر")
-            elif _diff_g > -5:
-                st.warning(f"⚠️ فرق بسيط ({_diff_g:+.0f}%) — ما نقدر نحكم بعد")
-            else:
-                st.error(f"❌ العادي أفضل بـ **{abs(_diff_g):.0f}%** — الفلتر الذهبي ما يشتغل!")
-        elif _g_total > 0 or _n_total_sigs > 0:
-            st.info(f"🥇 ذهبي: {_g_total} إشارة | 🔵 عادي: {_n_total_sigs} إشارة — يحتاج بيانات أكثر للمقارنة")
-        else:
-            st.info("لا توجد بيانات كافية — امسح يومياً لجمع إشارات")
-
-    # ── Signal Type + Location Breakdown ──
-    if _period and _n_completed > 5:
-        st.divider()
-        st.subheader("🏆 أفضل نوع إشارة")
-
-        _type_tab1, _type_tab2 = st.tabs(["📊 حسب نوع التجميع", "📍 حسب الموقع"])
-
-        with _type_tab1:
-            _type_perf = {}
-            for _s in _completed:
-                _al = _s.get("accum_level", "") or "غير محدد"
-                if _al not in _type_perf:
-                    _type_perf[_al] = {"total": 0, "wins": 0, "returns": [], "best": -999, "worst": 999}
-                _type_perf[_al]["total"] += 1
-                _ret = _s.get(_return_col, 0) or 0
-                if _s.get(_outcome_col) == "win":
-                    _type_perf[_al]["wins"] += 1
-                _type_perf[_al]["returns"].append(_ret)
-                if _ret > _type_perf[_al]["best"]:
-                    _type_perf[_al]["best"] = _ret
-                if _ret < _type_perf[_al]["worst"]:
-                    _type_perf[_al]["worst"] = _ret
-
-            _type_names = {
-                "accumulation": "🟢 تجميع (Accumulation)",
-                "spring": "💎 سبرنق (Spring)",
-                "markup": "🚀 صعود (Markup)",
-                "distribution": "🔴 تصريف (Distribution)",
-                "markdown": "📉 هبوط (Markdown)",
-            }
-
-            _type_rows = []
-            for _al, _td in sorted(_type_perf.items(), key=lambda x: sum(x[1]["returns"]) / len(x[1]["returns"]) if x[1]["returns"] else 0, reverse=True):
-                _wr = _td["wins"] / _td["total"] * 100 if _td["total"] > 0 else 0
-                _avg = sum(_td["returns"]) / len(_td["returns"]) if _td["returns"] else 0
-                _pf_gains = sum(r for r in _td["returns"] if r > 0)
-                _pf_losses = abs(sum(r for r in _td["returns"] if r < 0)) or 0.01
-                _pf = round(_pf_gains / _pf_losses, 2)
-                _rec = "✅ ابقِ" if _wr >= 50 else "⚠️ شدد" if _wr >= 30 else "❌ أوقف"
-                _type_rows.append({
-                    "النوع": _type_names.get(_al, _al),
-                    "إشارات": _td["total"],
-                    "نجاح": f"{_wr:.0f}%",
-                    "عائد": f"{_avg:+.2f}%",
-                    "PF": _pf,
-                    "أفضل": f"{_td['best']:+.1f}%",
-                    "أسوأ": f"{_td['worst']:+.1f}%",
+            _qt_rows = []
+            for _tier_name, _tier_data in _quality_tiers.items():
+                if not _tier_data:
+                    _qt_rows.append({"الفئة": _tier_name, "عدد": 0, "نجاح": "—", "عائد": "—", "التوصية": "—"})
+                    continue
+                _t_total = len(_tier_data)
+                _t_wins = sum(1 for t in _tier_data if t["outcome"] == "win")
+                _t_wr = _t_wins / _t_total * 100
+                _t_avg = sum(t["return"] for t in _tier_data) / _t_total
+                _rec = "✅ ابقِها" if _t_wr >= 50 else "⚠️ شدد" if _t_wr >= 35 else "❌ أوقفها"
+                _qt_rows.append({
+                    "الفئة": _tier_name,
+                    "عدد": _t_total,
+                    "نجاح": f"{_t_wr:.0f}%",
+                    "عائد": f"{_t_avg:+.2f}%",
                     "التوصية": _rec,
                 })
-            if _type_rows:
-                st.dataframe(pd.DataFrame(_type_rows), use_container_width=True, hide_index=True)
 
-        with _type_tab2:
-            _loc_perf = {}
-            for _s in _completed:
-                _loc = _s.get("location", "") or "غير محدد"
-                if _loc not in _loc_perf:
-                    _loc_perf[_loc] = {"total": 0, "wins": 0, "returns": []}
-                _loc_perf[_loc]["total"] += 1
-                _ret = _s.get(_return_col, 0) or 0
-                if _s.get(_outcome_col) == "win":
-                    _loc_perf[_loc]["wins"] += 1
-                _loc_perf[_loc]["returns"].append(_ret)
+            st.dataframe(pd.DataFrame(_qt_rows), use_container_width=True, hide_index=True)
 
-            _loc_names = {
-                "bottom": "📉 قاع القناة",
-                "support": "🟢 منطقة دعم",
-                "middle": "➡️ وسط المدى",
-                "above": "🚀 فوق المقاومة",
-                "resistance": "🔴 عند المقاومة",
-            }
+            _strong = _quality_tiers["🟢 قوية (70+)"]
+            _weak = _quality_tiers["🔴 ضعيفة (0-39)"]
+            if _strong and _weak:
+                _s_wr = sum(1 for t in _strong if t["outcome"] == "win") / len(_strong) * 100
+                _w_wr = sum(1 for t in _weak if t["outcome"] == "win") / len(_weak) * 100
+                _diff = _s_wr - _w_wr
+                if _diff > 15:
+                    st.success(f"💡 الإشارات القوية تنجح **{_diff:.0f}%** أكثر من الضعيفة — الفلتر يشتغل!")
+                elif _diff > 0:
+                    st.info(f"💡 فرق بسيط ({_diff:.0f}%) — يحتاج بيانات أكثر للتأكد")
+                else:
+                    st.warning(f"⚠️ الإشارات الضعيفة تنجح أكثر ({abs(_diff):.0f}%) — الـ scoring يحتاج مراجعة")
 
-            _loc_rows = []
-            for _loc, _ld in sorted(_loc_perf.items(), key=lambda x: sum(x[1]["returns"]) / len(x[1]["returns"]) if x[1]["returns"] else 0, reverse=True):
-                _wr = _ld["wins"] / _ld["total"] * 100 if _ld["total"] > 0 else 0
-                _avg = sum(_ld["returns"]) / len(_ld["returns"]) if _ld["returns"] else 0
-                _rec = "✅ ابقِ" if _wr >= 50 else "⚠️ شدد" if _wr >= 30 else "❌ أوقف"
-                _loc_rows.append({
-                    "الموقع": _loc_names.get(_loc, _loc),
-                    "إشارات": _ld["total"],
-                    "نجاح": f"{_wr:.0f}%",
-                    "عائد": f"{_avg:+.2f}%",
-                    "التوصية": _rec,
-                })
-            if _loc_rows:
-                st.dataframe(pd.DataFrame(_loc_rows), use_container_width=True, hide_index=True)
+        # ── Golden vs Normal Comparison ──
+        if _m_period and _m_n_completed > 3:
+            st.divider()
+            st.subheader("🥇 الذهبي vs العادي")
 
-                # Insight
-                _best_loc = max(_loc_perf.items(), key=lambda x: sum(x[1]["returns"]) / len(x[1]["returns"]) if x[1]["returns"] else 0)
-                _worst_loc = min(_loc_perf.items(), key=lambda x: sum(x[1]["returns"]) / len(x[1]["returns"]) if x[1]["returns"] else 0)
-                st.info(
-                    f"💡 أفضل موقع: **{_loc_names.get(_best_loc[0], _best_loc[0])}** "
-                    f"({sum(_best_loc[1]['returns'])/len(_best_loc[1]['returns']):+.2f}%) | "
-                    f"أسوأ موقع: **{_loc_names.get(_worst_loc[0], _worst_loc[0])}** "
-                    f"({sum(_worst_loc[1]['returns'])/len(_worst_loc[1]['returns']):+.2f}%)"
-                )
+            _golden_sigs = [s for s in _m_completed if s.get("is_golden") == 1]
+            _normal_sigs = [s for s in _m_completed if s.get("is_golden", 0) != 1]
 
-    # ── Weekly AI Report ──
+            if not _golden_sigs and _m_completed:
+                for _cs in _m_completed:
+                    _rf = _cs.get("reasons_for", "") or ""
+                    _ra = _cs.get("reasons_against", "") or ""
+                    _al = _cs.get("accum_level", "")
+                    _is_a = _al in ("accumulation", "spring")
+                    _has_b = "المشتري هو المهاجم" in _rf
+                    _zero_a = len(_ra.strip()) == 0
+
+                    import re as _re
+                    _dv = 0
+                    if "دايفرجنس" in _rf:
+                        _dm = _re.search(r'\+(\d+)', _rf.split("دايفرجنس")[1][:20] if "دايفرجنس" in _rf else "")
+                        if _dm:
+                            _dv = int(_dm.group(1))
+
+                    if _is_a and _has_b and _dv >= 25 and _zero_a:
+                        _golden_sigs.append(_cs)
+                    else:
+                        _normal_sigs.append(_cs)
+
+            _g_total = len(_golden_sigs)
+            _n_total_sigs = len(_normal_sigs)
+
+            if _g_total >= 2 and _n_total_sigs >= 2:
+                _g_wins = sum(1 for s in _golden_sigs if s.get(_m_outcome_col) == "win")
+                _n_wins = sum(1 for s in _normal_sigs if s.get(_m_outcome_col) == "win")
+                _g_wr = _g_wins / _g_total * 100
+                _n_wr = _n_wins / _n_total_sigs * 100
+                _g_avg = sum(s.get(_m_return_col, 0) or 0 for s in _golden_sigs) / _g_total
+                _n_avg = sum(s.get(_m_return_col, 0) or 0 for s in _normal_sigs) / _n_total_sigs
+
+                _gc1, _gc2 = st.columns(2)
+                with _gc1:
+                    st.markdown(f'''
+                    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid #FFD70040;
+                                border-radius:12px;padding:18px;text-align:center">
+                        <div style="color:#FFD700;font-size:1em;margin-bottom:8px">🥇 الذهبي</div>
+                        <div style="color:#FFD700;font-size:2.2em;font-weight:800">{_g_wr:.0f}%</div>
+                        <div style="color:#9ca3af;font-size:0.85em">{_g_wins}/{_g_total} نجاح | عائد {_g_avg:+.2f}%</div>
+                    </div>
+                    ''', unsafe_allow_html=True)
+                with _gc2:
+                    st.markdown(f'''
+                    <div style="background:linear-gradient(135deg,#131a2e,#0e1424);border:1px solid #192035;
+                                border-radius:12px;padding:18px;text-align:center">
+                        <div style="color:#6b7280;font-size:1em;margin-bottom:8px">🔵 العادي</div>
+                        <div style="color:#9ca3af;font-size:2.2em;font-weight:800">{_n_wr:.0f}%</div>
+                        <div style="color:#9ca3af;font-size:0.85em">{_n_wins}/{_n_total_sigs} نجاح | عائد {_n_avg:+.2f}%</div>
+                    </div>
+                    ''', unsafe_allow_html=True)
+
+                _diff_g = _g_wr - _n_wr
+                if _diff_g > 20:
+                    st.success(f"🏆 الذهبي أفضل بـ **{_diff_g:.0f}%** — الفلتر يشتغل!")
+                elif _diff_g > 5:
+                    st.info(f"💡 الذهبي أفضل بـ **{_diff_g:.0f}%** — مشجع")
+                elif _diff_g > -5:
+                    st.warning(f"⚠️ فرق بسيط ({_diff_g:+.0f}%)")
+                else:
+                    st.error(f"❌ العادي أفضل بـ **{abs(_diff_g):.0f}%**")
+            elif _g_total > 0 or _n_total_sigs > 0:
+                st.info(f"🥇 ذهبي: {_g_total} | 🔵 عادي: {_n_total_sigs} — يحتاج بيانات أكثر")
+
+        # ── Signal Type + Location Breakdown ──
+        if _m_period and _m_n_completed > 5:
+            st.divider()
+            st.subheader("🏆 أفضل نوع إشارة")
+
+            _type_tab1, _type_tab2 = st.tabs(["📊 حسب نوع التجميع", "📍 حسب الموقع"])
+
+            with _type_tab1:
+                _type_perf = {}
+                for _s in _m_completed:
+                    _al = _s.get("accum_level", "") or "غير محدد"
+                    if _al not in _type_perf:
+                        _type_perf[_al] = {"total": 0, "wins": 0, "returns": [], "best": -999, "worst": 999}
+                    _type_perf[_al]["total"] += 1
+                    _ret = _s.get(_m_return_col, 0) or 0
+                    if _s.get(_m_outcome_col) == "win":
+                        _type_perf[_al]["wins"] += 1
+                    _type_perf[_al]["returns"].append(_ret)
+                    if _ret > _type_perf[_al]["best"]:
+                        _type_perf[_al]["best"] = _ret
+                    if _ret < _type_perf[_al]["worst"]:
+                        _type_perf[_al]["worst"] = _ret
+
+                _type_names = {
+                    "accumulation": "🟢 تجميع (Accumulation)",
+                    "spring": "💎 سبرنق (Spring)",
+                    "markup": "🚀 صعود (Markup)",
+                    "distribution": "🔴 تصريف (Distribution)",
+                    "markdown": "📉 هبوط (Markdown)",
+                }
+
+                _type_rows = []
+                for _al, _td in sorted(_type_perf.items(), key=lambda x: sum(x[1]["returns"]) / len(x[1]["returns"]) if x[1]["returns"] else 0, reverse=True):
+                    _wr = _td["wins"] / _td["total"] * 100 if _td["total"] > 0 else 0
+                    _avg = sum(_td["returns"]) / len(_td["returns"]) if _td["returns"] else 0
+                    _pf_gains = sum(r for r in _td["returns"] if r > 0)
+                    _pf_losses = abs(sum(r for r in _td["returns"] if r < 0)) or 0.01
+                    _pf = round(_pf_gains / _pf_losses, 2)
+                    _rec = "✅ ابقِ" if _wr >= 50 else "⚠️ شدد" if _wr >= 30 else "❌ أوقف"
+                    _type_rows.append({
+                        "النوع": _type_names.get(_al, _al),
+                        "إشارات": _td["total"],
+                        "نجاح": f"{_wr:.0f}%",
+                        "عائد": f"{_avg:+.2f}%",
+                        "PF": _pf,
+                        "أفضل": f"{_td['best']:+.1f}%",
+                        "أسوأ": f"{_td['worst']:+.1f}%",
+                        "التوصية": _rec,
+                    })
+                if _type_rows:
+                    st.dataframe(pd.DataFrame(_type_rows), use_container_width=True, hide_index=True)
+
+            with _type_tab2:
+                _loc_perf = {}
+                for _s in _m_completed:
+                    _loc = _s.get("location", "") or "غير محدد"
+                    if _loc not in _loc_perf:
+                        _loc_perf[_loc] = {"total": 0, "wins": 0, "returns": []}
+                    _loc_perf[_loc]["total"] += 1
+                    _ret = _s.get(_m_return_col, 0) or 0
+                    if _s.get(_m_outcome_col) == "win":
+                        _loc_perf[_loc]["wins"] += 1
+                    _loc_perf[_loc]["returns"].append(_ret)
+
+                _loc_names = {
+                    "bottom": "📉 قاع القناة",
+                    "support": "🟢 منطقة دعم",
+                    "middle": "➡️ وسط المدى",
+                    "above": "🚀 فوق المقاومة",
+                    "resistance": "🔴 عند المقاومة",
+                }
+
+                _loc_rows = []
+                for _loc, _ld in sorted(_loc_perf.items(), key=lambda x: sum(x[1]["returns"]) / len(x[1]["returns"]) if x[1]["returns"] else 0, reverse=True):
+                    _wr = _ld["wins"] / _ld["total"] * 100 if _ld["total"] > 0 else 0
+                    _avg = sum(_ld["returns"]) / len(_ld["returns"]) if _ld["returns"] else 0
+                    _rec = "✅ ابقِ" if _wr >= 50 else "⚠️ شدد" if _wr >= 30 else "❌ أوقف"
+                    _loc_rows.append({
+                        "الموقع": _loc_names.get(_loc, _loc),
+                        "إشارات": _ld["total"],
+                        "نجاح": f"{_wr:.0f}%",
+                        "عائد": f"{_avg:+.2f}%",
+                        "التوصية": _rec,
+                    })
+                if _loc_rows:
+                    st.dataframe(pd.DataFrame(_loc_rows), use_container_width=True, hide_index=True)
+
+    # ── end of _render_market_perf function ──
+
+    # ── Market Tabs ──
+    _tab_sa, _tab_us = st.tabs(["🇸🇦 السوق السعودي", "🇺🇸 السوق الأمريكي"])
+    with _tab_sa:
+        _render_market_perf(_sa_all, "🇸🇦 السوق السعودي", "sa")
+    with _tab_us:
+        _render_market_perf(_us_all, "🇺🇸 السوق الأمريكي", "us")
+
+    # ── Weekly AI Report (shared) ──
+    _n_completed = len([s for s in _all_signals if s.get("outcome_20d") is not None or s.get("outcome_10d") is not None or s.get("outcome_5d") is not None])
+    _completed = [s for s in _all_signals if s.get("outcome_20d") is not None or s.get("outcome_10d") is not None or s.get("outcome_5d") is not None]
+    _period = "20d" if _db_data["has_20d"] else "10d" if _db_data["has_10d"] else "5d" if _db_data["has_5d"] else None
+    _outcome_col = f"outcome_{_period}" if _period else ""
+    _return_col = f"return_{_period}" if _period else ""
+    _n_signals = len(_all_signals)
     if _n_completed > 10:
         st.divider()
         st.subheader("📱 تقرير أسبوعي بالذكاء الاصطناعي")
