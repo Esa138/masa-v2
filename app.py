@@ -5775,13 +5775,13 @@ elif page == "🤖 تقارير AI":
     <div style="text-align:center;padding:20px 0 10px 0">
         <span style="font-size:1.8em;font-weight:800;color:#fff">🤖 تقارير AI</span>
         <div style="color:#6b7280;font-size:0.92em;margin-top:6px">
-            تحليل ذكي شامل بالذكاء الاصطناعي — مدعوم بـ MiniMax
+            تحليل ذكي شامل بالذكاء الاصطناعي — مدعوم بـ DeepSeek
         </div>
     </div>
     ''', unsafe_allow_html=True)
 
     if not is_ai_available():
-        st.error("❌ مفتاح API غير موجود. أضف `MINIMAX_API_KEY` في Settings → Secrets")
+        st.error("❌ مفتاح API غير موجود. أضف `DEEPSEEK_API_KEY` في Settings → Secrets")
     else:
         results = st.session_state.get("scan_results")
         if results is None:
@@ -6561,7 +6561,7 @@ elif page == "📊 أداء النظام":
     if _n_completed > 10:
         st.divider()
         st.subheader("📱 تقرير أسبوعي بالذكاء الاصطناعي")
-        st.caption("تحليل شامل لأداء المنصة — مدعوم بـ MiniMax")
+        st.caption("تحليل شامل لأداء المنصة — مدعوم بـ DeepSeek")
 
         if st.button("🚀 أنشئ التقرير الأسبوعي", key="weekly_ai_btn", type="primary", use_container_width=True):
             # Build performance summary for AI
@@ -6669,7 +6669,7 @@ Spring vs Accumulation vs Markup — مين الأفضل؟
 
             try:
                 from core.ai_reports import _call_sonnet
-                with st.spinner("🤖 MiniMax يحلل الأداء..."):
+                with st.spinner("🤖 DeepSeek يحلل الأداء..."):
                     _weekly_report = _call_sonnet(_weekly_system, _weekly_prompt, 4000)
                 st.markdown("---")
                 st.markdown(_weekly_report)
