@@ -192,8 +192,9 @@ def score_stock(
                 f"⚠️ RSI {rsi:.0f} — قريب من تشبع، انتظر تهدئة قبل الدخول"
             )
     elif rsi >= 50:
-        # V3 backtest: RSI 50-70 = momentum zone, 67.7% historical win rate
-        if phase in ("accumulation", "spring", "markup"):
+        # V3 backtest: RSI 50-70 = momentum zone, 67.7% win rate
+        # Excluded markup: V2 backtest shows 0% wins (11 trades) — too risky
+        if phase in ("accumulation", "spring"):
             reasons_for.append(
                 f"🟢 RSI {rsi:.0f} — زخم قوي، التوقيت المثالي (67.7% نجاح تاريخياً)"
             )
