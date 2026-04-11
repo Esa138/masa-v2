@@ -2846,7 +2846,7 @@ def show_detail_panel(r):
             {agg_html}
             <span>امتصاص: <b>{r["absorption_score"]:.0f}</b></span>
             <span>دايفرجنس: <b style="color:{div_color_val}">{r["divergence"]:+.0f}</b></span>
-            <span>RSI: <b>{r["rsi"]:.0f}</b></span>
+            <span>RSI: <b style="color:{('#4FC3F7' if r['rsi']<30 else '#FFB74D' if r['rsi']<50 else '#00E676' if r['rsi']<70 else '#FF5252')}">{r["rsi"]:.0f}</b> <span style="color:#6b7280;font-size:0.85em">({'تجميع' if r['rsi']<30 else 'متعافي' if r['rsi']<50 else 'زخم ✨' if r['rsi']<70 else 'تشبع ⚠️'})</span></span>
             {zr_detail_html}
         </div>
         <div style="display:flex;gap:16px;margin-top:6px;flex-wrap:wrap;color:#4b5563;font-size:0.80em">
