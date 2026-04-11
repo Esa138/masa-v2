@@ -3228,7 +3228,7 @@ with st.sidebar:
     st.divider()
 
     # Handle navigation from sector map → company analysis
-    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "📅 تقويم النتائج", "🤖 تقارير AI", "📊 أداء النظام"]
+    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "📊 أداء النظام"]
     if st.session_state.get("_goto_page"):
         st.session_state["page_nav"] = st.session_state.pop("_goto_page")
 
@@ -5809,6 +5809,150 @@ elif page == "📅 تقويم النتائج":
                 st.info("لا توجد بيانات نتائج سابقة كافية لهذا السهم")
 
 
+# ══════════════════════════════════════════════════════════════
+# PAGE: Market News — أخبار السوق
+# ══════════════════════════════════════════════════════════════
+
+elif page == "📰 أخبار السوق":
+    from core.news_aggregator import (
+        get_all_market_news,
+        summarize_news_with_gemini,
+        flatten_news_for_summary,
+    )
+    from core.ai_reports import is_ai_available
+
+    # ── RTL CSS for news content ──
+    st.markdown('''
+    <style>
+    [data-testid="stMarkdownContainer"] { direction: rtl; text-align: right; }
+    [data-testid="stMarkdownContainer"] h1,
+    [data-testid="stMarkdownContainer"] h2,
+    [data-testid="stMarkdownContainer"] h3,
+    [data-testid="stMarkdownContainer"] h4,
+    [data-testid="stMarkdownContainer"] p,
+    [data-testid="stMarkdownContainer"] ul,
+    [data-testid="stMarkdownContainer"] ol,
+    [data-testid="stMarkdownContainer"] li { direction: rtl !important; text-align: right !important; }
+    [data-testid="stMarkdownContainer"] ul,
+    [data-testid="stMarkdownContainer"] ol { padding-right: 1.5em; padding-left: 0; }
+    </style>
+    ''', unsafe_allow_html=True)
+
+    st.markdown('''
+    <div style="text-align:center;padding:20px 0 10px 0;direction:rtl">
+        <span style="font-size:1.8em;font-weight:800;color:#fff">📰 أخبار السوق السعودي</span>
+        <div style="color:#6b7280;font-size:0.92em;margin-top:6px">
+            ملخص يومي من أرقام + تداول — مدعوم بـ Gemini
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # Fetch button + cache in session state
+    _col_fetch, _col_clear = st.columns([3, 1])
+    with _col_fetch:
+        _fetch_btn = st.button("🔄 جلب آخر الأخبار", type="primary", use_container_width=True)
+    with _col_clear:
+        _clear_btn = st.button("🗑️ مسح", use_container_width=True)
+
+    if _clear_btn:
+        for k in ("_news_data", "_news_summary"):
+            if k in st.session_state:
+                del st.session_state[k]
+        st.rerun()
+
+    if _fetch_btn or "_news_data" not in st.session_state:
+        with st.spinner("📡 جاري جلب الأخبار من أرقام + تداول..."):
+            st.session_state["_news_data"] = get_all_market_news(limit_per_source=10)
+
+    _news_data = st.session_state.get("_news_data", {})
+
+    if not _news_data or not _news_data.get("argaam"):
+        st.info("اضغط 🔄 لجلب الأخبار")
+    else:
+        _total = sum(len(v) for v in _news_data.get("argaam", {}).values())
+        _total += len(_news_data.get("tadawul", []))
+        st.caption(f"📊 تم جلب **{_total}** خبر — آخر تحديث: {_news_data.get('fetched_at', '')}")
+
+        st.divider()
+
+        # ── AI Summary section ──
+        st.markdown("### 🤖 الملخص الذكي")
+
+        _ai_ok = is_ai_available()
+        if not _ai_ok:
+            st.warning("⚠️ أضف GEMINI_API_KEY في Settings → Secrets لتشغيل الملخص")
+        else:
+            _summary_btn = st.button(
+                "🚀 أنشئ الملخص الذكي",
+                key="news_summary_btn",
+                type="primary",
+                use_container_width=True,
+            )
+
+            if _summary_btn:
+                # Build MASA context if scan results exist
+                _masa_ctx = None
+                _scan_results = st.session_state.get("scan_results")
+                if _scan_results:
+                    _enters = [r for r in _scan_results if r.get("decision") == "enter"]
+                    _sectors = {}
+                    for r in _scan_results:
+                        _sec = r.get("sector", "")
+                        if not _sec:
+                            continue
+                        if _sec not in _sectors:
+                            _sectors[_sec] = {"flow": 0, "n": 0}
+                        _sectors[_sec]["flow"] += r.get("flow_bias", 0)
+                        _sectors[_sec]["n"] += 1
+                    _sorted_sec = sorted(
+                        _sectors.items(),
+                        key=lambda x: x[1]["flow"] / x[1]["n"] if x[1]["n"] > 0 else 0,
+                        reverse=True,
+                    )
+                    _masa_ctx = {
+                        "golden_count": sum(1 for r in _enters if r.get("is_golden")),
+                        "win_rate": "—",
+                        "top_sectors": [s[0] for s in _sorted_sec[:3]],
+                        "weak_sectors": [s[0] for s in _sorted_sec[-3:]],
+                    }
+
+                with st.spinner("🤖 Gemini يحلل الأخبار ويربطها مع MASA..."):
+                    _summary = summarize_news_with_gemini(_news_data, _masa_ctx)
+                st.session_state["_news_summary"] = _summary
+
+            if "_news_summary" in st.session_state:
+                st.markdown("---")
+                st.markdown(st.session_state["_news_summary"])
+
+        # ── Raw news tabs ──
+        st.divider()
+        st.markdown("### 📋 الأخبار الكاملة")
+
+        _tab_names = list(_news_data.get("argaam", {}).keys())
+        if _tab_names:
+            _tabs = st.tabs(_tab_names)
+            for _idx, _tab_name in enumerate(_tab_names):
+                with _tabs[_idx]:
+                    _items = _news_data["argaam"].get(_tab_name, [])
+                    for _it in _items:
+                        _title = _it.get("title", "").strip()
+                        _date = _it.get("pub_date", "")[:25]
+                        _link = _it.get("link", "")
+                        _desc = _it.get("description", "")
+                        _desc_html = f'<div style="color:#9ca3af;font-size:0.82em;line-height:1.6">{_desc}</div>' if _desc else ""
+                        _link_html = f'<a href="{_link}" target="_blank" style="color:#FFD700;font-size:0.75em;text-decoration:none">🔗 المصدر</a>' if _link else ""
+                        st.markdown(
+                            f'<div style="background:rgba(14,20,36,0.5);border:1px solid #192035;'
+                            f'border-radius:10px;padding:12px 14px;margin:6px 0;direction:rtl">'
+                            f'<div style="color:#4FC3F7;font-size:0.72em;margin-bottom:4px">📅 {_date}</div>'
+                            f'<div style="color:#fff;font-weight:600;font-size:0.95em;margin-bottom:6px">{_title}</div>'
+                            f'{_desc_html}{_link_html}'
+                            f'</div>',
+                            unsafe_allow_html=True,
+                        )
+
+
+# ══════════════════════════════════════════════════════════════
 # PAGE: AI Reports — تقارير AI
 # ══════════════════════════════════════════════════════════════
 
