@@ -5818,8 +5818,25 @@ elif page == "🤖 تقارير AI":
         generate_stock_report, generate_composite_report, generate_opportunities_report,
     )
 
+    # ── RTL CSS for AI reports ──
     st.markdown('''
-    <div style="text-align:center;padding:20px 0 10px 0">
+    <style>
+    [data-testid="stMarkdownContainer"] { direction: rtl; text-align: right; }
+    [data-testid="stMarkdownContainer"] h1,
+    [data-testid="stMarkdownContainer"] h2,
+    [data-testid="stMarkdownContainer"] h3,
+    [data-testid="stMarkdownContainer"] h4,
+    [data-testid="stMarkdownContainer"] p,
+    [data-testid="stMarkdownContainer"] ul,
+    [data-testid="stMarkdownContainer"] ol,
+    [data-testid="stMarkdownContainer"] li { direction: rtl !important; text-align: right !important; }
+    [data-testid="stMarkdownContainer"] ul,
+    [data-testid="stMarkdownContainer"] ol { padding-right: 1.5em; padding-left: 0; }
+    </style>
+    ''', unsafe_allow_html=True)
+
+    st.markdown('''
+    <div style="text-align:center;padding:20px 0 10px 0;direction:rtl">
         <span style="font-size:1.8em;font-weight:800;color:#fff">🤖 تقارير AI</span>
         <div style="color:#6b7280;font-size:0.92em;margin-top:6px">
             تحليل ذكي شامل بالذكاء الاصطناعي — مدعوم بـ Gemini
@@ -5878,7 +5895,7 @@ elif page == "🤖 تقارير AI":
                 st.markdown("### 📋 تقرير السوق اليومي الشامل")
                 st.caption(f"يحلل {len(results)} سهم — القرارات، القطاعات، التدفقات، الفرص والمخاطر")
                 if st.button("🚀 أنشئ التقرير", key="ai_market_btn", type="primary", use_container_width=True):
-                    with st.spinner("🤖 MiniMax يحلل السوق..."):
+                    with st.spinner("🤖 Gemini يحلل السوق..."):
                         report = generate_market_report(results, _ai_comp_data, _ai_pfi_data)
                     st.markdown("---")
                     st.markdown(report)
@@ -5893,7 +5910,7 @@ elif page == "🤖 تقارير AI":
                     _sect_stocks = [r for r in results if r.get("sector") == _ai_sector_sel]
                     st.caption(f"القطاع فيه {len(_sect_stocks)} سهم")
                     if st.button("🚀 حلل القطاع", key="ai_sector_btn", type="primary", use_container_width=True):
-                        with st.spinner(f"🤖 MiniMax يحلل {_ai_sector_sel}..."):
+                        with st.spinner(f"🤖 Gemini يحلل {_ai_sector_sel}..."):
                             report = generate_sector_report(results, _ai_sector_sel)
                         st.markdown("---")
                         st.markdown(report)
@@ -5956,7 +5973,7 @@ elif page == "🤖 تقارير AI":
                         except Exception:
                             pass
 
-                        with st.spinner(f"🤖 MiniMax يحلل {_sel_r.get('name', '')}..."):
+                        with st.spinner(f"🤖 Gemini يحلل {_sel_r.get('name', '')}..."):
                             report = generate_stock_report(_sel_r, _stock_sector_info, _stock_season_info)
                         st.markdown("---")
                         st.markdown(report)
@@ -5974,7 +5991,7 @@ elif page == "🤖 تقارير AI":
                     </div>
                     """, unsafe_allow_html=True)
                     if st.button("🚀 حلل المؤشر", key="ai_comp_btn", type="primary", use_container_width=True):
-                        with st.spinner("🤖 MiniMax يحلل المؤشر المركب..."):
+                        with st.spinner("🤖 Gemini يحلل المؤشر المركب..."):
                             report = generate_composite_report(_ai_comp_data, _ai_pfi_data)
                         st.markdown("---")
                         st.markdown(report)
@@ -5986,7 +6003,7 @@ elif page == "🤖 تقارير AI":
                 st.markdown("### 💎 اكتشاف الفرص المخفية والمخاطر الخفية")
                 st.caption("يبحث عن تجميع خفي، صعود كاذب، سبرنق، تناقضات — أشياء ما تشوفها بعينك")
                 if st.button("🚀 ابحث عن الفرص", key="ai_opp_btn", type="primary", use_container_width=True):
-                    with st.spinner("🤖 Claude يبحث عن الفرص المخفية..."):
+                    with st.spinner("🤖 Gemini يبحث عن الفرص المخفية..."):
                         report = generate_opportunities_report(results)
                     st.markdown("---")
                     st.markdown(report)
