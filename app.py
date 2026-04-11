@@ -5471,18 +5471,44 @@ elif page == "🥇 الفلتر الذهبي":
         else:
             st.markdown("### 🥇 الإشارات الذهبية")
 
-            for _gi, _g in enumerate(sorted(_golden, key=lambda x: -x["div"])):
+            # Sort: prioritize RSI 50-70 (best zone) first, then by divergence
+            def _golden_sort_key(g):
+                _r = g.get("rsi", 50)
+                _zone_priority = 0 if 50 <= _r < 70 else 1 if _r < 50 else 2
+                return (_zone_priority, -g["div"])
+
+            for _gi, _g in enumerate(sorted(_golden, key=_golden_sort_key)):
                 _g_change_c = "#00E676" if _g["change"] >= 0 else "#FF5252"
                 _g_flow_c = "#00E676" if _g["flow"] > 20 else "#FFD700" if _g["flow"] > 0 else "#FF5252"
                 _g_cdv_label = "صاعد ✅" if _g["cdv"] == "rising" else "هابط ❌" if _g["cdv"] == "falling" else "مستقر"
 
+                # RSI zone classification (V3 backtest data)
+                _g_rsi = _g.get("rsi", 50)
+                if _g_rsi < 30:
+                    _g_rsi_color, _g_rsi_label = "#4FC3F7", "تجميع"
+                    _g_rsi_badge = "🔵 تجميع مبكر"
+                elif _g_rsi < 50:
+                    _g_rsi_color, _g_rsi_label = "#FFB74D", "متعافي"
+                    _g_rsi_badge = ""
+                elif _g_rsi < 70:
+                    _g_rsi_color, _g_rsi_label = "#00E676", "زخم ✨"
+                    _g_rsi_badge = "🌟 منطقة الزخم (67.7% نجاح)"
+                else:
+                    _g_rsi_color, _g_rsi_label = "#FF5252", "تشبع ⚠️"
+                    _g_rsi_badge = "⚠️ تشبع — حذر"
+
+                # Premium border for RSI 50-70 zone
+                _g_border = "3px solid #00E67670" if 50 <= _g_rsi < 70 else "2px solid #FFD70040"
+                _g_glow = "box-shadow: 0 0 18px rgba(0,230,118,0.18);" if 50 <= _g_rsi < 70 else ""
+
                 st.markdown(f'''
-                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:2px solid #FFD70040;
-                            border-radius:12px;padding:16px 18px;margin:8px 0;direction:rtl">
+                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:{_g_border};
+                            border-radius:12px;padding:16px 18px;margin:8px 0;direction:rtl;{_g_glow}">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
                         <div>
                             <span style="font-size:1.2em;font-weight:800;color:#FFD700">🥇 {_g["name"]}</span>
                             <span style="color:#4b5563;font-size:0.8em;margin-right:8px">{_g["ticker"]} • {_g["sector"]}</span>
+                            {f'<span style="background:{_g_rsi_color}20;color:{_g_rsi_color};padding:3px 10px;border-radius:10px;font-size:0.72em;font-weight:700;border:1px solid {_g_rsi_color}40;margin-right:8px">{_g_rsi_badge}</span>' if _g_rsi_badge else ''}
                         </div>
                         <div style="display:flex;gap:12px;align-items:center">
                             <span style="color:{_g_change_c};font-weight:600">{_g["change"]:+.1f}%</span>
@@ -5493,7 +5519,7 @@ elif page == "🥇 الفلتر الذهبي":
                         <span style="color:{_g_flow_c}">📈 Flow: <b>{_g["flow"]:+.0f}</b></span>
                         <span>⭐ Div: <b style="color:#FFD700">{_g["div"]:+.0f}</b></span>
                         <span>📊 CDV: <b>{_g_cdv_label}</b></span>
-                        <span>📉 RSI: <b>{_g["rsi"]:.0f}</b></span>
+                        <span>📉 RSI: <b style="color:{_g_rsi_color}">{_g_rsi:.0f}</b> <span style="color:#6b7280;font-size:0.85em">({_g_rsi_label})</span></span>
                         <span>🔄 {_g["phase"]}</span>
                         <span>📍 {_g["location"]}</span>
                         <span>📅 {_g["days"]} يوم تجميع</span>
