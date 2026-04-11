@@ -298,6 +298,16 @@ def score_stock(
     else:
         decision = "watch"
 
+    # ── V3: RSI overbought downgrade ──
+    # Even if all other conditions met, if RSI > 70 in any buy phase,
+    # downgrade enter→watch (data-driven: V3 backtest shows low win rates)
+    if decision == "enter" and rsi > 70 and phase in ("accumulation", "spring", "markup"):
+        decision = "watch"
+        if not any("RSI" in r and "تشبع" in r for r in reasons_against):
+            reasons_against.append(
+                f"⚠️ RSI {rsi:.0f} — انتظر تهدئة (تاريخياً منطقة تشبع تعطي نتائج ضعيفة)"
+            )
+
     return {
         "decision": decision,
         "decision_info": DECISIONS[decision],
