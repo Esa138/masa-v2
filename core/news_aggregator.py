@@ -13,17 +13,21 @@ import requests
 import xml.etree.ElementTree as ET
 import re
 import datetime
+from email.utils import parsedate_to_datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-# ── Argaam RSS feeds ──────────────────────────────────────
+# ── Argaam RSS feeds — only fresh/active feeds ──────────────
+# Stale feeds (companies, analysts, conferences) excluded
 ARGAAM_FEEDS = {
-    "عاجل": "https://www.argaam.com/ar/rss/breaking-news?sectionid=1585",
-    "نبض السوق": "https://www.argaam.com/ar/rss/ho-market-pulse?sectionid=70",
     "الأخبار الرئيسية": "https://www.argaam.com/ar/rss/ho-main-news?sectionid=1523",
-    "الشركات": "https://www.argaam.com/ar/rss/companies?sectionid=1543",
-    "المحللون": "https://www.argaam.com/ar/rss/analysts?sectionid=1545",
+    "نبض السوق": "https://www.argaam.com/ar/rss/ho-market-pulse?sectionid=70",
+    "الأسواق العالمية": "https://www.argaam.com/ar/rss/internationmarket-mainnewsar?sectionid=1334",
+    "تعليمي": "https://www.argaam.com/ar/rss/educationalmarket-mainnewsar?sectionid=1408",
 }
+
+# News validity window — drop anything older than this
+FRESHNESS_HOURS = 24
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -31,8 +35,32 @@ HEADERS = {
 }
 
 
-def _parse_rss(xml_bytes: bytes) -> list:
-    """Parse RSS 2.0 feed and return list of items."""
+def _parse_pub_date(pub_str: str):
+    """Parse RSS pubDate (RFC 822) to datetime. Returns None on failure."""
+    if not pub_str:
+        return None
+    try:
+        dt = parsedate_to_datetime(pub_str)
+        # Normalize to naive UTC for comparison
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        return dt
+    except Exception:
+        return None
+
+
+def _is_fresh(pub_str: str, hours: int = FRESHNESS_HOURS) -> bool:
+    """Check if pub_date is within the last N hours."""
+    dt = _parse_pub_date(pub_str)
+    if dt is None:
+        return False
+    now_utc = datetime.datetime.utcnow()
+    age = now_utc - dt
+    return age <= datetime.timedelta(hours=hours)
+
+
+def _parse_rss(xml_bytes: bytes, only_fresh: bool = True) -> list:
+    """Parse RSS 2.0 feed and return list of items, optionally filtered by freshness."""
     try:
         root = ET.fromstring(xml_bytes)
         items = []
@@ -45,25 +73,35 @@ def _parse_rss(xml_bytes: bytes) -> list:
             description = re.sub(r"<[^>]+>", "", description)
             description = re.sub(r"\s+", " ", description).strip()
 
-            if title:
-                items.append({
-                    "title": title,
-                    "link": link,
-                    "pub_date": pub_date,
-                    "description": description[:300],
-                })
+            if not title:
+                continue
+            # Drop stale items (older than FRESHNESS_HOURS)
+            if only_fresh and not _is_fresh(pub_date):
+                continue
+
+            items.append({
+                "title": title,
+                "link": link,
+                "pub_date": pub_date,
+                "description": description[:300],
+                "_parsed_date": _parse_pub_date(pub_date),
+            })
+        # Sort newest first, then drop internal key
+        items.sort(key=lambda x: x.get("_parsed_date") or datetime.datetime.min, reverse=True)
+        for it in items:
+            it.pop("_parsed_date", None)
         return items
     except Exception:
         return []
 
 
 def fetch_argaam_feed(feed_url: str, limit: int = 15) -> list:
-    """Fetch a single Argaam RSS feed."""
+    """Fetch a single Argaam RSS feed (fresh items only)."""
     try:
         resp = requests.get(feed_url, headers=HEADERS, timeout=15)
         if resp.status_code != 200:
             return []
-        items = _parse_rss(resp.content)
+        items = _parse_rss(resp.content, only_fresh=True)
         return items[:limit]
     except Exception:
         return []
