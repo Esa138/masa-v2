@@ -178,7 +178,7 @@ def score_stock(
     elif market_health <= 30:
         reasons_against.append(f"السوق ضعيف جداً ({market_health:.0f}%)")
 
-    # 9. RSI extremes — V3: phase-aware + falling knife protection
+    # 9. RSI — V3: phase-aware, bidirectional (positive evidence + warnings)
     if rsi > 75:
         reasons_against.append(f"RSI مرتفع ({rsi:.0f}) — تشبع شرائي")
     elif rsi > 70:
@@ -191,6 +191,12 @@ def score_stock(
             reasons_against.append(
                 f"⚠️ RSI {rsi:.0f} — قريب من تشبع، انتظر تهدئة قبل الدخول"
             )
+    elif rsi >= 50:
+        # V3 backtest: RSI 50-70 = momentum zone, 67.7% historical win rate
+        if phase in ("accumulation", "spring", "markup"):
+            reasons_for.append(
+                f"🟢 RSI {rsi:.0f} — زخم قوي، التوقيت المثالي (67.7% نجاح تاريخياً)"
+            )
     elif rsi < 28:
         # V3: RSI low in markdown/distribution = crash continuing, NOT bounce
         if phase in ("markdown", "distribution"):
@@ -201,8 +207,14 @@ def score_stock(
             reasons_against.append(
                 f"⚠️ RSI منخفض ({rsi:.0f}) لكن مع كسر دعم + CDV هابط — سكين ساقطة لا ارتداد!"
             )
+        elif phase in ("accumulation", "spring"):
+            # V3 backtest: RSI<30 + accumulation/spring = early bottom (77-79% wins)
+            reasons_for.append(
+                f"🟢 RSI {rsi:.0f} — تجميع مبكر عند القاع (77-79% نجاح تاريخياً)"
+            )
         else:
             reasons_for.append(f"RSI منخفض ({rsi:.0f}) — احتمال ارتداد")
+    # RSI 28-50 = neutral (no signal added — neither bullish nor bearish)
 
     # 10. Institutional data
     if institutional_data:
