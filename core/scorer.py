@@ -325,4 +325,8 @@ def _check_veto(close, ma200, rsi, phase, flow_bias, market_health) -> str:
     if rsi < 15 and close < ma200 * 0.92:
         return f"❌ فيتو: RSI {rsi:.0f} + تحت MA200 بـ {((close/ma200-1)*100):.0f}% — انهيار نشط"
 
+    # Veto 6: markup breakout + RSI>70 = 0% historical win rate (V3 data, 92 trades)
+    if phase == "markup" and rsi > 70:
+        return f"❌ فيتو: اختراق + RSI {rsi:.0f} — تاريخياً 0% نجاح (فخ مؤكد)"
+
     return None

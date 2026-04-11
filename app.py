@@ -252,8 +252,19 @@ def build_card_html(r):
     # Absorption color
     abs_color = "#FFD700" if absorption_score > 70 else "#9ca3af"
 
-    # RSI color
-    rsi_color = "#FF5252" if rsi > 70 else "#00E676" if rsi < 30 else "#9ca3af"
+    # RSI color & label (based on V3 backtest: 50-70 = best zone, 67.7% wins)
+    if rsi < 30:
+        rsi_color = "#4FC3F7"  # blue — تجميع مبكر (53% wins)
+        rsi_label = "تجميع"
+    elif rsi < 50:
+        rsi_color = "#FFB74D"  # orange — متعافي (60% wins)
+        rsi_label = "متعافي"
+    elif rsi < 70:
+        rsi_color = "#00E676"  # green — منطقة الزخم (68% wins) ✨
+        rsi_label = "زخم"
+    else:
+        rsi_color = "#FF5252"  # red — تشبع (تحذير)
+        rsi_label = "تشبع"
 
     # SVG sparkline
     close_vals = r.get("chart_close", [])
@@ -437,6 +448,7 @@ def build_card_html(r):
 <div style="text-align:center">
 <div style="color:#374151;font-size:0.60em;margin-bottom:2px;font-weight:600">RSI</div>
 <div style="color:{rsi_color};font-weight:700;font-size:0.82em">{rsi:.0f}</div>
+<div style="color:{rsi_color};font-size:0.58em;font-weight:600;opacity:0.8">{rsi_label}</div>
 </div>
 </div>
 {bounce_badge}
@@ -1109,7 +1121,14 @@ def build_event_card_html(r):
     change_icon = "▲" if change >= 0 else "▼"
     flow_color = "#00E676" if flow_bias > 10 else "#FF5252" if flow_bias < -10 else "#9ca3af"
     div_color = "#00E676" if divergence > 15 else "#FF5252" if divergence < -15 else "#9ca3af"
-    rsi_color = "#FF5252" if rsi > 70 else "#00E676" if rsi < 30 else "#9ca3af"
+    if rsi < 30:
+        rsi_color, rsi_label = "#4FC3F7", "تجميع"
+    elif rsi < 50:
+        rsi_color, rsi_label = "#FFB74D", "متعافي"
+    elif rsi < 70:
+        rsi_color, rsi_label = "#00E676", "زخم"
+    else:
+        rsi_color, rsi_label = "#FF5252", "تشبع"
 
     if aggressor == "buyers":
         agg_text, agg_color = "🟢 مشتري", "#00E676"
@@ -1297,6 +1316,7 @@ def build_event_card_html(r):
 <div style="text-align:center">
 <div style="color:#374151;font-size:0.58em;margin-bottom:2px;font-weight:600">RSI</div>
 <div style="color:{rsi_color};font-weight:700;font-size:0.78em">{rsi:.0f}</div>
+<div style="color:{rsi_color};font-size:0.55em;font-weight:600;opacity:0.8">{rsi_label}</div>
 </div>
 </div>
 <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
@@ -6523,6 +6543,77 @@ elif page == "📊 أداء النظام":
                     })
                 if _loc_rows:
                     st.dataframe(pd.DataFrame(_loc_rows), use_container_width=True, hide_index=True)
+
+        # ── RSI Performance Breakdown ──
+        if _m_period and _m_n_completed > 5:
+            _rsi_completed = [s for s in _m_completed if s.get("rsi") is not None]
+            if len(_rsi_completed) >= 5:
+                st.divider()
+                st.subheader("📊 الأداء حسب RSI")
+                st.caption("اكتشاف أي منطقة RSI تعطي أفضل نتائج")
+
+                _rsi_bins = [
+                    ("🔵 RSI < 30 (تجميع مبكر)", lambda r: r < 30),
+                    ("🟠 RSI 30-50 (متعافي)", lambda r: 30 <= r < 50),
+                    ("🟢 RSI 50-70 (زخم) ✨", lambda r: 50 <= r < 70),
+                    ("🔴 RSI > 70 (تشبع)", lambda r: r >= 70),
+                ]
+                _rsi_rows = []
+                for _label, _check in _rsi_bins:
+                    _bin = [s for s in _rsi_completed if _check(s.get("rsi", 50))]
+                    if not _bin:
+                        _rsi_rows.append({"الفئة": _label, "إشارات": 0, "نجاح": "—", "عائد": "—", "أفضل": "—", "أسوأ": "—", "التوصية": "—"})
+                        continue
+                    _t = len(_bin)
+                    _w = sum(1 for s in _bin if s.get(_m_outcome_col) == "win")
+                    _wr = _w / _t * 100
+                    _avg = sum(s.get(_m_return_col, 0) or 0 for s in _bin) / _t
+                    _best = max(s.get(_m_return_col, 0) or 0 for s in _bin)
+                    _worst = min(s.get(_m_return_col, 0) or 0 for s in _bin)
+                    _rec = "✅ ممتاز" if _wr >= 65 else "🟡 متوسط" if _wr >= 45 else "❌ تجنب"
+                    _rsi_rows.append({
+                        "الفئة": _label,
+                        "إشارات": _t,
+                        "نجاح": f"{_wr:.0f}%",
+                        "عائد": f"{_avg:+.2f}%",
+                        "أفضل": f"{_best:+.1f}%",
+                        "أسوأ": f"{_worst:+.1f}%",
+                        "التوصية": _rec,
+                    })
+                st.dataframe(pd.DataFrame(_rsi_rows), use_container_width=True, hide_index=True)
+
+                # RSI × Signal Type matrix
+                st.markdown("**🎯 RSI × نوع الإشارة (مصفوفة الذكاء)**")
+                _matrix = {}
+                for s in _rsi_completed:
+                    _r = s.get("rsi", 50)
+                    _bin_name = "RSI<30" if _r < 30 else "RSI 30-50" if _r < 50 else "RSI 50-70" if _r < 70 else "RSI>70"
+                    _sig = s.get("accum_level", "غير محدد") or "غير محدد"
+                    _key = (_sig, _bin_name)
+                    if _key not in _matrix:
+                        _matrix[_key] = {"total": 0, "wins": 0, "ret_sum": 0}
+                    _matrix[_key]["total"] += 1
+                    if s.get(_m_outcome_col) == "win":
+                        _matrix[_key]["wins"] += 1
+                    _matrix[_key]["ret_sum"] += (s.get(_m_return_col, 0) or 0)
+
+                _matrix_rows = []
+                for (_sig, _bin), _d in sorted(_matrix.items(), key=lambda x: -(x[1]["wins"] / x[1]["total"]) if x[1]["total"] > 0 else 0):
+                    if _d["total"] < 2:
+                        continue
+                    _wr = _d["wins"] / _d["total"] * 100
+                    _avg = _d["ret_sum"] / _d["total"]
+                    _verdict = "🏆" if _wr >= 70 else "✅" if _wr >= 55 else "⚠️" if _wr >= 40 else "❌"
+                    _matrix_rows.append({
+                        "نوع الإشارة": _sig,
+                        "RSI": _bin,
+                        "صفقات": _d["total"],
+                        "نجاح": f"{_wr:.0f}%",
+                        "عائد": f"{_avg:+.2f}%",
+                        "حكم": _verdict,
+                    })
+                if _matrix_rows:
+                    st.dataframe(pd.DataFrame(_matrix_rows), use_container_width=True, hide_index=True)
 
     # ── end of _render_market_perf function ──
 
