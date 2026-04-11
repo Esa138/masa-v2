@@ -181,6 +181,16 @@ def score_stock(
     # 9. RSI extremes — V3: phase-aware + falling knife protection
     if rsi > 75:
         reasons_against.append(f"RSI مرتفع ({rsi:.0f}) — تشبع شرائي")
+    elif rsi > 70:
+        # V3 backtest: RSI 70-75 + buy phases = lower win rate (data-driven)
+        if phase in ("markup", "spring"):
+            reasons_against.append(
+                f"⚠️ RSI {rsi:.0f} في مرحلة {phase} — تاريخياً هذي المنطقة 0-25% نجاح فقط"
+            )
+        elif phase == "accumulation":
+            reasons_against.append(
+                f"⚠️ RSI {rsi:.0f} — قريب من تشبع، انتظر تهدئة قبل الدخول"
+            )
     elif rsi < 28:
         # V3: RSI low in markdown/distribution = crash continuing, NOT bounce
         if phase in ("markdown", "distribution"):
