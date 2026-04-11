@@ -231,7 +231,7 @@ def log_signal(signal: dict) -> bool:
     try:
         with sqlite3.connect(DB_FILE) as conn:
             # Add new columns if not exists
-            for col, typ in [("quality_score", "INTEGER DEFAULT 0"), ("platform", "TEXT DEFAULT 'V2'"), ("is_golden", "INTEGER DEFAULT 0")]:
+            for col, typ in [("quality_score", "INTEGER DEFAULT 0"), ("platform", "TEXT DEFAULT 'V2'"), ("is_golden", "INTEGER DEFAULT 0"), ("rsi", "REAL")]:
                 try:
                     conn.execute(f"ALTER TABLE signals ADD COLUMN {col} {typ}")
                 except Exception:
@@ -246,8 +246,8 @@ def log_signal(signal: dict) -> bool:
                 (date_logged, ticker, company, sector, decision,
                  accum_level, accum_days, location, cmf,
                  entry_price, stop_loss, target, rr_ratio,
-                 reasons_for, reasons_against, quality_score, platform, is_golden)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 reasons_for, reasons_against, quality_score, platform, is_golden, rsi)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 signal.get("date_logged", ""),
                 signal.get("ticker", ""),
@@ -267,6 +267,7 @@ def log_signal(signal: dict) -> bool:
                 quality,
                 platform,
                 golden,
+                signal.get("rsi", None),
             ))
             return True
     except Exception:

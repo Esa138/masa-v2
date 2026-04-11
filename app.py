@@ -3582,6 +3582,7 @@ if page == "🔬 Order Flow":
                 "rr_ratio": r["rr_ratio"],
                 "reasons_for": r["reasons_for"],
                 "reasons_against": r["reasons_against"],
+                "rsi": r.get("rsi"),
             })
 
     # ── Auto-update signal outcomes after every scan ────────
