@@ -1,6 +1,6 @@
 """
 MASA QUANT — AI Reports Engine V2
-Powered by DeepSeek
+Powered by Google Gemini
 
 Deep analysis — discovers hidden patterns, contradictions, and secrets
 """
@@ -10,40 +10,57 @@ import json
 import requests
 from datetime import datetime
 
-# DeepSeek API configuration
-DEEPSEEK_BASE_URL = "https://api.deepseek.com/chat/completions"
-DEEPSEEK_MODEL = "deepseek-chat"
+# Gemini API configuration
+GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_BASE_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
 
 def _get_api_key():
-    return st.secrets.get("DEEPSEEK_API_KEY", "")
+    # Support both GEMINI_API_KEY and GOOGLE_API_KEY naming
+    return st.secrets.get("GEMINI_API_KEY", "") or st.secrets.get("GOOGLE_API_KEY", "")
 
 
 def _call_sonnet(system_prompt: str, user_prompt: str, max_tokens: int = 6000) -> str:
-    """Call DeepSeek API (OpenAI-compatible endpoint)."""
+    """Call Google Gemini API."""
     api_key = _get_api_key()
     if not api_key:
-        return "مفتاح API غير موجود. أضف DEEPSEEK_API_KEY في Secrets."
+        return "مفتاح API غير موجود. أضف GEMINI_API_KEY في Secrets."
     try:
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
+        headers = {"Content-Type": "application/json"}
+        params = {"key": api_key}
         payload = {
-            "model": DEEPSEEK_MODEL,
-            "max_tokens": max_tokens,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
+            "systemInstruction": {
+                "parts": [{"text": system_prompt}]
+            },
+            "contents": [
+                {"role": "user", "parts": [{"text": user_prompt}]}
             ],
+            "generationConfig": {
+                "maxOutputTokens": max_tokens,
+                "temperature": 0.7,
+            },
         }
-        resp = requests.post(DEEPSEEK_BASE_URL, headers=headers, json=payload, timeout=120)
+        resp = requests.post(
+            GEMINI_BASE_URL,
+            headers=headers,
+            params=params,
+            json=payload,
+            timeout=120,
+        )
         resp.raise_for_status()
         data = resp.json()
-        return data["choices"][0]["message"]["content"]
+
+        # Extract text from response
+        candidates = data.get("candidates", [])
+        if not candidates:
+            return "لم يتم إرجاع أي رد من النموذج."
+        parts = candidates[0].get("content", {}).get("parts", [])
+        if not parts:
+            return "الرد فارغ من النموذج."
+        return "".join(p.get("text", "") for p in parts)
     except requests.exceptions.HTTPError as e:
-        if resp.status_code == 401:
-            return "مفتاح API غير صحيح."
+        if resp.status_code == 401 or resp.status_code == 403:
+            return "مفتاح API غير صحيح أو منتهي."
         elif resp.status_code == 429:
             return "تم تجاوز حد الاستخدام. حاول بعد دقيقة."
         return f"خطأ: {resp.status_code} — {resp.text[:200]}"
@@ -819,4 +836,4 @@ def generate_opportunities_report(results):
 
 
 def is_ai_available():
-    return bool(st.secrets.get("DEEPSEEK_API_KEY", ""))
+    return bool(st.secrets.get("GEMINI_API_KEY", "") or st.secrets.get("GOOGLE_API_KEY", ""))
