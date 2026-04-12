@@ -3228,7 +3228,7 @@ with st.sidebar:
     st.divider()
 
     # Handle navigation from sector map → company analysis
-    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "📊 أداء النظام"]
+    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "🧭 بوصلة القطاعات", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "📊 أداء النظام"]
     if st.session_state.get("_goto_page"):
         st.session_state["page_nav"] = st.session_state.pop("_goto_page")
 
@@ -5569,6 +5569,254 @@ elif page == "🥇 الفلتر الذهبي":
                         _missing.append(f"❌ فيه {len(_n['reasons_against'])} أسباب حذر")
 
                     st.markdown(f"**{_n['name']}** ({_n['ticker']}) — {_n['price']:.2f} | ينقصه: {' | '.join(_missing)}")
+
+# ══════════════════════════════════════════════════════════════
+# PAGE: Sector Compass — بوصلة القطاعات
+# ══════════════════════════════════════════════════════════════
+
+elif page == "🧭 بوصلة القطاعات":
+    from data.seasonality import (
+        MONTH_OVERVIEW, SECTOR_SEASONALITY, SECTOR_TIERS, MONTHS_AR,
+        get_current_month_ar, get_top_sectors, get_avoid_sectors,
+        get_sector_tier, get_defensive_sectors, check_seasonality_of_alignment,
+        get_rsi_signal_assessment,
+    )
+
+    # RTL
+    st.markdown('''
+    <style>
+    [data-testid="stMarkdownContainer"] { direction: rtl; text-align: right; }
+    [data-testid="stMarkdownContainer"] ul, [data-testid="stMarkdownContainer"] ol { padding-right: 1.5em; padding-left: 0; }
+    </style>
+    ''', unsafe_allow_html=True)
+
+    _cur_month = get_current_month_ar()
+    _month_info = MONTH_OVERVIEW.get(_cur_month, {})
+
+    st.markdown(f'''
+    <div style="text-align:center;padding:20px 0 10px 0;direction:rtl">
+        <span style="font-size:1.8em;font-weight:800;color:#fff">🧭 بوصلة القطاعات</span>
+        <div style="color:#6b7280;font-size:0.92em;margin-top:6px">
+            خريطة موسمية ذكية — وين تدخل ومن وين تهرب
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # ── Month selector ──
+    _sel_month = st.selectbox("الشهر:", MONTHS_AR, index=MONTHS_AR.index(_cur_month), key="compass_month")
+    _m = MONTH_OVERVIEW.get(_sel_month, {})
+
+    # ── Month Overview Card ──
+    _m_color = "#00E676" if _m.get("color") == "green" else "#FF5252" if _m.get("color") == "red" else "#FFD700"
+    _m_ret = _m.get("market_return", _m.get("return", 0))
+    _m_win = _m.get("win_rate", _m.get("win_pct", 0))
+    _m_sharpe = _m.get("sharpe", 0)
+
+    st.markdown(f'''
+    <div style="background:linear-gradient(135deg,#0d1117,#161b22);border:2px solid {_m_color}40;
+                border-radius:14px;padding:20px;margin:10px 0;direction:rtl">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div>
+                <span style="font-size:1.5em;font-weight:800;color:{_m_color}">📅 {_sel_month}</span>
+                <span style="color:#6b7280;font-size:0.85em;margin-right:12px">{_m.get("verdict", "")}</span>
+            </div>
+            <div style="text-align:left">
+                <div style="color:{_m_color};font-size:2em;font-weight:800">{_m_ret:+.1f}%</div>
+                <div style="color:#6b7280;font-size:0.75em">عائد تاريخي</div>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0">
+            <div style="background:rgba(14,20,36,0.6);border-radius:8px;padding:8px;text-align:center">
+                <div style="color:#6b7280;font-size:0.7em">نسبة النجاح</div>
+                <div style="color:#fff;font-weight:700">{f"{_m_win:.0f}%" if _m_win else "—"}</div>
+            </div>
+            <div style="background:rgba(14,20,36,0.6);border-radius:8px;padding:8px;text-align:center">
+                <div style="color:#6b7280;font-size:0.7em">Sharpe</div>
+                <div style="color:#fff;font-weight:700">{f"{_m_sharpe:.2f}" if _m_sharpe else "—"}</div>
+            </div>
+            <div style="background:rgba(14,20,36,0.6);border-radius:8px;padding:8px;text-align:center">
+                <div style="color:#6b7280;font-size:0.7em">Profit Factor</div>
+                <div style="color:#fff;font-weight:700">{f"{_m.get('pf', 0):.1f}" if _m.get("pf") else "—"}</div>
+            </div>
+        </div>
+        <div style="color:#9ca3af;font-size:0.82em;margin-top:8px">
+            <b>المحفز:</b> {_m.get("catalyst", "—")}
+        </div>
+        <div style="color:#FF8A80;font-size:0.82em;margin-top:4px">
+            <b>المخاطر:</b> {_m.get("risk", "—")}
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # ── Top Sectors for this month ──
+    st.divider()
+    st.markdown("### 🟢 أقوى القطاعات هذا الشهر")
+
+    _top = get_top_sectors(_sel_month, 10)
+    if _top:
+        _top_rows = []
+        for _i, _t in enumerate(_top):
+            _tier = get_sector_tier(_t["sector"])
+            _tier_emoji = "🟢" if _tier and _tier.get("tier") == "green" else "🟡" if _tier and _tier.get("tier") == "yellow" else "🔴" if _tier and _tier.get("tier") == "red" else "⚪"
+            _top_rows.append({
+                "#": _i + 1,
+                "القطاع": f"{_tier_emoji} {_t['sector']}",
+                "العائد": f"{_t['return']:+.1f}%",
+                "النجاح": f"{_t['win_pct']:.0f}%" if _t.get("win_pct") else "—",
+                "Sharpe": f"{_t['sharpe']:.2f}" if _t.get("sharpe") else "—",
+                "PF": f"{_t['pf']:.1f}" if _t.get("pf") else "—",
+            })
+        st.dataframe(pd.DataFrame(_top_rows), use_container_width=True, hide_index=True)
+
+    # ── Avoid Sectors ──
+    _avoid = get_avoid_sectors(_sel_month)
+    if _avoid:
+        st.markdown("### 🔴 قطاعات تجنبها")
+        for _a in _avoid:
+            st.markdown(
+                f'<div style="background:rgba(255,82,82,0.08);border:1px solid rgba(255,82,82,0.2);'
+                f'border-radius:8px;padding:8px 14px;margin:4px 0;direction:rtl">'
+                f'<span style="color:#FF5252;font-weight:700">❌ {_a["sector"]}</span> '
+                f'<span style="color:#FF8A80">{_a["return"]:+.1f}%</span></div>',
+                unsafe_allow_html=True,
+            )
+    else:
+        st.success("✅ لا توجد قطاعات سلبية هذا الشهر!")
+
+    # ── Defensive Sectors (important for weak months) ──
+    if _m_ret is not None and _m_ret < 2:
+        _def = get_defensive_sectors(_sel_month)
+        if _def:
+            st.markdown("### 🛡️ القطاعات الدفاعية (آمنة في الأشهر الضعيفة)")
+            for _d in _def[:5]:
+                st.markdown(f"**{_d['sector']}** — عائد {_d['return']:+.1f}%")
+
+    # ── Sector Tiers ──
+    st.divider()
+    st.markdown("### 🏷️ تصنيف القطاعات الاستراتيجي")
+
+    _tc1, _tc2, _tc3 = st.columns(3)
+    for _col, _tier_key, _border_c in [(_tc1, "green", "#00E676"), (_tc2, "yellow", "#FFD700"), (_tc3, "red", "#FF5252")]:
+        with _col:
+            _td = SECTOR_TIERS.get(_tier_key, {})
+            _sectors = _td.get("sectors", {})
+            if isinstance(_sectors, list):
+                _sec_list = "<br>".join(f"• {s}" for s in _sectors)
+            else:
+                _sec_list = "<br>".join(f"• {s}" for s in _sectors.keys())
+            st.markdown(
+                f'<div style="background:rgba(14,20,36,0.6);border:2px solid {_border_c}40;'
+                f'border-radius:12px;padding:14px;text-align:right;direction:rtl">'
+                f'<div style="color:{_border_c};font-weight:700;font-size:1em;margin-bottom:8px">{_td.get("label", "")}</div>'
+                f'<div style="color:#9ca3af;font-size:0.78em;margin-bottom:8px">{_td.get("description", _td.get("action", ""))}</div>'
+                f'<div style="color:#fff;font-size:0.82em;line-height:1.8">{_sec_list}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    # ── Cross-reference with Order Flow (if scan available) ──
+    _scan_results = st.session_state.get("scan_results")
+    if _scan_results:
+        st.divider()
+        st.markdown("### 🔗 موسمية × Order Flow — التوافق الحي")
+        st.caption("يقارن بيانات الموسمية مع Order Flow الحالي من آخر مسح")
+
+        _sector_flows = {}
+        for _r in _scan_results:
+            _sec = _r.get("sector", "")
+            if not _sec:
+                continue
+            if _sec not in _sector_flows:
+                _sector_flows[_sec] = {"flows": [], "count": 0}
+            _sector_flows[_sec]["flows"].append(_r.get("flow_bias", 0))
+            _sector_flows[_sec]["count"] += 1
+
+        _align_rows = []
+        for _sec, _fd in sorted(_sector_flows.items(), key=lambda x: sum(x[1]["flows"]) / len(x[1]["flows"]) if x[1]["flows"] else 0, reverse=True):
+            _avg_flow = sum(_fd["flows"]) / len(_fd["flows"]) if _fd["flows"] else 0
+            _of_dir = "positive" if _avg_flow > 5 else "negative" if _avg_flow < -5 else "neutral"
+            _check = check_seasonality_of_alignment(_sec, _sel_month, _of_dir)
+
+            if isinstance(_check, str):
+                _msg = _check
+                _type = ""
+            else:
+                _msg = _check.get("message", "")
+                _type = _check.get("type", "")
+
+            _verdict_emoji = "✅" if "تأكيد مزدوج" in _msg and "سلبي" not in _msg else "🏃" if "اهرب" in _msg else "⚠️" if "فخ" in _msg or "تناقض" in _msg else "🔄"
+
+            _align_rows.append({
+                "القطاع": _sec,
+                "OF": f"{_avg_flow:+.0f}",
+                "الحكم": f"{_verdict_emoji} {_msg[:50]}",
+            })
+
+        if _align_rows:
+            st.dataframe(pd.DataFrame(_align_rows), use_container_width=True, hide_index=True)
+    else:
+        st.info("💡 امسح السوق من Order Flow أولاً لتشوف التوافق بين الموسمية و Order Flow")
+
+    # ── Full 12-month heatmap for selected sector ──
+    st.divider()
+    st.markdown("### 📊 الخريطة الموسمية الكاملة")
+
+    _all_sectors = sorted(SECTOR_SEASONALITY.keys())
+    _sel_sector = st.selectbox("اختر القطاع:", _all_sectors, key="compass_sector")
+
+    if _sel_sector and _sel_sector in SECTOR_SEASONALITY:
+        _sec_data = SECTOR_SEASONALITY[_sel_sector]
+        _heatmap_rows = []
+        for _month in MONTHS_AR:
+            _md = _sec_data.get(_month, {})
+            _ret = _md.get("return", _md.get("ret", 0))
+            _win = _md.get("win_rate", _md.get("win", None))
+            _color = "🟢" if _ret > 2 else "🔴" if _ret < 0 else "🟡"
+            _highlight = " ⭐" if _month == _cur_month else ""
+            _heatmap_rows.append({
+                "الشهر": f"{_color} {_month}{_highlight}",
+                "العائد": f"{_ret:+.1f}%",
+                "النجاح": f"{_win:.0f}%" if _win else "—",
+                "Sharpe": f"{_md.get('sharpe', 0):.2f}" if _md.get("sharpe") else "—",
+                "PF": f"{_md.get('pf', 0):.1f}" if _md.get("pf") else "—",
+            })
+        st.dataframe(pd.DataFrame(_heatmap_rows), use_container_width=True, hide_index=True)
+
+        # Plotly bar chart
+        _chart_returns = [_sec_data.get(m, {}).get("return", _sec_data.get(m, {}).get("ret", 0)) for m in MONTHS_AR]
+        _chart_colors = ["#00E676" if v > 0 else "#FF5252" for v in _chart_returns]
+        import plotly.graph_objects as go
+        _fig = go.Figure(go.Bar(
+            x=MONTHS_AR, y=_chart_returns,
+            marker_color=_chart_colors,
+            text=[f"{v:+.1f}%" for v in _chart_returns],
+            textposition="outside",
+            textfont=dict(size=10),
+        ))
+        _fig.update_layout(
+            height=300, margin=dict(l=0, r=0, t=10, b=30),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(20,24,36,0.8)",
+            yaxis=dict(gridcolor="#151d30", title="العائد %"),
+            xaxis=dict(gridcolor="#151d30"),
+            font=dict(family="Tajawal"),
+        )
+        _cur_idx = MONTHS_AR.index(_cur_month)
+        _fig.add_vline(x=_cur_idx, line_dash="dash", line_color="#FFD700", line_width=2,
+                       annotation_text="📍 الآن", annotation_font_color="#FFD700")
+        st.plotly_chart(_fig, use_container_width=True, config={"displayModeBar": False})
+
+        # Tier badge
+        _tier = get_sector_tier(_sel_sector)
+        if _tier:
+            _tier_c = "#00E676" if _tier["tier"] == "green" else "#FFD700" if _tier["tier"] == "yellow" else "#FF5252"
+            st.markdown(
+                f'<div style="text-align:center;margin:10px 0">'
+                f'<span style="background:{_tier_c}20;color:{_tier_c};padding:6px 16px;'
+                f'border-radius:12px;font-weight:700;border:1px solid {_tier_c}40">'
+                f'{_tier["label"]}</span></div>',
+                unsafe_allow_html=True,
+            )
+
 
 elif page == "📅 تقويم النتائج":
     from core.earnings import _fetch_earnings_info, check_earnings_proximity, check_ex_dividend
