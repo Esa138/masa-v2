@@ -18,13 +18,23 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 # ── Argaam RSS feeds — only fresh/active feeds ──────────────
-# Stale feeds (companies, analysts, conferences) excluded
 ARGAAM_FEEDS = {
     "الأخبار الرئيسية": "https://www.argaam.com/ar/rss/ho-main-news?sectionid=1523",
     "نبض السوق": "https://www.argaam.com/ar/rss/ho-market-pulse?sectionid=70",
-    "الأسواق العالمية": "https://www.argaam.com/ar/rss/internationmarket-mainnewsar?sectionid=1334",
-    "تعليمي": "https://www.argaam.com/ar/rss/educationalmarket-mainnewsar?sectionid=1408",
 }
+
+# ── Saudi relevance keywords (filter out international noise) ──
+SAUDI_KEYWORDS = [
+    "تاسي", "تداول", "السعودي", "السعودية", "سابك", "أرامكو", "الراجحي",
+    "الإنماء", "الأهلي", "بنك", "أسمنت", "اتصالات", "stc", "زين",
+    "أرباح", "توزيعات", "نتائج", "ربع", "سهم", "أسهم", "مؤشر",
+    "ريال", "هيئة السوق", "ساما", "نمو", "طرح", "اكتتاب",
+    "قطاع", "شركة", "المالية", "الاستثمار", "صندوق", "عقاري",
+    "تأمين", "بتروكيم", "طاقة", "نفط", "معادن", "ذهب",
+    "موبايلي", "تبوك", "مكة", "المدينة", "الرياض", "جدة",
+    "دار الأركان", "جرير", "المراعي", "ملكية", "أجنبي",
+    "تجميع", "تصريف", "اختراق", "دعم", "مقاومة",
+]
 
 # News validity window — drop anything older than this
 FRESHNESS_HOURS = 24
@@ -129,6 +139,75 @@ def fetch_all_argaam_news(limit_per_feed: int = 10) -> dict:
     return results
 
 
+def _is_saudi_relevant(title: str, desc: str = "") -> bool:
+    """Check if a news item is relevant to Saudi market/stocks."""
+    text = f"{title} {desc}".lower()
+    return any(kw in text for kw in SAUDI_KEYWORDS)
+
+
+def fetch_maaal_news(limit: int = 15) -> list:
+    """Scrape recent articles from Maaal.com — Saudi-focused financial news."""
+    try:
+        resp = requests.get("https://maaal.com/", headers=HEADERS, timeout=15)
+        if resp.status_code != 200:
+            return []
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        seen = set()
+        items = []
+        for a in soup.find_all('a', href=True):
+            text = a.get_text(strip=True)
+            href = a['href']
+            if len(text) < 25 or text in seen:
+                continue
+            if 'maaal.com' not in href and not href.startswith('/'):
+                continue
+            # Only keep Saudi-relevant
+            if not _is_saudi_relevant(text):
+                continue
+            seen.add(text)
+            link = href if href.startswith('http') else f"https://maaal.com{href}"
+            items.append({
+                "title": text[:150],
+                "link": link,
+                "pub_date": "",
+                "description": "",
+            })
+        return items[:limit]
+    except Exception:
+        return []
+
+
+def fetch_argaam_page_news(limit: int = 15) -> list:
+    """Scrape Argaam main page for Saudi-relevant articles."""
+    try:
+        resp = requests.get("https://www.argaam.com/ar", headers=HEADERS, timeout=15)
+        if resp.status_code != 200:
+            return []
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        seen = set()
+        items = []
+        for a in soup.find_all('a', href=True):
+            text = a.get_text(strip=True)
+            href = a['href']
+            if len(text) < 20 or '/ar/article/' not in href or text in seen:
+                continue
+            if not _is_saudi_relevant(text):
+                continue
+            seen.add(text)
+            link = f"https://www.argaam.com{href}" if href.startswith('/') else href
+            items.append({
+                "title": text[:150],
+                "link": link,
+                "pub_date": "",
+                "description": "",
+            })
+        return items[:limit]
+    except Exception:
+        return []
+
+
 def fetch_tadawul_news(limit: int = 20) -> list:
     """
     Fetch Saudi Exchange issuer announcements.
@@ -165,19 +244,32 @@ def fetch_tadawul_news(limit: int = 20) -> list:
 
 def get_all_market_news(limit_per_source: int = 10) -> dict:
     """
-    Unified news fetch from all sources.
+    Unified news fetch from all sources (Saudi-focused).
     Returns:
       {
         "argaam": {category: [items]},
-        "tadawul": [items],
+        "argaam_page": [items],
+        "maaal": [items],
         "fetched_at": str
       }
     """
-    argaam = fetch_all_argaam_news(limit_per_feed=limit_per_source)
-    tadawul = fetch_tadawul_news(limit=limit_per_source)
+    argaam_rss = fetch_all_argaam_news(limit_per_feed=limit_per_source)
+    argaam_page = fetch_argaam_page_news(limit=limit_per_source)
+    maaal = fetch_maaal_news(limit=limit_per_source)
+
+    # Filter RSS results for Saudi relevance too
+    for cat in list(argaam_rss.keys()):
+        argaam_rss[cat] = [
+            it for it in argaam_rss[cat]
+            if _is_saudi_relevant(it.get("title", ""), it.get("description", ""))
+        ]
+        if not argaam_rss[cat]:
+            del argaam_rss[cat]
+
     return {
-        "argaam": argaam,
-        "tadawul": tadawul,
+        "argaam": argaam_rss,
+        "argaam_page": argaam_page,
+        "maaal": maaal,
         "fetched_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
 
@@ -193,14 +285,29 @@ def flatten_news_for_summary(news_data: dict, max_items: int = 40) -> list:
                 "date": it.get("pub_date", "")[:16],
                 "desc": it.get("description", ""),
             })
-    for it in news_data.get("tadawul", []):
+    for it in news_data.get("argaam_page", []):
         flat.append({
-            "source": "تداول",
+            "source": "أرقام/الموقع",
             "title": it["title"],
-            "date": it.get("pub_date", "")[:16],
-            "desc": it.get("description", ""),
+            "date": "",
+            "desc": "",
         })
-    return flat[:max_items]
+    for it in news_data.get("maaal", []):
+        flat.append({
+            "source": "مال",
+            "title": it["title"],
+            "date": "",
+            "desc": "",
+        })
+    # Deduplicate by title similarity
+    seen = set()
+    unique = []
+    for it in flat:
+        key = it["title"][:40]
+        if key not in seen:
+            seen.add(key)
+            unique.append(it)
+    return unique[:max_items]
 
 
 # ══════════════════════════════════════════════════════════

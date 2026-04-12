@@ -5928,12 +5928,31 @@ elif page == "📰 أخبار السوق":
         st.divider()
         st.markdown("### 📋 الأخبار الكاملة")
 
-        _tab_names = list(_news_data.get("argaam", {}).keys())
+        # Build tab list from all sources
+        _tab_names = []
+        _tab_items = {}
+        # Argaam RSS categories
+        for _cat, _items in _news_data.get("argaam", {}).items():
+            if _items:
+                _key = f"أرقام: {_cat}"
+                _tab_names.append(_key)
+                _tab_items[_key] = _items
+        # Argaam page scrape
+        _argaam_page = _news_data.get("argaam_page", [])
+        if _argaam_page:
+            _tab_names.append("أرقام: شركات")
+            _tab_items["أرقام: شركات"] = _argaam_page
+        # Maaal
+        _maaal = _news_data.get("maaal", [])
+        if _maaal:
+            _tab_names.append("📰 مال")
+            _tab_items["📰 مال"] = _maaal
+
         if _tab_names:
             _tabs = st.tabs(_tab_names)
             for _idx, _tab_name in enumerate(_tab_names):
                 with _tabs[_idx]:
-                    _items = _news_data["argaam"].get(_tab_name, [])
+                    _items = _tab_items.get(_tab_name, [])
                     for _it in _items:
                         _title = _it.get("title", "").strip()
                         _date = _it.get("pub_date", "")[:25]
@@ -5941,10 +5960,11 @@ elif page == "📰 أخبار السوق":
                         _desc = _it.get("description", "")
                         _desc_html = f'<div style="color:#9ca3af;font-size:0.82em;line-height:1.6">{_desc}</div>' if _desc else ""
                         _link_html = f'<a href="{_link}" target="_blank" style="color:#FFD700;font-size:0.75em;text-decoration:none">🔗 المصدر</a>' if _link else ""
+                        _date_html = f'<div style="color:#4FC3F7;font-size:0.72em;margin-bottom:4px">📅 {_date}</div>' if _date else ""
                         st.markdown(
                             f'<div style="background:rgba(14,20,36,0.5);border:1px solid #192035;'
                             f'border-radius:10px;padding:12px 14px;margin:6px 0;direction:rtl">'
-                            f'<div style="color:#4FC3F7;font-size:0.72em;margin-bottom:4px">📅 {_date}</div>'
+                            f'{_date_html}'
                             f'<div style="color:#fff;font-weight:600;font-size:0.95em;margin-bottom:6px">{_title}</div>'
                             f'{_desc_html}{_link_html}'
                             f'</div>',
