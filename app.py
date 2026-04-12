@@ -5818,6 +5818,7 @@ elif page == "📰 أخبار السوق":
         get_all_market_news,
         summarize_news_with_gemini,
         flatten_news_for_summary,
+        enrich_news_with_summaries,
     )
     from core.ai_reports import is_ai_available
 
@@ -5924,9 +5925,22 @@ elif page == "📰 أخبار السوق":
                 st.markdown("---")
                 st.markdown(st.session_state["_news_summary"])
 
-        # ── Raw news tabs ──
+        # ── Enrich news with AI summaries ──
         st.divider()
         st.markdown("### 📋 الأخبار الكاملة")
+
+        if _ai_ok:
+            _enrich_btn = st.button("✨ لخّص كل خبر بسطر", key="enrich_news_btn", use_container_width=True)
+            if _enrich_btn:
+                # Collect all items for enrichment
+                _all_items_flat = []
+                for _items_list in _news_data.get("argaam", {}).values():
+                    _all_items_flat.extend(_items_list)
+                _all_items_flat.extend(_news_data.get("argaam_page", []))
+                _all_items_flat.extend(_news_data.get("maaal", []))
+                with st.spinner("✨ Gemini يلخّص كل خبر بسطر..."):
+                    enrich_news_with_summaries(_all_items_flat)
+                st.session_state["_news_data"] = _news_data  # save enriched
 
         # Build tab list from all sources
         _tab_names = []
@@ -5958,15 +5972,18 @@ elif page == "📰 أخبار السوق":
                         _date = _it.get("pub_date", "")[:25]
                         _link = _it.get("link", "")
                         _desc = _it.get("description", "")
-                        _desc_html = f'<div style="color:#9ca3af;font-size:0.82em;line-height:1.6">{_desc}</div>' if _desc else ""
+                        _ai_sum = _it.get("ai_summary", "")
+                        # Prefer AI summary, fallback to RSS description
+                        _body = _ai_sum or _desc
+                        _body_html = f'<div style="color:#B0BEC5;font-size:0.85em;line-height:1.7;margin-bottom:6px">{_body}</div>' if _body else ""
                         _link_html = f'<a href="{_link}" target="_blank" style="color:#FFD700;font-size:0.75em;text-decoration:none">🔗 المصدر</a>' if _link else ""
                         _date_html = f'<div style="color:#4FC3F7;font-size:0.72em;margin-bottom:4px">📅 {_date}</div>' if _date else ""
                         st.markdown(
                             f'<div style="background:rgba(14,20,36,0.5);border:1px solid #192035;'
                             f'border-radius:10px;padding:12px 14px;margin:6px 0;direction:rtl">'
                             f'{_date_html}'
-                            f'<div style="color:#fff;font-weight:600;font-size:0.95em;margin-bottom:6px">{_title}</div>'
-                            f'{_desc_html}{_link_html}'
+                            f'<div style="color:#fff;font-weight:600;font-size:0.95em;margin-bottom:4px">{_title}</div>'
+                            f'{_body_html}{_link_html}'
                             f'</div>',
                             unsafe_allow_html=True,
                         )

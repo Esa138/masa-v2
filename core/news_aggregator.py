@@ -314,6 +314,44 @@ def flatten_news_for_summary(news_data: dict, max_items: int = 40) -> list:
 # AI Summarization (uses Gemini via core.ai_reports)
 # ══════════════════════════════════════════════════════════
 
+def enrich_news_with_summaries(news_items: list) -> list:
+    """
+    Use Gemini to add a one-line Arabic summary to each news title.
+    Enriches items in-place with 'ai_summary' field.
+    """
+    if not news_items:
+        return news_items
+
+    # Build batch prompt
+    titles = [f"{i+1}. {it['title']}" for i, it in enumerate(news_items[:30])]
+    prompt = "لخّص كل خبر بجملة واحدة قصيرة (15 كلمة max). رقّم الردود بنفس ترتيب الأخبار:\n\n" + "\n".join(titles)
+    system = "أنت محلل مالي. لخّص كل خبر بجملة واحدة مختصرة بالعربي. رقّم الردود."
+
+    try:
+        from core.ai_reports import _call_sonnet
+        result = _call_sonnet(system, prompt, max_tokens=2000)
+        if not result or "خطأ" in result[:20]:
+            return news_items
+
+        # Parse numbered lines
+        import re
+        lines = result.strip().split("\n")
+        summaries = {}
+        for line in lines:
+            m = re.match(r"(\d+)\.\s*(.+)", line.strip())
+            if m:
+                idx = int(m.group(1)) - 1
+                summaries[idx] = m.group(2).strip()
+
+        for i, it in enumerate(news_items[:30]):
+            if i in summaries:
+                it["ai_summary"] = summaries[i]
+    except Exception:
+        pass
+
+    return news_items
+
+
 NEWS_SYSTEM_PROMPT = """أنت محلل مالي سعودي خبير — مستوى hedge fund analyst.
 تكتب بالعربية الفصحى (لهجة مهنية سعودية).
 مهمتك: تلخيص أخبار السوق السعودي وربطها بإشارات منصة MASA (Order Flow).
