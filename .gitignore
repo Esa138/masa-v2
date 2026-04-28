@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 *.db
+!masa_v2.db          # Allow main signal DB (auto-scan persistence)
 .env
 
 # Test/experiment scripts

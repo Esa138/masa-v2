@@ -3582,28 +3582,39 @@ if page == "🔬 Order Flow":
                     st.session_state.selected_ticker = r["ticker"]
                     st.rerun()
 
-    # ── Log Enter Signals ─────────────────────────────────
+    # ── Log ALL Signals (enter/watch/avoid) for full data analysis ──
     today = datetime.datetime.now().strftime("%Y-%m-%d")
+    _logged_count = {"enter": 0, "watch": 0, "avoid": 0}
     for r in results:
-        if r["decision"] == "enter":
-            log_signal({
-                "date_logged": today,
-                "ticker": r["ticker"],
-                "company": r["name"],
-                "sector": r["sector"],
-                "decision": r["decision"],
-                "accum_level": r["phase"],
-                "accum_days": r["days"],
-                "location": r["location"],
-                "cmf": r["flow_bias"],
-                "entry_price": r["price"],
-                "stop_loss": r["stop_loss"],
-                "target": r["target"],
-                "rr_ratio": r["rr_ratio"],
-                "reasons_for": r["reasons_for"],
-                "reasons_against": r["reasons_against"],
-                "rsi": r.get("rsi"),
-            })
+        _dec = r.get("decision", "")
+        if _dec not in ("enter", "watch", "avoid"):
+            continue
+        log_signal({
+            "date_logged": today,
+            "ticker": r["ticker"],
+            "company": r["name"],
+            "sector": r["sector"],
+            "decision": _dec,
+            "accum_level": r["phase"],
+            "accum_days": r["days"],
+            "location": r["location"],
+            "cmf": r["flow_bias"],
+            "entry_price": r["price"],
+            "stop_loss": r.get("stop_loss", 0),
+            "target": r.get("target", 0),
+            "rr_ratio": r.get("rr_ratio", 0),
+            "reasons_for": r.get("reasons_for", []),
+            "reasons_against": r.get("reasons_against", []),
+            "rsi": r.get("rsi"),
+        })
+        _logged_count[_dec] = _logged_count.get(_dec, 0) + 1
+
+    # Show logging summary
+    if sum(_logged_count.values()) > 0:
+        st.toast(
+            f"💾 تم حفظ {_logged_count['enter']} ادخل + {_logged_count['watch']} راقب + {_logged_count['avoid']} تجنب",
+            icon="📊",
+        )
 
     # ── Auto-update signal outcomes after every scan ────────
     try:
@@ -6528,13 +6539,28 @@ elif page == "📊 أداء النظام":
     # ── Direct DB query for richest data ──
     import sqlite3
     _db_path = "masa_v2.db"
+
+    # ── Decision filter ──
+    _perf_decisions = st.multiselect(
+        "نوع الإشارات المعروضة:",
+        options=["enter", "watch", "avoid"],
+        default=["enter"],
+        format_func=lambda x: {"enter": "✅ ادخل", "watch": "⚠️ راقب", "avoid": "❌ تجنب"}.get(x, x),
+        key="_perf_decision_filter",
+        help="افتراضياً يعرض إشارات الدخول فقط. أضف 'راقب' لتشوف الإشارات الحدّية، أو 'تجنب' لتأكيد فعالية الفلتر.",
+    )
+    if not _perf_decisions:
+        _perf_decisions = ["enter"]
+    _decision_placeholders = ",".join("?" * len(_perf_decisions))
+
     _db_data = {"rows": [], "has_5d": False, "has_10d": False, "has_20d": False}
     try:
         with sqlite3.connect(_db_path) as _conn:
             _conn.row_factory = sqlite3.Row
-            _db_rows = _conn.execute("""
-                SELECT * FROM signals WHERE decision='enter' ORDER BY date_logged DESC
-            """).fetchall()
+            _db_rows = _conn.execute(
+                f"SELECT * FROM signals WHERE decision IN ({_decision_placeholders}) ORDER BY date_logged DESC",
+                _perf_decisions,
+            ).fetchall()
             _db_data["rows"] = [dict(r) for r in _db_rows]
             _db_data["has_5d"] = any(r["outcome_5d"] is not None for r in _db_data["rows"])
             _db_data["has_10d"] = any(r["outcome_10d"] is not None for r in _db_data["rows"])
