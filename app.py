@@ -7619,12 +7619,12 @@ elif page == "🔬 تشخيص الأداء":
         st.divider()
         st.markdown("### 📊 التحليل الأحادي (كل خاصية لوحدها)")
 
-        _uni_tab1, _uni_tab2, _uni_tab3, _uni_tab4 = st.tabs([
-            "🏭 القطاع", "📈 RSI", "💧 Flow", "📍 الموقع"
+        _uni_tab1, _uni_tab_ind, _uni_tab2, _uni_tab3, _uni_tab4 = st.tabs([
+            "🏭 القطاع", "🔬 الصناعة", "📈 RSI", "💧 Flow", "📍 الموقع"
         ])
 
-        def _render_univariate(_col, _icon):
-            _data = analyze_univariate(_md, _col, min_n=4)
+        def _render_univariate(_col, _icon, _min_n=4):
+            _data = analyze_univariate(_md, _col, min_n=_min_n)
             if not _data:
                 st.info("لا توجد بيانات كافية")
                 return
@@ -7643,6 +7643,12 @@ elif page == "🔬 تشخيص الأداء":
 
         with _uni_tab1:
             _render_univariate('sector', '🏭')
+        with _uni_tab_ind:
+            if 'industry' in _md.columns and _md['industry'].notna().any():
+                st.caption("التحليل على مستوى الصناعة الفرعية — كل قطاع مُقسّم إلى صناعات أدق")
+                _render_univariate('industry', '🔬', _min_n=3)
+            else:
+                st.info("التصنيف الصناعي متوفر حالياً للسوق الأمريكي فقط (553 سهم في 87 صناعة)")
         with _uni_tab2:
             _render_univariate('rsi_zone', '📈')
         with _uni_tab3:

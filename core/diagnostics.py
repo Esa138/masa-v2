@@ -104,6 +104,17 @@ def load_signals_df(db_path: str = DB_PATH) -> pd.DataFrame:
         return '40+ يوم'
     df['days_bin'] = df['accum_days'].apply(_days_bin)
 
+    # Industry (sub-sector) — mapped from data/markets
+    try:
+        from data.markets import US_INDUSTRIES
+        df['industry'] = df.apply(
+            lambda r: US_INDUSTRIES.get(r['ticker'], r.get('sector', '')) if not r['is_saudi']
+            else r.get('sector', ''),
+            axis=1,
+        )
+    except Exception:
+        df['industry'] = df.get('sector', '')
+
     return df
 
 
@@ -173,6 +184,17 @@ def find_golden_patterns(df: pd.DataFrame, min_win_rate: float = 65, min_n: int 
         analyze_bivariate(df, 'sector', 'flow_zone', min_n),
         "sector_flow"
     ))
+    # Industry × RSI Zone (sub-sector granular)
+    if 'industry' in df.columns:
+        candidates.extend(_label_patterns(
+            analyze_bivariate(df, 'industry', 'rsi_zone', min_n),
+            "industry_rsi"
+        ))
+        # Industry × Flow Zone
+        candidates.extend(_label_patterns(
+            analyze_bivariate(df, 'industry', 'flow_zone', min_n),
+            "industry_flow"
+        ))
     # Phase × RSI Zone
     candidates.extend(_label_patterns(
         analyze_bivariate(df, 'accum_level', 'rsi_zone', min_n),
@@ -206,6 +228,11 @@ def find_trap_patterns(df: pd.DataFrame, max_win_rate: float = 25, min_n: int = 
         analyze_bivariate(df, 'sector', 'rsi_zone', min_n), "sector_rsi"))
     candidates.extend(_label_patterns(
         analyze_bivariate(df, 'sector', 'flow_zone', min_n), "sector_flow"))
+    if 'industry' in df.columns:
+        candidates.extend(_label_patterns(
+            analyze_bivariate(df, 'industry', 'rsi_zone', min_n), "industry_rsi"))
+        candidates.extend(_label_patterns(
+            analyze_bivariate(df, 'industry', 'flow_zone', min_n), "industry_flow"))
     candidates.extend(_label_patterns(
         analyze_bivariate(df, 'accum_level', 'rsi_zone', min_n), "phase_rsi"))
     candidates.extend(_label_patterns(
@@ -223,6 +250,8 @@ def _label_patterns(patterns: list, pattern_type: str) -> list:
     type_labels = {
         "sector_rsi": "🏭 قطاع × RSI",
         "sector_flow": "🏭 قطاع × Flow",
+        "industry_rsi": "🔬 صناعة × RSI",
+        "industry_flow": "🔬 صناعة × Flow",
         "phase_rsi": "📊 مرحلة × RSI",
         "loc_days": "📍 موقع × مدة التجميع",
         "rr_flow": "🎯 R:R × Flow",
@@ -247,6 +276,8 @@ def simulate_golden_filter(df: pd.DataFrame, golden_patterns: list, top_n: int =
     type_to_cols = {
         "🏭 قطاع × RSI": ('sector', 'rsi_zone'),
         "🏭 قطاع × Flow": ('sector', 'flow_zone'),
+        "🔬 صناعة × RSI": ('industry', 'rsi_zone'),
+        "🔬 صناعة × Flow": ('industry', 'flow_zone'),
         "📊 مرحلة × RSI": ('accum_level', 'rsi_zone'),
         "📍 موقع × مدة التجميع": ('location', 'days_bin'),
         "🎯 R:R × Flow": ('rr_zone', 'flow_zone'),
