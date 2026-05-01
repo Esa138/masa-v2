@@ -307,236 +307,763 @@ SAUDI_STOCKS = {
 # ══════════════════════════════════════════════════════════════
 
 US_STOCKS = {
-    # ── Technology ──
-    "AAPL": "Apple",
-    "MSFT": "Microsoft",
-    "NVDA": "NVIDIA",
+    # ═══════════════════════════════════════════
+    # 1. Communication Services
+    # ═══════════════════════════════════════════
+    # Internet Content & Information
     "GOOG": "Alphabet (Google)",
     "GOOGL": "Alphabet Class A",
     "META": "Meta (Facebook)",
-    "AVGO": "Broadcom",
-    "ORCL": "Oracle",
-    "CRM": "Salesforce",
-    "CSCO": "Cisco",
-    "ADBE": "Adobe",
-    "ACN": "Accenture",
-    "IBM": "IBM",
-    "INTC": "Intel",
-    "TXN": "Texas Instruments",
-    "QCOM": "Qualcomm",
-    "AMAT": "Applied Materials",
-    "NOW": "ServiceNow",
-    "INTU": "Intuit",
-    "AMD": "AMD",
-    "PANW": "Palo Alto Networks",
-    "MU": "Micron",
-    "LRCX": "Lam Research",
-    "ADI": "Analog Devices",
-    "KLAC": "KLA Corp",
-    "SNPS": "Synopsys",
-    "CDNS": "Cadence Design",
-    "CRWD": "CrowdStrike",
-    "MRVL": "Marvell Technology",
-    "FTNT": "Fortinet",
-    "MSI": "Motorola Solutions",
-    "NXPI": "NXP Semiconductors",
-    "ROP": "Roper Technologies",
-    "ADSK": "Autodesk",
-    "WDAY": "Workday",
-    "TEAM": "Atlassian",
-    "MCHP": "Microchip Technology",
-    "ON": "ON Semiconductor",
-    "HPE": "HP Enterprise",
-    "HPQ": "HP Inc",
-    "DELL": "Dell Technologies",
-    # ── Consumer / E-Commerce ──
-    "AMZN": "Amazon",
-    "TSLA": "Tesla",
-    "HD": "Home Depot",
+    "BIDU": "Baidu",
+    "NTES": "NetEase",
+    "RDDT": "Reddit",
+
+    # Entertainment - Streaming & Media
+    "NFLX": "Netflix",
+    "DIS": "Walt Disney",
+    "SPOT": "Spotify",
+    "ROKU": "Roku",
+    "WBD": "Warner Bros Discovery",
+
+    # Entertainment - Gaming
+    "EA": "Electronic Arts",
+    "TTWO": "Take-Two Interactive",
+    "RBLX": "Roblox",
+
+    # Entertainment - Live Events & Music
+    "LYV": "Live Nation Entertainment",
+    "TKO": "TKO Group Holdings",
+    "WMG": "Warner Music Group",
+    "FWONA": "Liberty Media F1 Class A",
+    "FWONK": "Liberty Media F1 Class C",
+
+    # Telecom Services - US
+    "TMUS": "T-Mobile US",
+    "VZ": "Verizon",
+    "T": "AT&T",
+
+    # Telecom Services - International
+    "AMX": "América Móvil",
+    "VOD": "Vodafone",
+    "CHT": "Chunghwa Telecom",
+    "BCE": "BCE Inc.",
+    "RCI": "Rogers Communications",
+    "TU": "TELUS",
+    "TLK": "Telkom Indonesia",
+    "VIV": "Telefônica Brasil",
+    "TIGO": "Millicom",
+
+    # Pay TV & Broadcasting
+    "CMCSA": "Comcast",
+    "CHTR": "Charter Communications",
+    "FOX": "Fox Corporation",
+    "FOXA": "Fox Corporation A",
+
+    # Publishing
+    "NWSA": "News Corp A",
+    "NWS": "News Corp",
+
+    # Advertising
+    "APP": "AppLovin",
+    "OMC": "Omnicom Group",
+
+    # Communication Equipment & Satellites
+    "SATS": "EchoStar",
+
+    # ═══════════════════════════════════════════
+    # 2. Consumer Defensive
+    # ═══════════════════════════════════════════
+    # Discount Stores
+    "WMT": "Walmart",
     "COST": "Costco",
-    "NKE": "Nike",
-    "MCD": "McDonald's",
-    "SBUX": "Starbucks",
     "TGT": "Target",
-    "LOW": "Lowe's",
-    "TJX": "TJX Companies",
-    "BKNG": "Booking Holdings",
-    "MAR": "Marriott",
-    "CMG": "Chipotle",
-    "ORLY": "O'Reilly Auto",
-    "AZO": "AutoZone",
-    "ROST": "Ross Stores",
-    "DHI": "D.R. Horton",
-    "LEN": "Lennar",
-    "YUM": "Yum! Brands",
     "DG": "Dollar General",
     "DLTR": "Dollar Tree",
+    "BJ": "BJ's Wholesale",
+
+    # Grocery
+    "KR": "Kroger",
+    "ACI": "Albertsons",
+    "SFM": "Sprouts Farmers Market",
+    "CASY": "Casey's",
+
+    # Beverages - Non-Alcoholic
+    "KO": "Coca-Cola",
+    "PEP": "PepsiCo",
+    "MNST": "Monster Beverage",
+    "KDP": "Keurig Dr Pepper",
+    "CELH": "Celsius Holdings",
+    "CCEP": "Coca-Cola Europacific",
+
+    # Packaged Foods
+    "MDLZ": "Mondelez",
+    "GIS": "General Mills",
+    "K": "Kellanova",
+    "CPB": "Campbell's",
+    "MKC": "McCormick",
+    "SJM": "J.M. Smucker",
+    "BG": "Bunge Global",
+    "ADM": "Archer-Daniels-Midland",
+    "CALM": "Cal-Maine Foods",
+    "BYND": "Beyond Meat",
+
+    # Household & Personal Products
+    "PG": "Procter & Gamble",
+    "UL": "Unilever",
+    "CL": "Colgate-Palmolive",
+    "KMB": "Kimberly-Clark",
+    "CHD": "Church & Dwight",
+    "CLX": "Clorox",
+    "EL": "Estée Lauder",
+
+    # Confectioners
+    "HSY": "Hershey",
+    "TR": "Tootsie Roll",
+
+    # Agricultural Products
+    "AGRO": "Adecoagro",
+    "ANDE": "Andersons",
+
+    # ═══════════════════════════════════════════
+    # 3. Consumer Discretionary
+    # ═══════════════════════════════════════════
+    # Internet Retail
+    "AMZN": "Amazon",
+    "BABA": "Alibaba",
+    "MELI": "MercadoLibre",
+    "PDD": "PDD Holdings (Temu)",
     "EBAY": "eBay",
-    "ABNB": "Airbnb",
-    "DASH": "DoorDash",
-    "GM": "General Motors",
+    "ETSY": "Etsy",
+    "CHWY": "Chewy",
+    "W": "Wayfair",
+    "CVNA": "Carvana",
+
+    # Specialty Retail
+    "HD": "Home Depot",
+    "LOW": "Lowe's",
+    "TJX": "TJX Companies",
+    "ROST": "Ross Stores",
+    "BURL": "Burlington Stores",
+    "ULTA": "Ulta Beauty",
+    "BBY": "Best Buy",
+    "DKS": "Dick's Sporting Goods",
+    "AZO": "AutoZone",
+    "ORLY": "O'Reilly Automotive",
+    "AAP": "Advance Auto Parts",
+    "TSCO": "Tractor Supply",
+    "FND": "Floor & Decor",
+    "WSM": "Williams-Sonoma",
+    "RH": "RH (Restoration Hardware)",
+    "ASO": "Academy Sports",
+
+    # Apparel - Manufacturers
+    "NKE": "Nike",
+    "LULU": "Lululemon Athletica",
+    "DECK": "Deckers Outdoor",
+    "VFC": "VF Corporation",
+    "ONON": "On Holding",
+    "BIRK": "Birkenstock",
+    "CROX": "Crocs",
+    "SKX": "Skechers",
+    "COLM": "Columbia Sportswear",
+
+    # Apparel - Retail
+    "AEO": "American Eagle",
+    "ANF": "Abercrombie & Fitch",
+    "URBN": "Urban Outfitters",
+    "GAP": "Gap Inc.",
+
+    # Luxury Goods
+    "LVMUY": "LVMH",
+    "CFRUY": "Richemont",
+    "KER": "Kering",
+    "CPRI": "Capri Holdings",
+    "TPR": "Tapestry",
+
+    # Auto Manufacturers
+    "TSLA": "Tesla",
+    "TM": "Toyota Motor",
     "F": "Ford Motor",
-    "RIVN": "Rivian",
-    # ── Fintech (non-bank) ──
-    "V": "Visa",
-    "MA": "Mastercard",
-    "PYPL": "PayPal",
-    "SQ": "Block (Square)",
-    "SPGI": "S&P Global",
-    "MCO": "Moody's",
-    "ICE": "Intercontinental Exchange",
-    "CME": "CME Group",
-    # ── Healthcare ──
-    "UNH": "UnitedHealth",
-    "JNJ": "Johnson & Johnson",
-    "LLY": "Eli Lilly",
-    "PFE": "Pfizer",
-    "ABBV": "AbbVie",
-    "MRK": "Merck",
-    "TMO": "Thermo Fisher",
-    "ABT": "Abbott Labs",
-    "DHR": "Danaher",
-    "AMGN": "Amgen",
-    "BMY": "Bristol-Myers",
-    "MDT": "Medtronic",
-    "ISRG": "Intuitive Surgical",
-    "GILD": "Gilead Sciences",
-    "VRTX": "Vertex Pharma",
-    "REGN": "Regeneron",
-    "SYK": "Stryker",
-    "ZTS": "Zoetis",
-    "BSX": "Boston Scientific",
-    "BDX": "Becton Dickinson",
-    "EW": "Edwards Lifesciences",
-    "CI": "Cigna",
-    "HCA": "HCA Healthcare",
-    "ELV": "Elevance Health",
-    "HUM": "Humana",
-    "DXCM": "DexCom",
-    "IDXX": "IDEXX Labs",
-    "A": "Agilent Technologies",
-    "BIIB": "Biogen",
-    "MRNA": "Moderna",
-    # ── Energy ──
-    "XOM": "ExxonMobil",
+    "GM": "General Motors",
+    "HMC": "Honda Motor",
+    "STLA": "Stellantis",
+    "RIVN": "Rivian Automotive",
+    "LCID": "Lucid Group",
+    "LI": "Li Auto",
+    "NIO": "NIO Inc.",
+    "XPEV": "XPeng",
+    "BYDDY": "BYD",
+
+    # Auto Parts
+    "APTV": "Aptiv",
+    "LEA": "Lear",
+    "BWA": "BorgWarner",
+    "ALV": "Autoliv",
+    "ALSN": "Allison Transmission",
+    "DAN": "Dana",
+
+    # Auto & Truck Dealerships
+    "AN": "AutoNation",
+    "LAD": "Lithia Motors",
+    "PAG": "Penske Automotive",
+    "ABG": "Asbury Automotive",
+    "GPI": "Group 1 Automotive",
+    "KMX": "CarMax",
+
+    # Home Furnishings
+    "LEG": "Leggett & Platt",
+    "WHR": "Whirlpool",
+    "MHK": "Mohawk Industries",
+    "SCS": "Steelcase",
+
+    # Homebuilders
+    "DHI": "D.R. Horton",
+    "LEN": "Lennar",
+    "NVR": "NVR Inc.",
+    "PHM": "PulteGroup",
+    "TOL": "Toll Brothers",
+    "KBH": "KB Home",
+    "MTH": "Meritage Homes",
+
+    # Packaging & Containers
+    "PKG": "Packaging Corp",
+    "IP": "International Paper",
+    "BALL": "Ball Corp",
+    "AMCR": "Amcor",
+    "CCK": "Crown Holdings",
+    "AVY": "Avery Dennison",
+    "SEE": "Sealed Air",
+
+    # Restaurants & Travel (DoorDash moved here)
+    "DASH": "DoorDash",
+
+    # ═══════════════════════════════════════════
+    # 4. Energy
+    # ═══════════════════════════════════════════
+    # Oil & Gas Integrated
+    "XOM": "Exxon Mobil",
     "CVX": "Chevron",
+    "SHEL": "Shell plc",
+    "BP": "BP plc",
+    "TTE": "TotalEnergies",
+    "EQNR": "Equinor",
+    "E": "Eni",
+    "PBR": "Petrobras",
+    "PBR.A": "Petrobras A",
+    "EC": "Ecopetrol",
+    "SU": "Suncor Energy",
+    "IMO": "Imperial Oil",
+    "CNQ": "Canadian Natural Resources",
+    "CVE": "Cenovus Energy",
+
+    # Oil & Gas E&P
     "COP": "ConocoPhillips",
-    "SLB": "Schlumberger",
     "EOG": "EOG Resources",
+    "OXY": "Occidental Petroleum",
+    "CTRA": "Coterra Energy",
+    "DVN": "Devon Energy",
+    "HES": "Hess Corporation",
+    "MRO": "Marathon Oil",
+    "PXD": "Pioneer Natural Resources",
+    "FANG": "Diamondback Energy",
+    "APA": "APA Corporation",
+    "CHRD": "Chord Energy",
+    "MTDR": "Matador Resources",
+    "AR": "Antero Resources",
+    "SM": "SM Energy",
+    "CRC": "California Resources",
+    "CRGY": "Crescent Energy",
+    "VET": "Vermilion Energy",
+    "TPL": "Texas Pacific Land",
+
+    # Oil & Gas Midstream
+    "ENB": "Enbridge",
+    "ET": "Energy Transfer",
+    "EPD": "Enterprise Products Partners",
+    "KMI": "Kinder Morgan",
+    "WMB": "Williams Companies",
+    "OKE": "ONEOK",
+    "TRP": "TC Energy",
+    "LNG": "Cheniere Energy",
+    "MPLX": "MPLX LP",
+    "WES": "Western Midstream",
+    "PAA": "Plains All American",
+    "PAGP": "Plains GP Holdings",
+    "TRGP": "Targa Resources",
+    "AROC": "Archrock",
+
+    # Oil & Gas Refining & Marketing
     "MPC": "Marathon Petroleum",
     "PSX": "Phillips 66",
     "VLO": "Valero Energy",
-    "PXD": "Pioneer Natural",
-    "OXY": "Occidental Petroleum",
-    "WMB": "Williams Companies",
-    "KMI": "Kinder Morgan",
-    "HAL": "Halliburton",
-    "DVN": "Devon Energy",
+    "DINO": "HF Sinclair",
+    "PBF": "PBF Energy",
+
+    # Oil & Gas Equipment & Services
+    "SLB": "SLB (Schlumberger)",
     "BKR": "Baker Hughes",
-    # ── Industrials ──
+    "HAL": "Halliburton",
+    "TS": "Tenaris",
+    "WFRD": "Weatherford International",
+    "CHX": "ChampionX",
+    "LBRT": "Liberty Energy",
+    "NOV": "NOV Inc.",
+    "FTI": "TechnipFMC",
+    "ACDC": "ProFrac Holding",
+    "CLB": "Core Laboratories",
+
+    # Oil & Gas Drilling
+    "RIG": "Transocean",
+    "VAL": "Valaris",
+    "NE": "Noble Corp",
+    "BORR": "Borr Drilling",
+    "HP": "Helmerich & Payne",
+    "PTEN": "Patterson-UTI Energy",
+    "NBR": "Nabors Industries",
+
+    # Thermal Coal
+    "BTU": "Peabody Energy",
+    "ARLP": "Alliance Resource Partners",
+    "AMR": "Alpha Metallurgical Resources",
+    "HCC": "Warrior Met Coal",
+    "CEIX": "Consol Energy",
+    "METC": "Ramaco Resources",
+
+    # Uranium & Nuclear Fuel
+    "CCJ": "Cameco",
+    "UEC": "Uranium Energy",
+    "DNN": "Denison Mines",
+    "URG": "Ur-Energy",
+    "LEU": "Centrus Energy",
+    "BWXT": "BWX Technologies",
+
+    # Renewable Energy (Solar + Wind)
+    "BEPC": "Brookfield Renewable Corp",
+    "BEP": "Brookfield Renewable LP",
+    "FSLR": "First Solar",
+    "ENPH": "Enphase Energy",
+    "SEDG": "SolarEdge",
+    "RUN": "Sunrun",
+    "NOVA": "Sunnova Energy",
+    "ARRY": "Array Technologies",
+    "SHLS": "Shoals Technologies",
+    "CWEN": "Clearway Energy",
+
+    # Solar Manufacturing
+    "JKS": "JinkoSolar",
+    "CSIQ": "Canadian Solar",
+    "DQ": "Daqo New Energy",
+    "SOL": "Emeren Group",
+    "MAXN": "Maxeon Solar",
+
+    # ═══════════════════════════════════════════
+    # 5. Healthcare
+    # ═══════════════════════════════════════════
+    # Drug Manufacturers - General
+    "LLY": "Eli Lilly",
+    "JNJ": "Johnson & Johnson",
+    "NVO": "Novo Nordisk",
+    "ABBV": "AbbVie",
+    "MRK": "Merck & Co",
+    "AZN": "AstraZeneca",
+    "PFE": "Pfizer",
+    "NVS": "Novartis",
+    "BMY": "Bristol-Myers Squibb",
+    "GSK": "GlaxoSmithKline",
+    "SNY": "Sanofi",
+    "TAK": "Takeda",
+
+    # Biotechnology
+    "AMGN": "Amgen",
+    "VRTX": "Vertex Pharmaceuticals",
+    "GILD": "Gilead Sciences",
+    "REGN": "Regeneron Pharmaceuticals",
+    "BIIB": "Biogen",
+    "MRNA": "Moderna",
+    "BNTX": "BioNTech",
+    "ALNY": "Alnylam Pharmaceuticals",
+    "ARGX": "argenx",
+
+    # Medical Devices
+    "ABT": "Abbott Laboratories",
+    "ISRG": "Intuitive Surgical",
+    "SYK": "Stryker",
+    "MDT": "Medtronic",
+    "BSX": "Boston Scientific",
+    "BDX": "Becton Dickinson",
+    "EW": "Edwards Lifesciences",
+    "ZBH": "Zimmer Biomet",
+
+    # Medical Instruments & Supplies
+    "DXCM": "DexCom",
+    "PODD": "Insulet",
+    "ALC": "Alcon",
+    "COO": "Cooper Companies",
+
+    # Diagnostics & Research
+    "TMO": "Thermo Fisher Scientific",
+    "DHR": "Danaher",
+    "A": "Agilent Technologies",
+    "IQV": "IQVIA Holdings",
+    "MTD": "Mettler-Toledo",
+    "WAT": "Waters Corporation",
+    "IDXX": "IDEXX Laboratories",
+    "LH": "Labcorp Holdings",
+    "DGX": "Quest Diagnostics",
+
+    # Healthcare Plans
+    "UNH": "UnitedHealth Group",
+    "ELV": "Elevance Health",
+    "CI": "Cigna Group",
+    "HUM": "Humana",
+    "CNC": "Centene Corporation",
+
+    # Medical Care Facilities
+    "HCA": "HCA Healthcare",
+    "THC": "Tenet Healthcare",
+    "UHS": "Universal Health Services",
+    "DVA": "DaVita",
+
+    # Medical Distribution
+    "MCK": "McKesson",
+    "COR": "Cencora",
+    "CAH": "Cardinal Health",
+
+    # Pharmaceutical Retailers
+    "CVS": "CVS Health",
+    "WBA": "Walgreens Boots Alliance",
+
+    # Health Information Services
+    "VEEV": "Veeva Systems",
+
+    # ═══════════════════════════════════════════
+    # 6. Industrials
+    # ═══════════════════════════════════════════
+    # Aerospace & Defense
+    "RTX": "RTX Corporation",
+    "BA": "Boeing",
+    "LMT": "Lockheed Martin",
+    "GD": "General Dynamics",
+    "NOC": "Northrop Grumman",
+    "LHX": "L3Harris Technologies",
+    "TDG": "TransDigm Group",
+    "HWM": "Howmet Aerospace",
+
+    # Heavy Machinery & Construction Equipment
     "CAT": "Caterpillar",
+    "DE": "Deere & Company",
+    "CMI": "Cummins",
+    "PCAR": "PACCAR",
+    "URI": "United Rentals",
+
+    # Industrial Conglomerates
     "GE": "GE Aerospace",
-    # RTX (Raytheon) — defense/weapons ❌
     "HON": "Honeywell",
-    "UNP": "Union Pacific",
-    # BA (Boeing) — defense ❌
-    # LMT (Lockheed Martin) — defense/weapons ❌
-    "DE": "Deere & Co",
-    "UPS": "United Parcel Service",
     "MMM": "3M",
-    # GD (General Dynamics) — defense/weapons ❌
-    # NOC (Northrop Grumman) — defense/weapons ❌
     "ITW": "Illinois Tool Works",
+    "GEV": "GE Vernova",
+
+    # Electrical Equipment & Power
+    "ETN": "Eaton",
+    "VRT": "Vertiv Holdings",
+    "PWR": "Quanta Services",
     "EMR": "Emerson Electric",
-    "ETN": "Eaton Corp",
-    "FDX": "FedEx",
+    "BE": "Bloom Energy",
+
+    # Industrial Distribution
+    "GWW": "W.W. Grainger",
+
+    # Specialty Industrial Machinery
+    "PH": "Parker Hannifin",
+    "TT": "Trane Technologies",
+    "CARR": "Carrier Global",
+    "FIX": "Comfort Systems USA",
+
+    # Railroads
+    "UNP": "Union Pacific",
     "CSX": "CSX Corp",
     "NSC": "Norfolk Southern",
+    "CNI": "Canadian National Railway",
+    "CP": "Canadian Pacific Kansas City",
+
+    # Trucking & Logistics
+    "UPS": "United Parcel Service",
+    "FDX": "FedEx",
+
+    # Waste Management
     "WM": "Waste Management",
+    "RSG": "Republic Services",
+
+    # Building Products
     "JCI": "Johnson Controls",
-    "CARR": "Carrier Global",
-    "FAST": "Fastenal",
-    "IR": "Ingersoll Rand",
-    "PCAR": "PACCAR",
-    "CMI": "Cummins",
-    "ROK": "Rockwell Automation",
-    "UBER": "Uber Technologies",
-    # ── Consumer Staples ──
-    "PG": "Procter & Gamble",
-    "KO": "Coca-Cola",
-    "PEP": "PepsiCo",
-    "WMT": "Walmart",
-    # PM (Philip Morris) — tobacco ❌
-    # MO (Altria) — tobacco ❌
-    "CL": "Colgate-Palmolive",
-    "MDLZ": "Mondelez",
-    "GIS": "General Mills",
-    "KDP": "Keurig Dr Pepper",
-    "KHC": "Kraft Heinz",
-    "SYY": "Sysco",
-    "HSY": "Hershey",
-    # STZ (Constellation Brands) — alcohol ❌
-    "KR": "Kroger",
-    "ADM": "Archer-Daniels",
-    "EL": "Estée Lauder",
-    # ── Communications ──
-    "NFLX": "Netflix",
-    "DIS": "Walt Disney",
-    "CMCSA": "Comcast",
-    "T": "AT&T",
-    "VZ": "Verizon",
-    "TMUS": "T-Mobile",
-    "CHTR": "Charter Communications",
-    "EA": "Electronic Arts",
-    "TTWO": "Take-Two Interactive",
-    "WBD": "Warner Bros Discovery",
-    "SPOT": "Spotify",
-    # ── Utilities ──
-    "NEE": "NextEra Energy",
-    "DUK": "Duke Energy",
-    "SO": "Southern Co",
-    "D": "Dominion Energy",
-    "AEP": "American Electric Power",
-    "SRE": "Sempra",
-    "EXC": "Exelon",
-    "XEL": "Xcel Energy",
-    "WEC": "WEC Energy",
-    "ED": "Consolidated Edison",
-    # ── Real Estate ──
-    "AMT": "American Tower",
-    "PLD": "Prologis",
-    "CCI": "Crown Castle",
-    "EQIX": "Equinix",
-    "PSA": "Public Storage",
-    "SPG": "Simon Property",
-    "O": "Realty Income",
-    "WELL": "Welltower",
-    "DLR": "Digital Realty",
-    # ── Materials ──
-    "LIN": "Linde",
-    "APD": "Air Products",
-    "ECL": "Ecolab",
-    "SHW": "Sherwin-Williams",
-    "NEM": "Newmont",
-    "FCX": "Freeport-McMoRan",
-    "NUE": "Nucor",
-    "DOW": "Dow Inc",
-    "DD": "DuPont",
-    "PPG": "PPG Industries",
-    # ── Added batch ──
+
+    # Business Services
     "CTAS": "Cintas",
-    "CEG": "Constellation Energy",
-    "VRSK": "Verisk Analytics",
-    "MELI": "MercadoLibre",
-    "GEHC": "GE HealthCare",
-    "MNST": "Monster Beverage",
-    "ADP": "ADP",
-    "ASML": "ASML",
+    "RELX": "RELX Group",
+
+    # ═══════════════════════════════════════════
+    # 7. Information Technology
+    # ═══════════════════════════════════════════
+    # Semiconductors
+    "NVDA": "NVIDIA",
+    "AVGO": "Broadcom",
+    "TSM": "Taiwan Semiconductor",
+    "AMD": "Advanced Micro Devices",
+    "QCOM": "Qualcomm",
+    "TXN": "Texas Instruments",
+    "ARM": "Arm Holdings",
+    "MU": "Micron Technology",
+    "ADI": "Analog Devices",
+    "LRCX": "Lam Research",
+    "KLAC": "KLA Corporation",
+    "AMAT": "Applied Materials",
+    "ASML": "ASML Holding",
+    "MRVL": "Marvell Technology",
+    "MCHP": "Microchip Technology",
+    "ON": "ON Semiconductor",
+    "NXPI": "NXP Semiconductors",
+    "ASX": "ASE Technology",
+    "UMC": "United Microelectronics",
+    "ALAB": "Astera Labs",
+
+    # Software - Infrastructure
+    "MSFT": "Microsoft",
+    "ORCL": "Oracle",
+    "ADBE": "Adobe",
+    "PANW": "Palo Alto Networks",
+    "CRWD": "CrowdStrike",
+    "FTNT": "Fortinet",
+    "SNPS": "Synopsys",
+    "CDNS": "Cadence Design Systems",
+    "ANSS": "ANSYS",
+    "DDOG": "Datadog",
+    "NET": "Cloudflare",
     "ZS": "Zscaler",
-    "FER": "Ferrovial",
+    "OKTA": "Okta",
+    "MDB": "MongoDB",
+    "SNOW": "Snowflake",
+    "ESTC": "Elastic",
+    "CHKP": "Check Point",
+    "NTNX": "Nutanix",
+    "GTLB": "GitLab",
+
+    # Software - Application
+    "CRM": "Salesforce",
+    "INTU": "Intuit",
+    "SAP": "SAP SE",
+    "WDAY": "Workday",
+    "ADSK": "Autodesk",
+    "TEAM": "Atlassian",
+    "NOW": "ServiceNow",
+    "HUBS": "HubSpot",
+    "DOCU": "DocuSign",
+    "ZM": "Zoom Communications",
+    "TYL": "Tyler Technologies",
+    "PEGA": "Pegasystems",
+    "MNDY": "Monday.com",
+    "FRSH": "Freshworks",
+    "BSY": "Bentley Systems",
+
+    # Information Technology Services
+    "IBM": "IBM",
+    "ACN": "Accenture",
+    "INFY": "Infosys",
+    "WIT": "Wipro",
+    "CTSH": "Cognizant",
+    "DXC": "DXC Technology",
+    "EPAM": "EPAM Systems",
+    "GLOB": "Globant",
+    "IT": "Gartner",
+
+    # Consumer Electronics
+    "AAPL": "Apple",
+    "SONY": "Sony Group",
+    "LPL": "LG Display",
+
+    # Computer Hardware
+    "DELL": "Dell Technologies",
+    "HPQ": "HP Inc.",
+    "HPE": "Hewlett Packard Enterprise",
+    "NTAP": "NetApp",
+    "PSTG": "Pure Storage",
+    "SMCI": "Super Micro Computer",
+    "WDC": "Western Digital",
+    "STX": "Seagate Technology",
+
+    # Communication Equipment
+    "CSCO": "Cisco Systems",
+    "ANET": "Arista Networks",
+    "MSI": "Motorola Solutions",
+    "JNPR": "Juniper Networks",
+    "ZBRA": "Zebra Technologies",
+    "ERIC": "Ericsson",
+    "NOK": "Nokia",
+    "AAOI": "Applied Optoelectronics",
+
+    # Electronic Components
+    "TEL": "TE Connectivity",
+    "APH": "Amphenol",
+    "GLW": "Corning",
+    "CDW": "CDW Corporation",
+    "ARW": "Arrow Electronics",
+    "AVT": "Avnet",
+
+    # Scientific & Technical Instruments
+    "ROP": "Roper Technologies",
+    "KEYS": "Keysight Technologies",
+    "TDY": "Teledyne Technologies",
+    "TRMB": "Trimble",
+    "COHR": "Coherent",
+
+    # AI & Data Specific
+    "PLTR": "Palantir Technologies",
+    "AI": "C3.ai",
+    "BBAI": "BigBear.ai",
+    "SOUN": "SoundHound AI",
+
+    # ═══════════════════════════════════════════
+    # 8. Basic Materials
+    # ═══════════════════════════════════════════
+    # Specialty Chemicals
+    "LIN": "Linde",
+    "SHW": "Sherwin-Williams",
+    "APD": "Air Products and Chemicals",
+    "ECL": "Ecolab",
+    "PPG": "PPG Industries",
+    "ALB": "Albemarle",
+    "IFF": "International Flavors & Fragrances",
+    "RPM": "RPM International",
+    "AXTA": "Axalta Coating Systems",
+    "AVNT": "Avient",
+
+    # Agricultural Inputs & Fertilizers
+    "NTR": "Nutrien",
+    "CF": "CF Industries",
+    "MOS": "Mosaic",
+    "CTVA": "Corteva",
+    "FMC": "FMC Corporation",
+    "ICL": "ICL Group",
+    "SQM": "Sociedad Química y Minera",
+
+    # Steel
+    "NUE": "Nucor",
+    "STLD": "Steel Dynamics",
+    "VALE": "Vale",
+    "RIO": "Rio Tinto",
+    "BHP": "BHP Group",
+    "CLF": "Cleveland-Cliffs",
+    "X": "United States Steel",
+    "TX": "Ternium",
+    "ASTL": "Algoma Steel",
+
+    # Copper & Industrial Metals
+    "FCX": "Freeport-McMoRan",
+    "SCCO": "Southern Copper",
+    "TECK": "Teck Resources",
+
+    # Aluminum
+    "AA": "Alcoa",
+    "ACH": "Aluminum Corp of China",
+    "CENX": "Century Aluminum",
+
+    # Gold Mining
+    "NEM": "Newmont",
+    "GOLD": "Barrick Gold",
+    "AEM": "Agnico Eagle Mines",
+    "AU": "AngloGold Ashanti",
+    "KGC": "Kinross Gold",
+    "WPM": "Wheaton Precious Metals",
+    "FNV": "Franco-Nevada",
+    "GFI": "Gold Fields",
+    "HMY": "Harmony Gold",
+    "BTG": "B2Gold",
+    "AGI": "Alamos Gold",
+
+    # Silver Mining
+    "PAAS": "Pan American Silver",
+    "HL": "Hecla Mining",
+    "AG": "First Majestic Silver",
+
+    # Other Precious Metals
+    "SBSW": "Sibanye Stillwater",
+    "SAND": "Sandstorm Gold",
+
+    # Forest Products
+    "WY": "Weyerhaeuser",
+    "LPX": "Louisiana-Pacific",
+
+    # Building Materials
+    "VMC": "Vulcan Materials",
+    "MLM": "Martin Marietta Materials",
+    "EXP": "Eagle Materials",
+    "CRH": "CRH plc",
+
+    # Chemicals - Diversified
+    "DOW": "Dow Inc.",
+    "DD": "DuPont",
+    "LYB": "LyondellBasell",
+    "WLK": "Westlake",
+    "EMN": "Eastman Chemical",
+    "HUN": "Huntsman",
+    "CE": "Celanese",
+    "ASH": "Ashland",
+
+    # ═══════════════════════════════════════════
+    # 9. Utilities
+    # ═══════════════════════════════════════════
+    # Regulated Electric
+    "NEE": "NextEra Energy",
+    "SO": "Southern Company",
+    "DUK": "Duke Energy",
+    "AEP": "American Electric Power",
+    "D": "Dominion Energy",
+    "XEL": "Xcel Energy",
+    "EXC": "Exelon",
+    "ED": "Consolidated Edison",
+    "PEG": "Public Service Enterprise Group",
+    "WEC": "WEC Energy Group",
+    "PCG": "PG&E Corporation",
+    "DTE": "DTE Energy",
+    "AEE": "Ameren",
+    "ETR": "Entergy",
+    "EIX": "Edison International",
+    "ES": "Eversource Energy",
+    "FE": "FirstEnergy",
+    "PPL": "PPL Corporation",
+    "CMS": "CMS Energy",
+    "EVRG": "Evergy",
+    "LNT": "Alliant Energy",
+
+    # Diversified
+    "CEG": "Constellation Energy",
+    "VST": "Vistra Corp",
+    "TLN": "Talen Energy",
+    "NRG": "NRG Energy",
+    "ATO": "Atmos Energy",
+
+    # Regulated Gas
+    "SRE": "Sempra",
+    "NI": "NiSource",
+    "CNP": "CenterPoint Energy",
+
+    # Renewable
+    "BIP": "Brookfield Infrastructure Partners",
+    "ENLT": "Enlight Renewable Energy",
+    "OKLO": "Oklo (SMR Nuclear)",
+
+    # Water
+    "AWK": "American Water Works",
+    "SBS": "Sabesp",
+
+    # Foreign Diversified
+    "NGG": "National Grid",
+    "FTS": "Fortis",
+    "EMA": "Emera",
+    "KEP": "Korea Electric Power",
 }
 
 
+# ══════════════════════════════════════════════════════════════
 # ══════════════════════════════════════════════════════════════
 # Forex Market — 20 Currency Pairs
 # ══════════════════════════════════════════════════════════════
@@ -975,69 +1502,294 @@ SAUDI_SECTORS = {
 }
 
 
-# Sector mapping for US stocks
+
+# US Sector Mapping (top-level)
+# ══════════════════════════════════════════════════════════════
+
 US_SECTORS = {
-    # التقنية
-    **{t: "التقنية" for t in [
-        "AAPL", "MSFT", "NVDA", "GOOG", "GOOGL", "META", "AVGO", "ORCL", "CRM",
-        "CSCO", "ADBE", "ACN", "IBM", "INTC", "TXN", "QCOM", "AMAT", "NOW",
-        "INTU", "AMD", "PANW", "MU", "LRCX", "ADI", "KLAC", "SNPS", "CDNS",
-        "CRWD", "MRVL", "FTNT", "MSI", "NXPI", "ROP", "ADSK", "WDAY", "TEAM",
-        "MCHP", "ON", "HPE", "HPQ", "DELL", "ASML", "ZS",
+    # Communication Services
+    **{t: "خدمات الاتصالات" for t in [
+        "GOOG", "GOOGL", "META", "BIDU", "NTES", "RDDT",
+        "NFLX", "DIS", "SPOT", "ROKU", "WBD",
+        "EA", "TTWO", "RBLX",
+        "LYV", "TKO", "WMG", "FWONA", "FWONK",
+        "TMUS", "VZ", "T",
+        "AMX", "VOD", "CHT", "BCE", "RCI", "TU", "TLK", "VIV", "TIGO",
+        "CMCSA", "CHTR", "FOX", "FOXA",
+        "NWSA", "NWS",
+        "APP", "OMC",
+        "SATS",
     ]},
-    # السلع الاستهلاكية
-    **{t: "السلع الاستهلاكية" for t in [
-        "AMZN", "TSLA", "HD", "COST", "NKE", "MCD", "SBUX", "TGT", "LOW",
-        "TJX", "BKNG", "MAR", "CMG", "ORLY", "AZO", "ROST", "DHI", "LEN",
-        "YUM", "DG", "DLTR", "EBAY", "ABNB", "DASH", "GM", "F", "RIVN", "MELI",
-    ]},
-    # التقنية المالية
-    **{t: "التقنية المالية" for t in [
-        "V", "MA", "PYPL", "SQ", "SPGI", "ICE", "CME", "MCO",
-    ]},
-    # الرعاية الصحية
-    **{t: "الرعاية الصحية" for t in [
-        "UNH", "JNJ", "LLY", "PFE", "ABBV", "MRK", "TMO", "ABT", "DHR",
-        "AMGN", "BMY", "MDT", "ISRG", "GILD", "VRTX", "REGN", "SYK", "ZTS",
-        "BSX", "BDX", "EW", "CI", "HCA", "ELV", "HUM", "DXCM", "IDXX", "A",
-        "BIIB", "MRNA", "GEHC",
-    ]},
-    # الطاقة
-    **{t: "الطاقة" for t in [
-        "XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "VLO", "PXD",
-        "OXY", "WMB", "KMI", "HAL", "DVN", "BKR",
-    ]},
-    # القطاع الصناعي
-    **{t: "القطاع الصناعي" for t in [
-        "CAT", "GE", "HON", "UNP", "DE", "UPS", "MMM",
-        "ITW", "EMR", "ETN", "FDX", "CSX", "NSC", "WM", "JCI",
-        "CARR", "FAST", "IR", "PCAR", "CMI", "ROK", "UBER",
-        "CTAS", "ADP", "VRSK", "FER",
-    ]},
-    # السلع الاستهلاكية الأساسية
+
+    # Consumer Defensive
     **{t: "السلع الاستهلاكية الأساسية" for t in [
-        "PG", "KO", "PEP", "WMT", "CL", "MDLZ", "GIS", "KDP",
-        "KHC", "SYY", "HSY", "KR", "ADM", "EL", "MNST",
+        "WMT", "COST", "TGT", "DG", "DLTR", "BJ",
+        "KR", "ACI", "SFM", "CASY",
+        "KO", "PEP", "MNST", "KDP", "CELH", "CCEP",
+        "MDLZ", "GIS", "K", "CPB", "MKC", "SJM", "BG", "ADM", "CALM", "BYND",
+        "PG", "UL", "CL", "KMB", "CHD", "CLX", "EL",
+        "HSY", "TR",
+        "AGRO", "ANDE",
     ]},
-    # الاتصالات
-    **{t: "الاتصالات" for t in [
-        "NFLX", "DIS", "CMCSA", "T", "VZ", "TMUS", "CHTR", "EA", "TTWO",
-        "WBD", "SPOT",
+
+    # Consumer Discretionary
+    **{t: "السلع الكمالية" for t in [
+        "AMZN", "BABA", "MELI", "PDD", "EBAY", "ETSY", "CHWY", "W", "CVNA",
+        "HD", "LOW", "TJX", "ROST", "BURL", "ULTA", "BBY", "DKS", "AZO", "ORLY",
+        "AAP", "TSCO", "FND", "WSM", "RH", "ASO",
+        "NKE", "LULU", "DECK", "VFC", "ONON", "BIRK", "CROX", "SKX", "COLM",
+        "AEO", "ANF", "URBN", "GAP",
+        "LVMUY", "CFRUY", "KER", "CPRI", "TPR",
+        "TSLA", "TM", "F", "GM", "HMC", "STLA", "RIVN", "LCID", "LI", "NIO", "XPEV", "BYDDY",
+        "APTV", "LEA", "BWA", "ALV", "ALSN", "DAN",
+        "AN", "LAD", "PAG", "ABG", "GPI", "KMX",
+        "LEG", "WHR", "MHK", "SCS",
+        "DHI", "LEN", "NVR", "PHM", "TOL", "KBH", "MTH",
+        "PKG", "IP", "BALL", "AMCR", "CCK", "AVY", "SEE",
+        "DASH",
     ]},
-    # المرافق العامة
-    **{t: "المرافق العامة" for t in [
-        "NEE", "DUK", "SO", "D", "AEP", "SRE", "EXC", "XEL", "WEC", "ED", "CEG",
+
+    # Energy
+    **{t: "الطاقة" for t in [
+        "XOM", "CVX", "SHEL", "BP", "TTE", "EQNR", "E", "PBR", "PBR.A", "EC",
+        "SU", "IMO", "CNQ", "CVE",
+        "COP", "EOG", "OXY", "CTRA", "DVN", "HES", "MRO", "PXD", "FANG", "APA",
+        "CHRD", "MTDR", "AR", "SM", "CRC", "CRGY", "VET", "TPL",
+        "ENB", "ET", "EPD", "KMI", "WMB", "OKE", "TRP", "LNG", "MPLX", "WES",
+        "PAA", "PAGP", "TRGP", "AROC",
+        "MPC", "PSX", "VLO", "DINO", "PBF",
+        "SLB", "BKR", "HAL", "TS", "WFRD", "CHX", "LBRT", "NOV", "FTI", "ACDC", "CLB",
+        "RIG", "VAL", "NE", "BORR", "HP", "PTEN", "NBR",
+        "BTU", "ARLP", "AMR", "HCC", "CEIX", "METC",
+        "CCJ", "UEC", "DNN", "URG", "LEU", "BWXT",
+        "BEPC", "BEP", "FSLR", "ENPH", "SEDG", "RUN", "NOVA", "ARRY", "SHLS", "CWEN",
+        "JKS", "CSIQ", "DQ", "SOL", "MAXN",
     ]},
-    # العقارات
-    **{t: "العقارات" for t in [
-        "AMT", "PLD", "CCI", "EQIX", "PSA", "SPG", "O", "WELL", "DLR",
+
+    # Healthcare
+    **{t: "الرعاية الصحية" for t in [
+        "LLY", "JNJ", "NVO", "ABBV", "MRK", "AZN", "PFE", "NVS", "BMY", "GSK", "SNY", "TAK",
+        "AMGN", "VRTX", "GILD", "REGN", "BIIB", "MRNA", "BNTX", "ALNY", "ARGX",
+        "ABT", "ISRG", "SYK", "MDT", "BSX", "BDX", "EW", "ZBH",
+        "DXCM", "PODD", "ALC", "COO",
+        "TMO", "DHR", "A", "IQV", "MTD", "WAT", "IDXX", "LH", "DGX",
+        "UNH", "ELV", "CI", "HUM", "CNC",
+        "HCA", "THC", "UHS", "DVA",
+        "MCK", "COR", "CAH",
+        "CVS", "WBA",
+        "VEEV",
     ]},
-    # المواد الأساسية
+
+    # Industrials
+    **{t: "القطاع الصناعي" for t in [
+        "RTX", "BA", "LMT", "GD", "NOC", "LHX", "TDG", "HWM",
+        "CAT", "DE", "CMI", "PCAR", "URI",
+        "GE", "HON", "MMM", "ITW", "GEV",
+        "ETN", "VRT", "PWR", "EMR", "BE",
+        "GWW",
+        "PH", "TT", "CARR", "FIX",
+        "UNP", "CSX", "NSC", "CNI", "CP",
+        "UPS", "FDX",
+        "WM", "RSG",
+        "JCI",
+        "CTAS", "RELX",
+    ]},
+
+    # Information Technology
+    **{t: "التقنية" for t in [
+        "NVDA", "AVGO", "TSM", "AMD", "QCOM", "TXN", "ARM", "MU", "ADI", "LRCX",
+        "KLAC", "AMAT", "ASML", "MRVL", "MCHP", "ON", "NXPI", "ASX", "UMC", "ALAB",
+        "MSFT", "ORCL", "ADBE", "PANW", "CRWD", "FTNT", "SNPS", "CDNS", "ANSS",
+        "DDOG", "NET", "ZS", "OKTA", "MDB", "SNOW", "ESTC", "CHKP", "NTNX", "GTLB",
+        "CRM", "INTU", "SAP", "WDAY", "ADSK", "TEAM", "NOW", "HUBS", "DOCU", "ZM",
+        "TYL", "PEGA", "MNDY", "FRSH", "BSY",
+        "IBM", "ACN", "INFY", "WIT", "CTSH", "DXC", "EPAM", "GLOB", "IT",
+        "AAPL", "SONY", "LPL",
+        "DELL", "HPQ", "HPE", "NTAP", "PSTG", "SMCI", "WDC", "STX",
+        "CSCO", "ANET", "MSI", "JNPR", "ZBRA", "ERIC", "NOK", "AAOI",
+        "TEL", "APH", "GLW", "CDW", "ARW", "AVT",
+        "ROP", "KEYS", "TDY", "TRMB", "COHR",
+        "PLTR", "AI", "BBAI", "SOUN",
+    ]},
+
+    # Basic Materials
     **{t: "المواد الأساسية" for t in [
-        "LIN", "APD", "ECL", "SHW", "NEM", "FCX", "NUE", "DOW", "DD", "PPG",
+        "LIN", "SHW", "APD", "ECL", "PPG", "ALB", "IFF", "RPM", "AXTA", "AVNT",
+        "NTR", "CF", "MOS", "CTVA", "FMC", "ICL", "SQM",
+        "NUE", "STLD", "VALE", "RIO", "BHP", "CLF", "X", "TX", "ASTL",
+        "FCX", "SCCO", "TECK",
+        "AA", "ACH", "CENX",
+        "NEM", "GOLD", "AEM", "AU", "KGC", "WPM", "FNV", "GFI", "HMY", "BTG", "AGI",
+        "PAAS", "HL", "AG",
+        "SBSW", "SAND",
+        "WY", "LPX",
+        "VMC", "MLM", "EXP", "CRH",
+        "DOW", "DD", "LYB", "WLK", "EMN", "HUN", "CE", "ASH",
+    ]},
+
+    # Utilities
+    **{t: "المرافق العامة" for t in [
+        "NEE", "SO", "DUK", "AEP", "D", "XEL", "EXC", "ED", "PEG", "WEC", "PCG",
+        "DTE", "AEE", "ETR", "EIX", "ES", "FE", "PPL", "CMS", "EVRG", "LNT",
+        "CEG", "VST", "TLN", "NRG", "ATO",
+        "SRE", "NI", "CNP",
+        "BIP", "ENLT", "OKLO",
+        "AWK", "SBS",
+        "NGG", "FTS", "EMA", "KEP",
     ]},
 }
 
+
+# ══════════════════════════════════════════════════════════════
+# US Industries (sub-sectors) — NEW: granular industry mapping
+# ══════════════════════════════════════════════════════════════
+
+US_INDUSTRIES = {
+    # ── Communication Services ──
+    **{t: "محتوى الإنترنت" for t in ["GOOG", "GOOGL", "META", "BIDU", "NTES", "RDDT"]},
+    **{t: "ترفيه - بث ومحتوى" for t in ["NFLX", "DIS", "SPOT", "ROKU", "WBD"]},
+    **{t: "ترفيه - ألعاب" for t in ["EA", "TTWO", "RBLX"]},
+    **{t: "ترفيه - فعاليات حية وموسيقى" for t in ["LYV", "TKO", "WMG", "FWONA", "FWONK"]},
+    **{t: "اتصالات أمريكية" for t in ["TMUS", "VZ", "T"]},
+    **{t: "اتصالات دولية" for t in ["AMX", "VOD", "CHT", "BCE", "RCI", "TU", "TLK", "VIV", "TIGO"]},
+    **{t: "تلفزيون وبث" for t in ["CMCSA", "CHTR", "FOX", "FOXA"]},
+    **{t: "نشر" for t in ["NWSA", "NWS"]},
+    **{t: "إعلانات" for t in ["APP", "OMC"]},
+    **{t: "أقمار صناعية" for t in ["SATS"]},
+
+    # ── Consumer Defensive ──
+    **{t: "تجزئة وتخفيضات" for t in ["WMT", "COST", "TGT", "DG", "DLTR", "BJ"]},
+    **{t: "بقالة" for t in ["KR", "ACI", "SFM", "CASY"]},
+    **{t: "مشروبات غير كحولية" for t in ["KO", "PEP", "MNST", "KDP", "CELH", "CCEP"]},
+    **{t: "أغذية معبأة" for t in ["MDLZ", "GIS", "K", "CPB", "MKC", "SJM", "BG", "ADM", "CALM", "BYND"]},
+    **{t: "منتجات منزلية وعناية شخصية" for t in ["PG", "UL", "CL", "KMB", "CHD", "CLX", "EL"]},
+    **{t: "حلويات" for t in ["HSY", "TR"]},
+    **{t: "منتجات زراعية" for t in ["AGRO", "ANDE"]},
+
+    # ── Consumer Discretionary ──
+    **{t: "تجزئة إلكترونية" for t in ["AMZN", "BABA", "MELI", "PDD", "EBAY", "ETSY", "CHWY", "W", "CVNA"]},
+    **{t: "تجزئة متخصصة" for t in [
+        "HD", "LOW", "TJX", "ROST", "BURL", "ULTA", "BBY", "DKS", "AZO", "ORLY",
+        "AAP", "TSCO", "FND", "WSM", "RH", "ASO",
+    ]},
+    **{t: "ملابس وأحذية - تصنيع" for t in ["NKE", "LULU", "DECK", "VFC", "ONON", "BIRK", "CROX", "SKX", "COLM"]},
+    **{t: "ملابس - تجزئة" for t in ["AEO", "ANF", "URBN", "GAP"]},
+    **{t: "سلع فاخرة" for t in ["LVMUY", "CFRUY", "KER", "CPRI", "TPR"]},
+    **{t: "سيارات" for t in ["TSLA", "TM", "F", "GM", "HMC", "STLA", "RIVN", "LCID", "LI", "NIO", "XPEV", "BYDDY"]},
+    **{t: "قطع غيار سيارات" for t in ["APTV", "LEA", "BWA", "ALV", "ALSN", "DAN"]},
+    **{t: "وكالات سيارات" for t in ["AN", "LAD", "PAG", "ABG", "GPI", "KMX"]},
+    **{t: "أثاث ومنزل" for t in ["LEG", "WHR", "MHK", "SCS"]},
+    **{t: "مقاولو بناء" for t in ["DHI", "LEN", "NVR", "PHM", "TOL", "KBH", "MTH"]},
+    **{t: "تغليف" for t in ["PKG", "IP", "BALL", "AMCR", "CCK", "AVY", "SEE"]},
+    **{t: "مطاعم وتوصيل" for t in ["DASH"]},
+
+    # ── Energy ──
+    **{t: "نفط وغاز متكامل" for t in [
+        "XOM", "CVX", "SHEL", "BP", "TTE", "EQNR", "E", "PBR", "PBR.A", "EC",
+        "SU", "IMO", "CNQ", "CVE",
+    ]},
+    **{t: "استكشاف وإنتاج نفط" for t in [
+        "COP", "EOG", "OXY", "CTRA", "DVN", "HES", "MRO", "PXD", "FANG", "APA",
+        "CHRD", "MTDR", "AR", "SM", "CRC", "CRGY", "VET", "TPL",
+    ]},
+    **{t: "نقل وتخزين نفط" for t in [
+        "ENB", "ET", "EPD", "KMI", "WMB", "OKE", "TRP", "LNG", "MPLX", "WES",
+        "PAA", "PAGP", "TRGP", "AROC",
+    ]},
+    **{t: "تكرير وتسويق نفط" for t in ["MPC", "PSX", "VLO", "DINO", "PBF"]},
+    **{t: "خدمات حفر ومعدات" for t in [
+        "SLB", "BKR", "HAL", "TS", "WFRD", "CHX", "LBRT", "NOV", "FTI", "ACDC", "CLB",
+    ]},
+    **{t: "حفر آبار" for t in ["RIG", "VAL", "NE", "BORR", "HP", "PTEN", "NBR"]},
+    **{t: "فحم حراري" for t in ["BTU", "ARLP", "AMR", "HCC", "CEIX", "METC"]},
+    **{t: "يورانيوم ووقود نووي" for t in ["CCJ", "UEC", "DNN", "URG", "LEU", "BWXT"]},
+    **{t: "طاقة متجددة" for t in [
+        "BEPC", "BEP", "FSLR", "ENPH", "SEDG", "RUN", "NOVA", "ARRY", "SHLS", "CWEN",
+    ]},
+    **{t: "تصنيع طاقة شمسية" for t in ["JKS", "CSIQ", "DQ", "SOL", "MAXN"]},
+
+    # ── Healthcare ──
+    **{t: "أدوية كبرى" for t in [
+        "LLY", "JNJ", "NVO", "ABBV", "MRK", "AZN", "PFE", "NVS", "BMY", "GSK", "SNY", "TAK",
+    ]},
+    **{t: "تقنية حيوية" for t in [
+        "AMGN", "VRTX", "GILD", "REGN", "BIIB", "MRNA", "BNTX", "ALNY", "ARGX",
+    ]},
+    **{t: "أجهزة طبية" for t in ["ABT", "ISRG", "SYK", "MDT", "BSX", "BDX", "EW", "ZBH"]},
+    **{t: "مستلزمات طبية" for t in ["DXCM", "PODD", "ALC", "COO"]},
+    **{t: "تشخيص وأبحاث" for t in [
+        "TMO", "DHR", "A", "IQV", "MTD", "WAT", "IDXX", "LH", "DGX",
+    ]},
+    **{t: "تأمين صحي" for t in ["UNH", "ELV", "CI", "HUM", "CNC"]},
+    **{t: "مستشفيات ومرافق" for t in ["HCA", "THC", "UHS", "DVA"]},
+    **{t: "توزيع طبي" for t in ["MCK", "COR", "CAH"]},
+    **{t: "صيدليات تجزئة" for t in ["CVS", "WBA"]},
+    **{t: "خدمات معلومات صحية" for t in ["VEEV"]},
+
+    # ── Industrials ──
+    **{t: "طيران ودفاع" for t in ["RTX", "BA", "LMT", "GD", "NOC", "LHX", "TDG", "HWM"]},
+    **{t: "معدات ثقيلة" for t in ["CAT", "DE", "CMI", "PCAR", "URI"]},
+    **{t: "تكتلات صناعية" for t in ["GE", "HON", "MMM", "ITW", "GEV"]},
+    **{t: "معدات كهربائية وطاقة" for t in ["ETN", "VRT", "PWR", "EMR", "BE"]},
+    **{t: "توزيع صناعي" for t in ["GWW"]},
+    **{t: "آلات صناعية متخصصة" for t in ["PH", "TT", "CARR", "FIX"]},
+    **{t: "سكك حديدية" for t in ["UNP", "CSX", "NSC", "CNI", "CP"]},
+    **{t: "شحن ولوجستيات" for t in ["UPS", "FDX"]},
+    **{t: "إدارة النفايات" for t in ["WM", "RSG"]},
+    **{t: "منتجات بناء" for t in ["JCI"]},
+    **{t: "خدمات أعمال" for t in ["CTAS", "RELX"]},
+
+    # ── Information Technology ──
+    **{t: "أشباه موصلات" for t in [
+        "NVDA", "AVGO", "TSM", "AMD", "QCOM", "TXN", "ARM", "MU", "ADI", "LRCX",
+        "KLAC", "AMAT", "ASML", "MRVL", "MCHP", "ON", "NXPI", "ASX", "UMC", "ALAB",
+    ]},
+    **{t: "برمجيات بنية تحتية" for t in [
+        "MSFT", "ORCL", "ADBE", "PANW", "CRWD", "FTNT", "SNPS", "CDNS", "ANSS",
+        "DDOG", "NET", "ZS", "OKTA", "MDB", "SNOW", "ESTC", "CHKP", "NTNX", "GTLB",
+    ]},
+    **{t: "برمجيات تطبيقية" for t in [
+        "CRM", "INTU", "SAP", "WDAY", "ADSK", "TEAM", "NOW", "HUBS", "DOCU", "ZM",
+        "TYL", "PEGA", "MNDY", "FRSH", "BSY",
+    ]},
+    **{t: "خدمات تقنية" for t in [
+        "IBM", "ACN", "INFY", "WIT", "CTSH", "DXC", "EPAM", "GLOB", "IT",
+    ]},
+    **{t: "إلكترونيات استهلاكية" for t in ["AAPL", "SONY", "LPL"]},
+    **{t: "أجهزة حاسوب" for t in ["DELL", "HPQ", "HPE", "NTAP", "PSTG", "SMCI", "WDC", "STX"]},
+    **{t: "معدات اتصالات" for t in ["CSCO", "ANET", "MSI", "JNPR", "ZBRA", "ERIC", "NOK", "AAOI"]},
+    **{t: "مكونات إلكترونية" for t in ["TEL", "APH", "GLW", "CDW", "ARW", "AVT"]},
+    **{t: "أدوات علمية" for t in ["ROP", "KEYS", "TDY", "TRMB", "COHR"]},
+    **{t: "ذكاء اصطناعي" for t in ["PLTR", "AI", "BBAI", "SOUN"]},
+
+    # ── Basic Materials ──
+    **{t: "كيماويات متخصصة" for t in [
+        "LIN", "SHW", "APD", "ECL", "PPG", "ALB", "IFF", "RPM", "AXTA", "AVNT",
+    ]},
+    **{t: "مدخلات زراعية وأسمدة" for t in ["NTR", "CF", "MOS", "CTVA", "FMC", "ICL", "SQM"]},
+    **{t: "حديد وصلب" for t in ["NUE", "STLD", "VALE", "RIO", "BHP", "CLF", "X", "TX", "ASTL"]},
+    **{t: "نحاس ومعادن صناعية" for t in ["FCX", "SCCO", "TECK"]},
+    **{t: "ألمنيوم" for t in ["AA", "ACH", "CENX"]},
+    **{t: "تعدين ذهب" for t in [
+        "NEM", "GOLD", "AEM", "AU", "KGC", "WPM", "FNV", "GFI", "HMY", "BTG", "AGI",
+    ]},
+    **{t: "تعدين فضة" for t in ["PAAS", "HL", "AG"]},
+    **{t: "معادن نفيسة أخرى" for t in ["SBSW", "SAND"]},
+    **{t: "منتجات الغابات" for t in ["WY", "LPX"]},
+    **{t: "مواد بناء" for t in ["VMC", "MLM", "EXP", "CRH"]},
+    **{t: "كيماويات متنوعة" for t in ["DOW", "DD", "LYB", "WLK", "EMN", "HUN", "CE", "ASH"]},
+
+    # ── Utilities ──
+    **{t: "كهرباء منظمة" for t in [
+        "NEE", "SO", "DUK", "AEP", "D", "XEL", "EXC", "ED", "PEG", "WEC", "PCG",
+        "DTE", "AEE", "ETR", "EIX", "ES", "FE", "PPL", "CMS", "EVRG", "LNT",
+    ]},
+    **{t: "مرافق متنوعة" for t in ["CEG", "VST", "TLN", "NRG", "ATO"]},
+    **{t: "غاز منظم" for t in ["SRE", "NI", "CNP"]},
+    **{t: "مرافق متجددة" for t in ["BIP", "ENLT", "OKLO"]},
+    **{t: "مياه" for t in ["AWK", "SBS"]},
+    **{t: "مرافق دولية" for t in ["NGG", "FTS", "EMA", "KEP"]},
+}
 
 # Sector mapping for Forex pairs
 FOREX_SECTORS = {
@@ -1140,8 +1892,16 @@ def get_stock_name(ticker: str) -> str:
 
 
 def get_sector(ticker: str) -> str:
-    """Get sector for a ticker."""
+    """Get top-level sector for a ticker."""
     for d in (SAUDI_SECTORS, US_SECTORS, FOREX_SECTORS, CRYPTO_SECTORS, COMMODITIES_SECTORS):
         if ticker in d:
             return d[ticker]
     return "أخرى"
+
+
+def get_industry(ticker: str) -> str:
+    """Get industry (sub-sector) for a ticker. Currently US only."""
+    if ticker in US_INDUSTRIES:
+        return US_INDUSTRIES[ticker]
+    # For non-US, fall back to sector
+    return get_sector(ticker)
