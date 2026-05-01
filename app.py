@@ -6456,13 +6456,50 @@ elif page == "🤖 تقارير AI":
 elif page == "💬 المساعد الذكي":
     from core.chatbot import chat as masa_chat, get_starter_prompts
 
-    # RTL CSS
+    # RTL CSS — aggressive override for chat messages
     st.markdown('''
     <style>
-    [data-testid="stMarkdownContainer"] { direction: rtl; text-align: right; }
-    [data-testid="stMarkdownContainer"] ul, [data-testid="stMarkdownContainer"] ol { padding-right: 1.5em; padding-left: 0; }
-    [data-testid="stChatMessage"] { direction: rtl; }
-    [data-testid="stChatInput"] textarea { direction: rtl; text-align: right; font-family: Tajawal, sans-serif; }
+    /* Force RTL on all markdown content */
+    [data-testid="stMarkdownContainer"],
+    [data-testid="stMarkdownContainer"] * {
+        direction: rtl !important;
+        text-align: right !important;
+        unicode-bidi: plaintext;
+    }
+    [data-testid="stMarkdownContainer"] ul,
+    [data-testid="stMarkdownContainer"] ol {
+        padding-right: 1.5em !important;
+        padding-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    /* Chat message containers */
+    [data-testid="stChatMessage"],
+    [data-testid="stChatMessage"] > div,
+    [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"],
+    [data-testid="stChatMessage"] p,
+    [data-testid="stChatMessage"] li,
+    [data-testid="stChatMessage"] ul,
+    [data-testid="stChatMessage"] ol,
+    [data-testid="stChatMessage"] strong,
+    [data-testid="stChatMessage"] em {
+        direction: rtl !important;
+        text-align: right !important;
+    }
+    /* Avatar position — keep on right side of message */
+    [data-testid="stChatMessage"] {
+        flex-direction: row-reverse !important;
+    }
+    /* Chat input — RTL typing */
+    [data-testid="stChatInput"] textarea {
+        direction: rtl !important;
+        text-align: right !important;
+        font-family: 'Tajawal', sans-serif !important;
+    }
+    /* Quick action buttons */
+    [data-testid="stButton"] button {
+        direction: rtl !important;
+        text-align: right !important;
+    }
     </style>
     ''', unsafe_allow_html=True)
 
