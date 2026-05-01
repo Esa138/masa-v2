@@ -5512,39 +5512,51 @@ elif page == "🥇 الفلتر الذهبي":
                 _g_border = "3px solid #00E67670" if 50 <= _g_rsi < 70 else "2px solid #FFD70040"
                 _g_glow = "box-shadow: 0 0 18px rgba(0,230,118,0.18);" if 50 <= _g_rsi < 70 else ""
 
-                st.markdown(f'''
-                <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:{_g_border};
-                            border-radius:12px;padding:16px 18px;margin:8px 0;direction:rtl;{_g_glow}">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-                        <div>
-                            <span style="font-size:1.2em;font-weight:800;color:#FFD700">🥇 {_g["name"]}</span>
-                            <span style="color:#4b5563;font-size:0.8em;margin-right:8px">{_g["ticker"]} • {_g["sector"]}</span>
-                            {f'<span style="background:{_g_rsi_color}20;color:{_g_rsi_color};padding:3px 10px;border-radius:10px;font-size:0.72em;font-weight:700;border:1px solid {_g_rsi_color}40;margin-right:8px">{_g_rsi_badge}</span>' if _g_rsi_badge else ''}
-                        </div>
-                        <div style="display:flex;gap:12px;align-items:center">
-                            <span style="color:{_g_change_c};font-weight:600">{_g["change"]:+.1f}%</span>
-                            <span style="font-size:1.4em;font-weight:800;color:#fff">{_g["price"]:.2f}</span>
-                        </div>
-                    </div>
-                    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:0.82em;color:#9ca3af">
-                        <span style="color:{_g_flow_c}">📈 Flow: <b>{_g["flow"]:+.0f}</b></span>
-                        <span>⭐ Div: <b style="color:#FFD700">{_g["div"]:+.0f}</b></span>
-                        <span>📊 CDV: <b>{_g_cdv_label}</b></span>
-                        <span>📉 RSI: <b style="color:{_g_rsi_color}">{_g_rsi:.0f}</b> <span style="color:#6b7280;font-size:0.85em">({_g_rsi_label})</span></span>
-                        <span>🔄 {_g["phase"]}</span>
-                        <span>📍 {_g["location"]}</span>
-                        <span>📅 {_g["days"]} يوم تجميع</span>
-                    </div>
-                    <div style="display:flex;gap:16px;margin-top:8px;font-size:0.82em">
-                        <span style="color:#FF5252">🛑 وقف: <b>{_g["stop"]:.2f}</b></span>
-                        <span style="color:#00E676">🎯 هدف: <b>{_g["target"]:.2f}</b></span>
-                        <span style="color:#4FC3F7">📐 R:R: <b>{_g["rr"]:.1f}</b></span>
-                    </div>
-                    <div style="margin-top:6px;font-size:0.75em;color:#374151">
-                        ✅ أسباب الدخول: {" | ".join(_g["reasons_for"][:3]) if _g["reasons_for"] else "—"}
-                    </div>
-                </div>
-                ''', unsafe_allow_html=True)
+                # Build badge HTML separately to avoid nested f-string issues
+                _badge_html = (
+                    f'<span style="background:{_g_rsi_color}20;color:{_g_rsi_color};'
+                    f'padding:3px 10px;border-radius:10px;font-size:0.72em;font-weight:700;'
+                    f'border:1px solid {_g_rsi_color}40;margin-right:8px">{_g_rsi_badge}</span>'
+                ) if _g_rsi_badge else ""
+
+                _reasons_text = " | ".join(_g["reasons_for"][:3]) if _g.get("reasons_for") else "—"
+
+                # Build full HTML as single line to prevent markdown code-block detection
+                _card_html = (
+                    f'<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);'
+                    f'border:{_g_border};border-radius:12px;padding:16px 18px;margin:8px 0;'
+                    f'direction:rtl;{_g_glow}">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+                    f'<div>'
+                    f'<span style="font-size:1.2em;font-weight:800;color:#FFD700">🥇 {_g["name"]}</span> '
+                    f'<span style="color:#4b5563;font-size:0.8em;margin-right:8px">{_g["ticker"]} • {_g["sector"]}</span> '
+                    f'{_badge_html}'
+                    f'</div>'
+                    f'<div style="display:flex;gap:12px;align-items:center">'
+                    f'<span style="color:{_g_change_c};font-weight:600">{_g["change"]:+.1f}%</span>'
+                    f'<span style="font-size:1.4em;font-weight:800;color:#fff">{_g["price"]:.2f}</span>'
+                    f'</div></div>'
+                    f'<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:0.82em;color:#9ca3af">'
+                    f'<span style="color:{_g_flow_c}">📈 Flow: <b>{_g["flow"]:+.0f}</b></span>'
+                    f'<span>⭐ Div: <b style="color:#FFD700">{_g["div"]:+.0f}</b></span>'
+                    f'<span>📊 CDV: <b>{_g_cdv_label}</b></span>'
+                    f'<span>📉 RSI: <b style="color:{_g_rsi_color}">{_g_rsi:.0f}</b> '
+                    f'<span style="color:#6b7280;font-size:0.85em">({_g_rsi_label})</span></span>'
+                    f'<span>🔄 {_g["phase"]}</span>'
+                    f'<span>📍 {_g["location"]}</span>'
+                    f'<span>📅 {_g["days"]} يوم تجميع</span>'
+                    f'</div>'
+                    f'<div style="display:flex;gap:16px;margin-top:8px;font-size:0.82em">'
+                    f'<span style="color:#FF5252">🛑 وقف: <b>{_g["stop"]:.2f}</b></span>'
+                    f'<span style="color:#00E676">🎯 هدف: <b>{_g["target"]:.2f}</b></span>'
+                    f'<span style="color:#4FC3F7">📐 R:R: <b>{_g["rr"]:.1f}</b></span>'
+                    f'</div>'
+                    f'<div style="margin-top:6px;font-size:0.75em;color:#374151">'
+                    f'✅ أسباب الدخول: {_reasons_text}'
+                    f'</div>'
+                    f'</div>'
+                )
+                st.markdown(_card_html, unsafe_allow_html=True)
 
                 _gcol1, _gcol2 = st.columns([1, 1])
                 with _gcol1:

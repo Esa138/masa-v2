@@ -63,6 +63,15 @@ SYSTEM_PROMPT = """أنت مساعد ذكي متخصص في السوق السع�
 # CONTEXT BUILDER
 # ══════════════════════════════════════════════════════════════
 
+def _is_golden_signal(r: dict) -> bool:
+    """Same formula as Golden Filter page: accumulation/spring + buyer aggressor + div>=25 + 0 against."""
+    is_accum = r.get("phase") in ("accumulation", "spring")
+    is_buyer = r.get("aggressor") == "buyers"
+    has_div = abs(r.get("divergence", 0)) >= 25
+    zero_against = len(r.get("reasons_against", []) or []) == 0
+    return is_accum and is_buyer and has_div and zero_against
+
+
 def _summarize_scan(scan_results: list, max_items: int = 30) -> dict:
     """Summarize scan results into compact dict for AI context."""
     if not scan_results:
@@ -85,22 +94,33 @@ def _summarize_scan(scan_results: list, max_items: int = 30) -> dict:
             if dec == "enter":
                 sectors[sec]["enters"] += 1
         if dec == "enter":
+            is_g = _is_golden_signal(r)
             enters.append({
                 "ticker": r.get("ticker", ""),
                 "name": r.get("name", ""),
                 "sector": sec,
                 "phase": r.get("phase", ""),
                 "flow": r.get("flow_bias", 0),
+                "divergence": r.get("divergence", 0),
                 "rsi": r.get("rsi", 50),
                 "days": r.get("days", 0),
-                "price": r.get("price", 0),
+                "price": r.get("price", r.get("last_close", 0)),
                 "stop": r.get("stop_loss", 0),
                 "target": r.get("target", 0),
                 "rr": r.get("rr_ratio", 0),
-                "is_golden": r.get("is_golden", False),
+                "is_golden": is_g,
+                "aggressor": r.get("aggressor", ""),
             })
-            if r.get("is_golden"):
-                golden.append(r.get("name", r.get("ticker", "")))
+            if is_g:
+                golden.append({
+                    "name": r.get("name", r.get("ticker", "")),
+                    "ticker": r.get("ticker", ""),
+                    "sector": sec,
+                    "rsi": r.get("rsi", 50),
+                    "flow": r.get("flow_bias", 0),
+                    "divergence": r.get("divergence", 0),
+                    "price": r.get("price", r.get("last_close", 0)),
+                })
 
     # Top sectors by avg flow
     sector_ranks = sorted(
@@ -121,8 +141,8 @@ def _summarize_scan(scan_results: list, max_items: int = 30) -> dict:
             for s, d in sector_ranks[-3:]
         ],
         "enter_signals": enters[:max_items],
+        "golden_signals": golden,
         "golden_count": len(golden),
-        "golden_names": golden[:10],
     }
 
 
