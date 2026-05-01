@@ -6535,7 +6535,16 @@ elif page == "💬 المساعد الذكي":
     with _hc1:
         if _scan_results:
             _enters = sum(1 for r in _scan_results if r.get("decision") == "enter")
-            st.success(f"✅ المساعد متصل ببيانات المسح الحالي ({len(_scan_results)} سهم، {_enters} ادخل)")
+            # Count breakouts/bounces using same logic as chatbot
+            from core.chatbot import _detect_breakout, _detect_bounce, _is_golden_signal
+            _bo_count = sum(1 for r in _scan_results if _detect_breakout(r)[0])
+            _bn_count = sum(1 for r in _scan_results if _detect_bounce(r)[0])
+            _gold_count = sum(1 for r in _scan_results if r.get("decision") == "enter" and _is_golden_signal(r))
+            st.success(
+                f"✅ متصل: {len(_scan_results)} سهم | "
+                f"✅ {_enters} ادخل | 🥇 {_gold_count} ذهبي | "
+                f"🚀 {_bo_count} اختراق | 🪲 {_bn_count} ارتداد"
+            )
         else:
             st.info("💡 اعمل مسح أولاً من Order Flow عشان المساعد يقدر يحلل بياناتك الحالية")
     with _hc2:
