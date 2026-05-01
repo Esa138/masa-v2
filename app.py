@@ -3228,7 +3228,7 @@ with st.sidebar:
     st.divider()
 
     # Handle navigation from sector map → company analysis
-    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "🧭 بوصلة القطاعات", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "📊 أداء النظام"]
+    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "🧭 بوصلة القطاعات", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "💬 المساعد الذكي", "📊 أداء النظام"]
     if st.session_state.get("_goto_page"):
         st.session_state["page_nav"] = st.session_state.pop("_goto_page")
 
@@ -6447,6 +6447,84 @@ elif page == "🤖 تقارير AI":
                         report = generate_opportunities_report(results)
                     st.markdown("---")
                     st.markdown(report)
+
+
+# ══════════════════════════════════════════════════════════════
+# PAGE: Smart Chatbot — المساعد الذكي
+# ══════════════════════════════════════════════════════════════
+
+elif page == "💬 المساعد الذكي":
+    from core.chatbot import chat as masa_chat, get_starter_prompts
+
+    # RTL CSS
+    st.markdown('''
+    <style>
+    [data-testid="stMarkdownContainer"] { direction: rtl; text-align: right; }
+    [data-testid="stMarkdownContainer"] ul, [data-testid="stMarkdownContainer"] ol { padding-right: 1.5em; padding-left: 0; }
+    [data-testid="stChatMessage"] { direction: rtl; }
+    [data-testid="stChatInput"] textarea { direction: rtl; text-align: right; font-family: Tajawal, sans-serif; }
+    </style>
+    ''', unsafe_allow_html=True)
+
+    st.markdown('''
+    <div style="text-align:center;padding:20px 0 10px 0;direction:rtl">
+        <span style="font-size:1.8em;font-weight:800;color:#fff">💬 المساعد الذكي</span>
+        <div style="color:#6b7280;font-size:0.92em;margin-top:6px">
+            اسأل أي شي عن السوق، الإشارات، الأداء — مدعوم بـ Gemini + بياناتك الحية
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # Initialize history
+    if "_chat_history" not in st.session_state:
+        st.session_state["_chat_history"] = []
+
+    _scan_results = st.session_state.get("scan_results")
+
+    # Header bar with status + clear button
+    _hc1, _hc2 = st.columns([4, 1])
+    with _hc1:
+        if _scan_results:
+            _enters = sum(1 for r in _scan_results if r.get("decision") == "enter")
+            st.success(f"✅ المساعد متصل ببيانات المسح الحالي ({len(_scan_results)} سهم، {_enters} ادخل)")
+        else:
+            st.info("💡 اعمل مسح أولاً من Order Flow عشان المساعد يقدر يحلل بياناتك الحالية")
+    with _hc2:
+        if st.button("🗑️ مسح المحادثة", use_container_width=True):
+            st.session_state["_chat_history"] = []
+            st.rerun()
+
+    st.divider()
+
+    # Show conversation
+    for msg in st.session_state["_chat_history"]:
+        with st.chat_message(msg["role"], avatar="🧑‍💼" if msg["role"] == "user" else "🤖"):
+            st.markdown(msg["content"])
+
+    # Quick action buttons (only show if no history)
+    if not st.session_state["_chat_history"]:
+        st.markdown("**💡 أسئلة سريعة لتبدأ:**")
+        _starters = get_starter_prompts(_scan_results)
+        _qc = st.columns(2)
+        for _i, _q in enumerate(_starters):
+            with _qc[_i % 2]:
+                if st.button(_q, key=f"_quick_{_i}", use_container_width=True):
+                    st.session_state["_chat_history"].append({"role": "user", "content": _q})
+                    with st.spinner("🤖 المساعد يفكر..."):
+                        _reply = masa_chat(_q, st.session_state["_chat_history"][:-1], _scan_results)
+                    st.session_state["_chat_history"].append({"role": "assistant", "content": _reply})
+                    st.rerun()
+
+    # Chat input
+    if _user_input := st.chat_input("اسأل أي شي عن السوق أو إشاراتك..."):
+        st.session_state["_chat_history"].append({"role": "user", "content": _user_input})
+        with st.chat_message("user", avatar="🧑‍💼"):
+            st.markdown(_user_input)
+        with st.chat_message("assistant", avatar="🤖"):
+            with st.spinner("🤖 المساعد يفكر..."):
+                _reply = masa_chat(_user_input, st.session_state["_chat_history"][:-1], _scan_results)
+            st.markdown(_reply)
+        st.session_state["_chat_history"].append({"role": "assistant", "content": _reply})
 
 
 # ══════════════════════════════════════════════════════════════
