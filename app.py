@@ -6244,17 +6244,83 @@ elif page == "📰 أخبار السوق":
                         _link = _it.get("link", "")
                         _desc = _it.get("description", "")
                         _ai_sum = _it.get("ai_summary", "")
-                        # Prefer AI summary, fallback to RSS description
+                        _cls = _it.get("classification", {}) or {}
+
+                        # Sentiment badge
+                        _badge_label = _cls.get("label", "")
+                        _badge_color = _cls.get("color", "#9ca3af")
+                        _badge_html = (
+                            f'<span style="background:{_badge_color}20;color:{_badge_color};'
+                            f'padding:3px 10px;border-radius:10px;font-size:0.72em;font-weight:700;'
+                            f'border:1px solid {_badge_color}40;margin-left:6px">{_badge_label}</span>'
+                        ) if _badge_label else ""
+
+                        # Sectors badge
+                        _sectors = _cls.get("sectors", [])
+                        _sectors_html = ""
+                        if _sectors:
+                            _sec_str = " • ".join(_sectors[:3])
+                            _sectors_html = f'<span style="color:#9ca3af;font-size:0.7em;margin-right:6px">📊 {_sec_str}</span>'
+
+                        # Geography
+                        _geo = _cls.get("geography", "")
+                        _geo_html = f'<span style="color:#6b7280;font-size:0.7em;margin-right:6px">{_geo}</span>' if _geo else ""
+
+                        # Strength indicator
+                        _strength = _cls.get("strength", "")
+                        _strength_html = ""
+                        if _strength == "عالية":
+                            _strength_html = '<span style="color:#FFD700;font-size:0.7em">💪 قوي</span>'
+                        elif _strength == "متوسطة":
+                            _strength_html = '<span style="color:#9ca3af;font-size:0.7em">📊 متوسط</span>'
+
+                        # Border highlight for urgent or strong sentiment
+                        _is_urgent = _cls.get("urgent", False)
+                        _sentiment = _cls.get("sentiment", "neutral")
+                        if _is_urgent:
+                            _card_border = "2px solid #FF6F0080"
+                            _card_glow = "box-shadow: 0 0 12px rgba(255,111,0,0.3);"
+                        elif _sentiment == "positive" and _strength == "عالية":
+                            _card_border = f"1px solid {_badge_color}50"
+                            _card_glow = ""
+                        elif _sentiment == "negative" and _strength == "عالية":
+                            _card_border = f"1px solid {_badge_color}50"
+                            _card_glow = ""
+                        else:
+                            _card_border = "1px solid #192035"
+                            _card_glow = ""
+
+                        # Body (AI summary or description)
                         _body = _ai_sum or _desc
-                        _body_html = f'<div style="color:#B0BEC5;font-size:0.85em;line-height:1.7;margin-bottom:6px">{_body}</div>' if _body else ""
+                        _body_html = f'<div style="color:#B0BEC5;font-size:0.85em;line-height:1.7;margin:6px 0">{_body}</div>' if _body else ""
+
                         _link_html = f'<a href="{_link}" target="_blank" style="color:#FFD700;font-size:0.75em;text-decoration:none">🔗 المصدر</a>' if _link else ""
-                        _date_html = f'<div style="color:#4FC3F7;font-size:0.72em;margin-bottom:4px">📅 {_date}</div>' if _date else ""
+
+                        # Top row: badge + date
+                        _top_row = (
+                            f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+                            f'<div>{_badge_html}{_strength_html}</div>'
+                            f'<div style="color:#4FC3F7;font-size:0.72em">📅 {_date}</div>'
+                            f'</div>'
+                        ) if _date or _badge_label else ""
+
+                        # Meta row: sectors + geography
+                        _meta_row = ""
+                        if _sectors_html or _geo_html:
+                            _meta_row = (
+                                f'<div style="margin-top:6px;padding-top:6px;border-top:1px solid #192035">'
+                                f'{_geo_html}{_sectors_html}'
+                                f'</div>'
+                            )
+
                         st.markdown(
-                            f'<div style="background:rgba(14,20,36,0.5);border:1px solid #192035;'
-                            f'border-radius:10px;padding:12px 14px;margin:6px 0;direction:rtl">'
-                            f'{_date_html}'
-                            f'<div style="color:#fff;font-weight:600;font-size:0.95em;margin-bottom:4px">{_title}</div>'
-                            f'{_body_html}{_link_html}'
+                            f'<div style="background:rgba(14,20,36,0.5);border:{_card_border};'
+                            f'border-radius:10px;padding:12px 14px;margin:6px 0;direction:rtl;{_card_glow}">'
+                            f'{_top_row}'
+                            f'<div style="color:#fff;font-weight:600;font-size:0.95em">{_title}</div>'
+                            f'{_body_html}'
+                            f'{_meta_row}'
+                            f'<div style="margin-top:6px">{_link_html}</div>'
                             f'</div>',
                             unsafe_allow_html=True,
                         )

@@ -68,6 +68,152 @@ EXCLUDE_KEYWORDS = [
 # News validity window — drop anything older than this
 FRESHNESS_HOURS = 24
 
+
+# ══════════════════════════════════════════════════════════════
+# NEWS CLASSIFICATION — sentiment + urgency
+# ══════════════════════════════════════════════════════════════
+
+POSITIVE_KEYWORDS = [
+    "أرباح", "نمو", "ارتفاع", "ارتفع", "صعود", "صاعد", "توزيعات",
+    "فوق التوقعات", "تجاوز التوقعات", "تجاوزت", "تتجاوز",
+    "صفقة", "استحواذ", "طرح ناجح", "اكتتاب ناجح",
+    "تحسن", "قياسي", "مكاسب", "ربحية", "إيجابي",
+    "نجاح", "تعاون", "اتفاقية", "شراكة", "توسع",
+    "مرتفع", "زيادة", "رفع", "ترفع", "يرفع",
+    "قفزة", "قفز", "تضاعف", "أعلى", "ازداد", "ازدياد",
+    "إنجاز", "أرباح صافية", "توزيعات نقدية",
+    "outperform", "beat estimates", "record high",
+]
+
+NEGATIVE_KEYWORDS = [
+    "خسائر", "خسارة", "تراجع", "انخفاض", "هبوط", "انهيار",
+    "تحت التوقعات", "أقل من التوقعات", "خيبة",
+    "تعثر", "إفلاس", "تصفية الشركة", "تصفية شركة",
+    "تحقيق رقابي", "غرامة", "عقوبة", "تحقيقات",
+    "أزمة", "تحذير", "ضغط بيعي",
+    "هابط", "انخفض", "تدهور", "نزول", "تقلص",
+    "ركود", "كساد", "تباطؤ", "متعثر",
+    "delist", "downgrade", "loss",
+]
+
+URGENT_KEYWORDS = [
+    "عاجل", "قرار سيادي", "صدمة", "استثنائي",
+    "BREAKING", "URGENT", "بشكل عاجل",
+    "قرار حكومي", "مرسوم ملكي", "أمر ملكي",
+    "إيقاف التداول", "تعليق التداول", "إعلان مفاجئ",
+]
+
+# Sector mapping for impact extraction
+SECTOR_KEYWORDS = {
+    "البنوك": ["بنك", "بنوك", "مصرف", "مصارف", "تمويل", "إقراض", "السيولة"],
+    "الطاقة": ["نفط", "أرامكو", "برميل", "أوبك", "OPEC", "غاز", "بترول"],
+    "البتروكيماويات": ["سابك", "بتروكيم", "كيماويات", "بتروكيماوي"],
+    "الاتصالات": ["اتصالات", "stc", "زين", "موبايلي"],
+    "العقارات": ["عقاري", "عقار", "الإسكان", "تطوير عقاري"],
+    "التأمين": ["تأمين", "بوبا"],
+    "التقنية": ["تقنية", "أبل", "مايكروسوفت", "جوجل", "إنفيديا", "AI", "ذكاء اصطناعي"],
+    "التجزئة": ["جرير", "إكسترا", "تجزئة"],
+    "الأغذية": ["أغذية", "المراعي", "الأسماك", "غذاء"],
+    "الأسمنت": ["أسمنت", "إسمنت"],
+    "الصحة": ["صحة", "مستشفى", "أدوية", "صيدلية"],
+    "المرافق": ["كهرباء", "مياه", "مرافق"],
+}
+
+# Geographic markers
+SAUDI_MARKERS = ["السعودي", "السعودية", "تاسي", "تداول", "أرامكو", "الراجحي", "ريال"]
+US_MARKERS = ["أمريك", "وول ستريت", "S&P", "ناسداك", "الفيدرالي", "أبل", "تسلا", "Fed"]
+
+
+def _detect_sectors(text: str) -> list:
+    """Detect which sectors are affected by the news."""
+    sectors = []
+    for sec, keywords in SECTOR_KEYWORDS.items():
+        if any(kw in text or kw.lower() in text.lower() for kw in keywords):
+            sectors.append(sec)
+    return sectors
+
+
+def _detect_geography(text: str) -> str:
+    """Detect news geographic focus."""
+    has_saudi = any(m in text for m in SAUDI_MARKERS)
+    has_us = any(m in text or m.lower() in text.lower() for m in US_MARKERS)
+    if has_saudi and has_us:
+        return "🇸🇦🇺🇸 سعودي + أمريكي"
+    if has_saudi:
+        return "🇸🇦 سعودي"
+    if has_us:
+        return "🇺🇸 أمريكي"
+    return "🌍 عام"
+
+
+def classify_news(title: str, description: str = "") -> dict:
+    """
+    Classify a news item by sentiment and urgency.
+    Returns: {label, color, sentiment, urgent, strength, sectors, geography}
+    """
+    text = f"{title} {description}"
+    text_lower = text.lower()
+
+    pos_hits = sum(1 for kw in POSITIVE_KEYWORDS if kw in text or kw.lower() in text_lower)
+    neg_hits = sum(1 for kw in NEGATIVE_KEYWORDS if kw in text or kw.lower() in text_lower)
+    is_urgent = any(kw in text or kw.lower() in text_lower for kw in URGENT_KEYWORDS)
+
+    sectors = _detect_sectors(text)
+    geography = _detect_geography(text)
+
+    # Determine sentiment
+    if pos_hits > neg_hits:
+        sentiment = "positive"
+        label = "🟢 إيجابي"
+        color = "#00E676"
+    elif neg_hits > pos_hits:
+        sentiment = "negative"
+        label = "🔴 سلبي"
+        color = "#FF5252"
+    else:
+        sentiment = "neutral"
+        label = "⚪ محايد"
+        color = "#9ca3af"
+
+    # Override with urgent if applicable (only if also has sentiment hits)
+    if is_urgent and (pos_hits > 0 or neg_hits > 0):
+        urgent_label = "🔥 عاجل إيجابي" if sentiment == "positive" else "🔥 عاجل سلبي" if sentiment == "negative" else "🔥 عاجل"
+        label = urgent_label
+        color = "#FF6F00"
+
+    # Strength based on hit count
+    total_hits = pos_hits + neg_hits
+    if total_hits >= 3:
+        strength = "عالية"
+    elif total_hits >= 1:
+        strength = "متوسطة"
+    else:
+        strength = "منخفضة"
+
+    return {
+        "label": label,
+        "color": color,
+        "sentiment": sentiment,
+        "urgent": is_urgent,
+        "strength": strength,
+        "sectors": sectors,
+        "geography": geography,
+        "pos_hits": pos_hits,
+        "neg_hits": neg_hits,
+    }
+
+
+def enrich_with_classification(items: list) -> list:
+    """Add classification dict to each news item in-place."""
+    for it in items:
+        if "classification" not in it:
+            it["classification"] = classify_news(
+                it.get("title", ""),
+                it.get("description", ""),
+            )
+    return items
+
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
     "Accept": "application/rss+xml, application/xml, text/xml, */*",
@@ -310,6 +456,11 @@ def get_all_market_news(limit_per_source: int = 10) -> dict:
         ]
         if not argaam_rss[cat]:
             del argaam_rss[cat]
+        else:
+            enrich_with_classification(argaam_rss[cat])
+
+    enrich_with_classification(argaam_page)
+    enrich_with_classification(maaal)
 
     return {
         "argaam": argaam_rss,
