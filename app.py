@@ -3228,7 +3228,7 @@ with st.sidebar:
     st.divider()
 
     # Handle navigation from sector map → company analysis
-    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "🧭 بوصلة القطاعات", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "💬 المساعد الذكي", "📊 أداء النظام"]
+    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "🧭 بوصلة القطاعات", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "💬 المساعد الذكي", "📊 أداء النظام", "🔬 تشخيص الأداء"]
     if st.session_state.get("_goto_page"):
         st.session_state["page_nav"] = st.session_state.pop("_goto_page")
 
@@ -7488,3 +7488,230 @@ Spring vs Accumulation vs Markup — مين الأفضل؟
         وتم تتبع نتائجها. لا يوجد فلترة أو إخفاء للنتائج السيئة.
     </div>
     ''', unsafe_allow_html=True)
+
+
+# ══════════════════════════════════════════════════════════════
+# PAGE: Performance Diagnostics — تشخيص الأداء
+# ══════════════════════════════════════════════════════════════
+
+elif page == "🔬 تشخيص الأداء":
+    from core.diagnostics import (
+        load_signals_df, analyze_univariate, analyze_bivariate,
+        find_golden_patterns, find_trap_patterns,
+        simulate_golden_filter, get_market_summary,
+    )
+
+    # RTL CSS
+    st.markdown('''
+    <style>
+    [data-testid="stMarkdownContainer"] { direction: rtl; text-align: right; }
+    [data-testid="stMarkdownContainer"] ul, [data-testid="stMarkdownContainer"] ol { padding-right: 1.5em; padding-left: 0; }
+    </style>
+    ''', unsafe_allow_html=True)
+
+    st.markdown('''
+    <div style="text-align:center;padding:20px 0 10px 0;direction:rtl">
+        <span style="font-size:1.8em;font-weight:800;color:#fff">🔬 تشخيص الأداء</span>
+        <div style="color:#6b7280;font-size:0.92em;margin-top:6px">
+            تحليل عميق للأنماط الذهبية والفخاخ — لا يحجب، يعرض الحقيقة بالأرقام
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    _diag_df = load_signals_df()
+    if _diag_df.empty:
+        st.warning("⚠️ لا توجد إشارات مكتملة بعد للتحليل.")
+        st.stop()
+
+    # Market tabs
+    _saudi_df = _diag_df[_diag_df['is_saudi']].copy()
+    _us_df = _diag_df[~_diag_df['is_saudi']].copy()
+
+    _diag_tab_sa, _diag_tab_us, _diag_tab_compare = st.tabs([
+        f"🇸🇦 السعودي ({len(_saudi_df)})",
+        f"🇺🇸 الأمريكي ({len(_us_df)})",
+        "⚖️ مقارنة",
+    ])
+
+    def _render_market_diagnostic(_md, _market_name):
+        if _md.empty:
+            st.info(f"لا توجد بيانات لـ {_market_name}")
+            return
+
+        _summary = get_market_summary(_md)
+        _wr = _summary['win_rate']
+        _summary_color = "#00E676" if _wr >= 55 else "#FFD700" if _wr >= 45 else "#FF5252"
+
+        # ── Header summary ──
+        st.markdown(f'''
+        <div style="background:linear-gradient(135deg,#0d1117,#161b22);border:2px solid {_summary_color}40;
+                    border-radius:14px;padding:18px;margin:10px 0;direction:rtl">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+                <div style="text-align:center">
+                    <div style="color:#6b7280;font-size:0.72em">إجمالي الإشارات</div>
+                    <div style="color:#fff;font-size:1.6em;font-weight:800">{_summary['n']}</div>
+                </div>
+                <div style="text-align:center">
+                    <div style="color:#6b7280;font-size:0.72em">نسبة النجاح</div>
+                    <div style="color:{_summary_color};font-size:1.6em;font-weight:800">{_wr}%</div>
+                </div>
+                <div style="text-align:center">
+                    <div style="color:#6b7280;font-size:0.72em">متوسط العائد</div>
+                    <div style="color:{_summary_color};font-size:1.6em;font-weight:800">{_summary['avg_return']:+.2f}%</div>
+                </div>
+                <div style="text-align:center">
+                    <div style="color:#6b7280;font-size:0.72em">ناجحة / خاسرة</div>
+                    <div style="color:#fff;font-size:1.2em;font-weight:700">
+                        <span style="color:#00E676">{_summary['wins']}</span> / <span style="color:#FF5252">{_summary['losses']}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+
+        # ── Golden Patterns ──
+        st.divider()
+        st.markdown("### 🥇 الأنماط الذهبية (نجاح ≥ 65%)")
+        st.caption("تركيبات الشروط اللي تعطي أعلى نسبة نجاح تاريخياً")
+
+        _golden = find_golden_patterns(_md, min_win_rate=65, min_n=4)
+        if not _golden:
+            st.info("لا توجد أنماط ذهبية بعينة كافية")
+        else:
+            _gold_rows = []
+            for _g in _golden[:15]:
+                _badge = "🥇" if _g['win_rate'] >= 80 else "✅" if _g['win_rate'] >= 70 else "🟢"
+                _strength = "قوية" if _g['is_strong_sample'] else "🟡 محدودة"
+                _gold_rows.append({
+                    "النوع": _g['pattern_type'],
+                    "النمط": _g['pattern'],
+                    "النجاح": f"{_badge} {_g['win_rate']}%",
+                    "العائد": f"{_g['avg_return']:+.2f}%",
+                    "العينة": f"n={_g['n']}",
+                    "القوة": _strength,
+                })
+            st.dataframe(pd.DataFrame(_gold_rows), use_container_width=True, hide_index=True)
+
+        # ── Trap Patterns ──
+        st.divider()
+        st.markdown("### 🪤 الفخاخ (نجاح ≤ 25%)")
+        st.caption("تركيبات الشروط اللي تخسر تاريخياً — تجنّبها")
+
+        _traps = find_trap_patterns(_md, max_win_rate=25, min_n=4)
+        if not _traps:
+            st.success("لا توجد فخاخ خطيرة بعينة كافية ✅")
+        else:
+            _trap_rows = []
+            for _t in _traps[:15]:
+                _badge = "💀" if _t['win_rate'] == 0 else "❌" if _t['win_rate'] < 15 else "⚠️"
+                _strength = "قوية" if _t['is_strong_sample'] else "🟡 محدودة"
+                _trap_rows.append({
+                    "النوع": _t['pattern_type'],
+                    "النمط": _t['pattern'],
+                    "النجاح": f"{_badge} {_t['win_rate']}%",
+                    "العائد": f"{_t['avg_return']:+.2f}%",
+                    "العينة": f"n={_t['n']}",
+                    "القوة": _strength,
+                })
+            st.dataframe(pd.DataFrame(_trap_rows), use_container_width=True, hide_index=True)
+
+        # ── Univariate breakdowns ──
+        st.divider()
+        st.markdown("### 📊 التحليل الأحادي (كل خاصية لوحدها)")
+
+        _uni_tab1, _uni_tab2, _uni_tab3, _uni_tab4 = st.tabs([
+            "🏭 القطاع", "📈 RSI", "💧 Flow", "📍 الموقع"
+        ])
+
+        def _render_univariate(_col, _icon):
+            _data = analyze_univariate(_md, _col, min_n=4)
+            if not _data:
+                st.info("لا توجد بيانات كافية")
+                return
+            _rows = []
+            for _r in _data:
+                _emoji = "🥇" if _r['win_rate'] >= 70 else "✅" if _r['win_rate'] >= 55 else "⚠️" if _r['win_rate'] >= 40 else "❌"
+                _rows.append({
+                    "الفئة": f"{_emoji} {_r['category']}",
+                    "النجاح": f"{_r['win_rate']}%",
+                    "متوسط العائد": f"{_r['avg_return']:+.2f}%",
+                    "أفضل": f"{_r['best_return']:+.1f}%",
+                    "أسوأ": f"{_r['worst_return']:+.1f}%",
+                    "عينة": _r['n'],
+                })
+            st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
+
+        with _uni_tab1:
+            _render_univariate('sector', '🏭')
+        with _uni_tab2:
+            _render_univariate('rsi_zone', '📈')
+        with _uni_tab3:
+            _render_univariate('flow_zone', '💧')
+        with _uni_tab4:
+            _render_univariate('location', '📍')
+
+        # ── Simulation ──
+        if _golden:
+            st.divider()
+            st.markdown("### 🧪 محاكاة: ماذا لو طبقنا الأنماط الذهبية فقط؟")
+            _sim = simulate_golden_filter(_md, _golden, top_n=5)
+            if _sim:
+                _sim_c1, _sim_c2 = st.columns(2)
+                with _sim_c1:
+                    st.markdown(f'''
+                    <div style="background:rgba(255,82,82,0.1);border:1px solid #FF525250;
+                                border-radius:10px;padding:14px;direction:rtl">
+                        <div style="color:#FF5252;font-weight:700;margin-bottom:8px">📋 قبل الفلترة</div>
+                        <div style="color:#fff;font-size:0.9em">إشارات: <b>{_sim['before']['n']}</b></div>
+                        <div style="color:#fff;font-size:0.9em">نجاح: <b>{_sim['before']['win_rate']}%</b></div>
+                        <div style="color:#fff;font-size:0.9em">متوسط العائد: <b>{_sim['before']['avg_return']:+.2f}%</b></div>
+                    </div>
+                    ''', unsafe_allow_html=True)
+                with _sim_c2:
+                    _improvement = _sim['after']['win_rate'] - _sim['before']['win_rate']
+                    st.markdown(f'''
+                    <div style="background:rgba(0,230,118,0.1);border:1px solid #00E67650;
+                                border-radius:10px;padding:14px;direction:rtl">
+                        <div style="color:#00E676;font-weight:700;margin-bottom:8px">🥇 بعد الفلترة الذهبية</div>
+                        <div style="color:#fff;font-size:0.9em">إشارات: <b>{_sim['after']['n']}</b> ({_sim['after']['kept_pct']}%)</div>
+                        <div style="color:#fff;font-size:0.9em">نجاح: <b>{_sim['after']['win_rate']}%</b> <span style="color:#00E676">(+{_improvement:.1f})</span></div>
+                        <div style="color:#fff;font-size:0.9em">متوسط العائد: <b>{_sim['after']['avg_return']:+.2f}%</b></div>
+                    </div>
+                    ''', unsafe_allow_html=True)
+                st.caption("⚠️ هذي محاكاة على بيانات تاريخية — لا تضمن أداء مستقبلي")
+
+    with _diag_tab_sa:
+        _render_market_diagnostic(_saudi_df, "السعودي")
+
+    with _diag_tab_us:
+        _render_market_diagnostic(_us_df, "الأمريكي")
+
+    with _diag_tab_compare:
+        st.markdown("### ⚖️ مقارنة بين السوقين")
+        _sa_sum = get_market_summary(_saudi_df)
+        _us_sum = get_market_summary(_us_df)
+
+        _comp_rows = [
+            {"المقياس": "إجمالي الإشارات", "🇸🇦 السعودي": _sa_sum['n'], "🇺🇸 الأمريكي": _us_sum['n']},
+            {"المقياس": "نسبة النجاح", "🇸🇦 السعودي": f"{_sa_sum['win_rate']}%", "🇺🇸 الأمريكي": f"{_us_sum['win_rate']}%"},
+            {"المقياس": "متوسط العائد", "🇸🇦 السعودي": f"{_sa_sum['avg_return']:+.2f}%", "🇺🇸 الأمريكي": f"{_us_sum['avg_return']:+.2f}%"},
+            {"المقياس": "أفضل صفقة", "🇸🇦 السعودي": f"{_sa_sum['best']:+.1f}%", "🇺🇸 الأمريكي": f"{_us_sum['best']:+.1f}%"},
+            {"المقياس": "أسوأ صفقة", "🇸🇦 السعودي": f"{_sa_sum['worst']:+.1f}%", "🇺🇸 الأمريكي": f"{_us_sum['worst']:+.1f}%"},
+        ]
+        st.dataframe(pd.DataFrame(_comp_rows), use_container_width=True, hide_index=True)
+
+        st.markdown("### 💡 الاستنتاجات الرئيسية")
+
+        _insights = []
+        if _sa_sum['win_rate'] > _us_sum['win_rate'] + 20:
+            _insights.append(f"🇸🇦 **السوق السعودي يتفوق بفارق ضخم** ({_sa_sum['win_rate']}% vs {_us_sum['win_rate']}%) — ركّز عليه أولاً")
+        if _us_sum['win_rate'] < 30:
+            _insights.append(f"🇺🇸 **السوق الأمريكي ضعيف جداً** ({_us_sum['win_rate']}%) — راجع منطق الإشارات للأسهم الأمريكية أو أوقفها مؤقتاً")
+        if _sa_sum['avg_return'] > 0 and _us_sum['avg_return'] < 0:
+            _insights.append(f"💰 **العائد الإجمالي:** السعودي رابح ({_sa_sum['avg_return']:+.2f}%) والأمريكي خاسر ({_us_sum['avg_return']:+.2f}%)")
+
+        for _i in _insights:
+            st.info(_i)
+
+        if not _insights:
+            st.write("لا توجد فروقات حادة")
