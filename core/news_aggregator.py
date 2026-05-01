@@ -23,17 +23,46 @@ ARGAAM_FEEDS = {
     "نبض السوق": "https://www.argaam.com/ar/rss/ho-market-pulse?sectionid=70",
 }
 
-# ── Saudi relevance keywords (filter out international noise) ──
+# ── Saudi market keywords ──
 SAUDI_KEYWORDS = [
     "تاسي", "تداول", "السعودي", "السعودية", "سابك", "أرامكو", "الراجحي",
     "الإنماء", "الأهلي", "بنك", "أسمنت", "اتصالات", "stc", "زين",
-    "أرباح", "توزيعات", "نتائج", "ربع", "سهم", "أسهم", "مؤشر",
-    "ريال", "هيئة السوق", "ساما", "نمو", "طرح", "اكتتاب",
-    "قطاع", "شركة", "المالية", "الاستثمار", "صندوق", "عقاري",
-    "تأمين", "بتروكيم", "طاقة", "نفط", "معادن", "ذهب",
+    "ريال", "هيئة السوق", "ساما", "السوق المالية السعودية", "نمو سوق",
     "موبايلي", "تبوك", "مكة", "المدينة", "الرياض", "جدة",
-    "دار الأركان", "جرير", "المراعي", "ملكية", "أجنبي",
-    "تجميع", "تصريف", "اختراق", "دعم", "مقاومة",
+    "دار الأركان", "جرير", "المراعي", "بوبا", "بنك البلاد",
+    "نيوم", "رؤية 2030", "مدن", "صندوق الاستثمارات",
+]
+
+# ── US market keywords ──
+US_KEYWORDS = [
+    "أمريك", "الأمريك", "وول ستريت", "وول ستريت", "S&P", "ناسداك", "داو جونز",
+    "الاحتياطي الفيدرالي", "الفيدرالي", "Fed", "باول",
+    "أبل", "مايكروسوفت", "جوجل", "أمازون", "تسلا", "إنفيديا", "ميتا",
+    "دولار", "بورصات أمريكا", "بورصة نيويورك", "نيويورك",
+    "ترامب", "بايدن", "البيت الأبيض", "الكونغرس",
+    "المركزي الأمريكي", "وزارة الخزانة", "ستاندرد آند بورز",
+    "أرباح Q1", "أرباح Q2", "أرباح الربع", "نتائج فصلية",
+]
+
+# ── Generic financial keywords (Saudi + US relevant) ──
+FINANCIAL_KEYWORDS = [
+    "أرباح", "توزيعات", "نتائج", "ربع", "سهم", "أسهم", "مؤشر",
+    "نمو", "طرح", "اكتتاب", "قطاع", "شركة", "المالية", "الاستثمار",
+    "صندوق", "عقاري", "تأمين", "بتروكيم", "طاقة", "نفط", "معادن", "ذهب",
+    "أجنبي", "تجميع", "تصريف", "اختراق", "دعم", "مقاومة",
+    "أوبك", "OPEC", "برميل", "أسعار النفط",
+]
+
+# ── Exclusion keywords — reject these even if other keywords match ──
+EXCLUDE_KEYWORDS = [
+    "الإمارات", "الإماراتي", "أبوظبي", "دبي", "الدوحة", "قطر", "البحرين",
+    "الكويت", "عمان", "مصر", "المصري", "الأردن", "لبنان", "تركيا", "تركي",
+    "إيران", "العراق", "اليمن", "سوريا", "ليبيا",
+    "نيكي", "الياباني", "اليابان", "طوكيو", "الصين", "الصيني", "بكين",
+    "الهند", "الهندي", "كوريا", "تايوان", "ماليزيا", "إندونيسيا",
+    "أوروبا", "ألمانيا", "فرنسا", "بريطاني", "لندن", "إيطاليا", "إسباني",
+    "روسي", "روسيا", "أوكرانيا", "أفريقيا", "البرازيل",
+    "آسيان", "ASEAN", "تايلاند", "فيتنام",
 ]
 
 # News validity window — drop anything older than this
@@ -140,9 +169,25 @@ def fetch_all_argaam_news(limit_per_feed: int = 10) -> dict:
 
 
 def _is_saudi_relevant(title: str, desc: str = "") -> bool:
-    """Check if a news item is relevant to Saudi market/stocks."""
-    text = f"{title} {desc}".lower()
-    return any(kw in text for kw in SAUDI_KEYWORDS)
+    """Check if news is Saudi or US market relevant. Rejects other regions."""
+    text = f"{title} {desc}"
+    text_lower = text.lower()
+
+    # Hard reject: title STARTS with excluded region (within first 30 chars)
+    head = title[:30]
+    for kw in EXCLUDE_KEYWORDS:
+        if kw in head:
+            # Allow only if Saudi/US explicitly named in same head
+            saudi_in_head = any(s in head for s in ("السعودي", "تاسي", "أرامكو", "الراجحي", "ريال سعودي"))
+            us_in_head = any(s in head for s in ("أمريك", "وول ستريت", "S&P", "ناسداك"))
+            if not (saudi_in_head or us_in_head):
+                return False
+
+    has_saudi = any(kw in text for kw in SAUDI_KEYWORDS)
+    has_us = any(kw in text or kw.lower() in text_lower for kw in US_KEYWORDS)
+
+    # Must be Saudi OR US relevant
+    return has_saudi or has_us
 
 
 def fetch_maaal_news(limit: int = 15) -> list:
