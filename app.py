@@ -3280,7 +3280,7 @@ if page == "🔬 Order Flow":
     with hcol3:
         period_options = {"سنة": "1y", "سنتين": "2y", "٣ سنوات": "3y", "٥ سنوات": "5y", "١٠ سنوات": "10y", "الكل": "max"}
         selected_period_label = st.selectbox(
-            "📅 الفترة", list(period_options.keys()), index=2,
+            "📅 الفترة", list(period_options.keys()), index=0,
             key="scan_period", label_visibility="collapsed",
             disabled=(selected_interval != "1d"),  # فترة تلقائية للإطار اللحظي
         )
