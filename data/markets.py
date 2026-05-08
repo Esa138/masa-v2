@@ -308,6 +308,11 @@ SAUDI_STOCKS = {
 
 US_STOCKS = {
     # ═══════════════════════════════════════════
+    # 0. ETFs & Index Funds (مؤشرات وصناديق متداولة)
+    # ═══════════════════════════════════════════
+    "IWM": "iShares Russell 2000 ETF",
+
+    # ═══════════════════════════════════════════
     # 1. Communication Services
     # ═══════════════════════════════════════════
     # Internet Content & Information
@@ -1507,6 +1512,9 @@ SAUDI_SECTORS = {
 # ══════════════════════════════════════════════════════════════
 
 US_SECTORS = {
+    # ETFs & Index Funds
+    **{t: "صناديق متداولة" for t in ["IWM"]},
+
     # Communication Services
     **{t: "خدمات الاتصالات" for t in [
         "GOOG", "GOOGL", "META", "BIDU", "NTES", "RDDT",
@@ -1645,6 +1653,9 @@ US_SECTORS = {
 # ══════════════════════════════════════════════════════════════
 
 US_INDUSTRIES = {
+    # ── ETFs & Index Funds ──
+    **{t: "مؤشر شركات صغيرة (Small-Cap ETF)" for t in ["IWM"]},
+
     # ── Communication Services ──
     **{t: "محتوى الإنترنت" for t in ["GOOG", "GOOGL", "META", "BIDU", "NTES", "RDDT"]},
     **{t: "ترفيه - بث ومحتوى" for t in ["NFLX", "DIS", "SPOT", "ROKU", "WBD"]},
