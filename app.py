@@ -3228,7 +3228,7 @@ with st.sidebar:
     st.divider()
 
     # Handle navigation from sector map → company analysis
-    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "🧭 بوصلة القطاعات", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "💬 المساعد الذكي", "📊 أداء النظام", "🔬 تشخيص الأداء"]
+    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "🧭 بوصلة القطاعات", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "💬 المساعد الذكي", "📊 أداء النظام", "🔬 تشخيص الأداء", "♾️ إحصائيات ZR"]
     if st.session_state.get("_goto_page"):
         st.session_state["page_nav"] = st.session_state.pop("_goto_page")
 
@@ -7721,3 +7721,202 @@ elif page == "🔬 تشخيص الأداء":
 
         if not _insights:
             st.write("لا توجد فروقات حادة")
+
+
+# ══════════════════════════════════════════════════════════════
+# PAGE: ZR Statistics — إحصائيات اختراقات زيرو انعكاس
+# ══════════════════════════════════════════════════════════════
+
+elif page == "♾️ إحصائيات ZR":
+    from core.zr_stats import (
+        run_zr_backtest, aggregate_stats,
+        stats_by_sector, stats_by_magnitude, stats_by_year,
+    )
+    from data.markets import SAUDI_STOCKS, US_STOCKS, get_sector
+
+    st.markdown('''
+    <style>
+    [data-testid="stMarkdownContainer"] { direction: rtl; text-align: right; }
+    [data-testid="stMarkdownContainer"] ul, [data-testid="stMarkdownContainer"] ol { padding-right: 1.5em; padding-left: 0; }
+    </style>
+    ''', unsafe_allow_html=True)
+
+    st.markdown('''
+    <div style="text-align:center;padding:20px 0 10px 0;direction:rtl">
+        <span style="font-size:1.8em;font-weight:800;color:#fff">♾️ إحصائيات اختراقات ZR</span>
+        <div style="color:#6b7280;font-size:0.92em;margin-top:6px">
+            باك تيست شامل لكل اختراق زيرو انعكاس على البيانات التاريخية
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # Settings
+    _zr_c1, _zr_c2, _zr_c3 = st.columns([2, 2, 2])
+    with _zr_c1:
+        _zr_market = st.selectbox(
+            "السوق:",
+            ["🇸🇦 السعودي", "🇺🇸 الأمريكي", "كلاهما"],
+            key="_zr_market_sel",
+        )
+    with _zr_c2:
+        _zr_period = st.selectbox(
+            "الفترة:",
+            ["1y", "2y", "3y", "5y"],
+            index=2,
+            key="_zr_period_sel",
+        )
+    with _zr_c3:
+        _zr_run = st.button("🚀 شغّل التحليل", type="primary", use_container_width=True)
+
+    # Cache key
+    _zr_cache_key = f"_zr_data_{_zr_market}_{_zr_period}"
+
+    if _zr_run:
+        if _zr_market == "🇸🇦 السعودي":
+            tickers = list(SAUDI_STOCKS.keys())
+        elif _zr_market == "🇺🇸 الأمريكي":
+            tickers = list(US_STOCKS.keys())
+        else:
+            tickers = list(SAUDI_STOCKS.keys()) + list(US_STOCKS.keys())
+
+        st.info(f"⏳ جاري تحليل {len(tickers)} سهم — قد يأخذ 1-3 دقائق...")
+        _progress = st.progress(0.0)
+        _status = st.empty()
+
+        def _cb(done, total, events):
+            _progress.progress(done / total)
+            _status.text(f"تم: {done}/{total} | اكتشف {events} اختراق")
+
+        df = run_zr_backtest(tickers, period=_zr_period, max_workers=8, progress_callback=_cb)
+        _progress.empty()
+        _status.empty()
+
+        if df.empty:
+            st.error("❌ لم يتم العثور على اختراقات")
+        else:
+            # Add sector
+            df['sector'] = df['ticker'].map(lambda t: get_sector(t))
+            st.session_state[_zr_cache_key] = df
+            st.success(f"✅ تم اكتشاف {len(df)} اختراق ZR")
+
+    # Display cached results
+    if _zr_cache_key in st.session_state:
+        df = st.session_state[_zr_cache_key]
+        stats = aggregate_stats(df)
+
+        st.divider()
+        st.markdown(f"### 📊 الملخص العام — **{stats['total']}** اختراق")
+
+        # 3-period summary
+        _ps_c1, _ps_c2, _ps_c3 = st.columns(3)
+        for col, period, label in [
+            (_ps_c1, '5d', '5 أيام'),
+            (_ps_c2, '10d', '10 أيام'),
+            (_ps_c3, '20d', '20 يوم'),
+        ]:
+            p = stats['periods'][period]
+            color = "#00E676" if p['win_rate'] >= 55 else "#FFD700" if p['win_rate'] >= 45 else "#FF5252"
+            with col:
+                st.markdown(f'''
+                <div style="background:linear-gradient(135deg,#0d1117,#161b22);
+                            border:2px solid {color}40;border-radius:12px;padding:16px;direction:rtl">
+                    <div style="color:{color};font-size:1.1em;font-weight:700;margin-bottom:8px">{label}</div>
+                    <div style="color:{color};font-size:2em;font-weight:800">{p['win_rate']}%</div>
+                    <div style="color:#9ca3af;font-size:0.85em;margin-top:6px">
+                        نسبة النجاح ({p['wins']}/{stats['total']})
+                    </div>
+                    <div style="color:#fff;font-size:0.85em;margin-top:10px;line-height:1.7">
+                        متوسط: <b>{p['avg_return']:+.2f}%</b><br>
+                        وسيط: <b>{p['median_return']:+.2f}%</b><br>
+                        أفضل: <b style="color:#00E676">{p['best']:+.1f}%</b><br>
+                        أسوأ: <b style="color:#FF5252">{p['worst']:+.1f}%</b><br>
+                        Profit Factor: <b>{p['profit_factor']}</b>
+                    </div>
+                </div>
+                ''', unsafe_allow_html=True)
+
+        # ── Period selector for breakdowns ──
+        st.divider()
+        _selected_period = st.radio(
+            "اعرض التحليل لفترة:",
+            ['5d', '10d', '20d'],
+            index=2,
+            horizontal=True,
+            key="_zr_period_radio",
+        )
+
+        # ── Sector breakdown ──
+        st.markdown(f"### 🏭 حسب القطاع ({_selected_period})")
+        sec_data = stats_by_sector(df, period=_selected_period, min_n=5)
+        if sec_data:
+            sec_rows = []
+            for s in sec_data:
+                emoji = "🥇" if s['win_rate'] >= 65 else "✅" if s['win_rate'] >= 50 else "⚠️" if s['win_rate'] >= 40 else "❌"
+                sec_rows.append({
+                    "القطاع": f"{emoji} {s['sector']}",
+                    "الاختراقات": s['n'],
+                    "النجاح": f"{s['win_rate']}%",
+                    "متوسط العائد": f"{s['avg_return']:+.2f}%",
+                    "أفضل": f"{s['best']:+.1f}%",
+                    "أسوأ": f"{s['worst']:+.1f}%",
+                })
+            st.dataframe(pd.DataFrame(sec_rows), use_container_width=True, hide_index=True)
+
+        # ── Magnitude breakdown ──
+        st.markdown(f"### 📏 حسب قوة الاختراق ({_selected_period})")
+        st.caption("قوة الاختراق = نسبة السعر فوق سقف ZR")
+        mag_data = stats_by_magnitude(df, period=_selected_period)
+        if mag_data:
+            mag_rows = []
+            for m in mag_data:
+                emoji = "🥇" if m['win_rate'] >= 65 else "✅" if m['win_rate'] >= 50 else "⚠️" if m['win_rate'] >= 40 else "❌"
+                mag_rows.append({
+                    "قوة الاختراق": f"{emoji} {m['magnitude']}",
+                    "العدد": m['n'],
+                    "النجاح": f"{m['win_rate']}%",
+                    "متوسط العائد": f"{m['avg_return']:+.2f}%",
+                })
+            st.dataframe(pd.DataFrame(mag_rows), use_container_width=True, hide_index=True)
+
+        # ── Yearly breakdown ──
+        st.markdown(f"### 📅 حسب السنة ({_selected_period})")
+        year_data = stats_by_year(df, period=_selected_period)
+        if year_data:
+            yr_rows = []
+            for y in year_data:
+                emoji = "🥇" if y['win_rate'] >= 65 else "✅" if y['win_rate'] >= 50 else "⚠️" if y['win_rate'] >= 40 else "❌"
+                yr_rows.append({
+                    "السنة": f"{emoji} {y['year']}",
+                    "الاختراقات": y['n'],
+                    "النجاح": f"{y['win_rate']}%",
+                    "متوسط العائد": f"{y['avg_return']:+.2f}%",
+                })
+            st.dataframe(pd.DataFrame(yr_rows), use_container_width=True, hide_index=True)
+
+        # ── Top 20 best/worst events ──
+        st.divider()
+        _top_c1, _top_c2 = st.columns(2)
+        ret_col = f'ret_{_selected_period}'
+        with _top_c1:
+            st.markdown("### 🏆 أفضل 10 اختراقات")
+            top_best = df.nlargest(10, ret_col)[['ticker', 'date', 'breakout_price', ret_col]].copy()
+            top_best.columns = ['الرمز', 'التاريخ', 'سعر الاختراق', f'عائد {_selected_period}']
+            st.dataframe(top_best, use_container_width=True, hide_index=True)
+        with _top_c2:
+            st.markdown("### 💀 أسوأ 10 اختراقات")
+            top_worst = df.nsmallest(10, ret_col)[['ticker', 'date', 'breakout_price', ret_col]].copy()
+            top_worst.columns = ['الرمز', 'التاريخ', 'سعر الاختراق', f'عائد {_selected_period}']
+            st.dataframe(top_worst, use_container_width=True, hide_index=True)
+
+        # Export button
+        st.divider()
+        csv = df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            "💾 تحميل البيانات الكاملة (CSV)",
+            csv,
+            file_name=f"zr_breakouts_{_zr_market}_{_zr_period}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    else:
+        st.info("اختر السوق والفترة ثم اضغط **🚀 شغّل التحليل** لبدء الباك تيست")
