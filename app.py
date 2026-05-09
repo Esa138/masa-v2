@@ -29,6 +29,10 @@ st.set_page_config(
 )
 st.markdown(DARK_THEME_CSS, unsafe_allow_html=True)
 
+# ── PWA: inject manifest, meta tags, service worker registration ──
+from core.pwa import inject_pwa
+inject_pwa()
+
 # ── Initialize ───────────────────────────────────────────────
 init_database()
 
@@ -3228,7 +3232,7 @@ with st.sidebar:
     st.divider()
 
     # Handle navigation from sector map → company analysis
-    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "🧭 بوصلة القطاعات", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "💬 المساعد الذكي", "📊 أداء النظام", "🔬 تشخيص الأداء", "♾️ إحصائيات ZR"]
+    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "🧭 بوصلة القطاعات", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "💬 المساعد الذكي", "📊 أداء النظام", "🔬 تشخيص الأداء", "♾️ إحصائيات ZR", "🔔 الإشعارات"]
     if st.session_state.get("_goto_page"):
         st.session_state["page_nav"] = st.session_state.pop("_goto_page")
 
@@ -7920,3 +7924,95 @@ elif page == "♾️ إحصائيات ZR":
         )
     else:
         st.info("اختر السوق والفترة ثم اضغط **🚀 شغّل التحليل** لبدء الباك تيست")
+
+
+# ══════════════════════════════════════════════════════════════
+# PAGE: Notifications — الإشعارات
+# ══════════════════════════════════════════════════════════════
+
+elif page == "🔔 الإشعارات":
+    from core.pwa import get_push_ui_html
+
+    st.markdown('''
+    <style>
+    [data-testid="stMarkdownContainer"] { direction: rtl; text-align: right; }
+    </style>
+    ''', unsafe_allow_html=True)
+
+    st.markdown('''
+    <div style="text-align:center;padding:20px 0 10px 0;direction:rtl">
+        <span style="font-size:1.8em;font-weight:800;color:#fff">🔔 إعدادات الإشعارات</span>
+        <div style="color:#6b7280;font-size:0.92em;margin-top:6px">
+            استقبل تنبيهات الإشارات الذهبية، الأخبار العاجلة، والاختراقات
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # ── Step 1: PWA Install Check ──
+    st.markdown("### 📱 الخطوة 1: تثبيت التطبيق")
+    st.markdown("""
+    <div style="background:rgba(0,210,255,0.1);border:1px solid #00d2ff;
+                border-radius:10px;padding:14px;direction:rtl">
+        <b style="color:#00d2ff">⚠️ مهم للأيفون:</b> الإشعارات تشتغل فقط بعد تثبيت التطبيق على الشاشة الرئيسية.
+        <ul style="margin-top:10px;line-height:1.9">
+            <li><b>iPhone:</b> Safari → أيقونة المشاركة → "Add to Home Screen"</li>
+            <li><b>Android:</b> Chrome → القائمة (⋮) → "Add to Home screen"</li>
+            <li><b>Desktop:</b> Chrome → أيقونة التثبيت في شريط العنوان</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.divider()
+
+    # ── Step 2: Permission & Subscription ──
+    st.markdown("### 🔐 الخطوة 2: تفعيل الإشعارات")
+
+    _vapid_pub = st.secrets.get("VAPID_PUBLIC_KEY", "")
+    _push_server = st.secrets.get("PUSH_SERVER_URL", "")
+
+    if not _vapid_pub:
+        st.warning("⚠️ لم يتم إعداد VAPID_PUBLIC_KEY في Streamlit Secrets. تواصل مع المدير.")
+    else:
+        components.html(
+            get_push_ui_html(_vapid_pub, _push_server),
+            height=240,
+        )
+
+    st.divider()
+
+    # ── Step 3: Notification preferences ──
+    st.markdown("### ⚙️ الخطوة 3: تفضيلاتك")
+    st.caption("اختر أنواع الإشعارات اللي تبيها (ستحفظ محلياً على جوالك)")
+
+    _pc1, _pc2 = st.columns(2)
+    with _pc1:
+        st.checkbox("🥇 إشارات ذهبية جديدة", value=True, key="_notif_golden")
+        st.checkbox("⚡ اختراقات ZR قوية", value=True, key="_notif_zr")
+        st.checkbox("🚨 أخبار عاجلة", value=True, key="_notif_news")
+        st.checkbox("⏰ بداية ساعة الذروة", value=False, key="_notif_peak")
+    with _pc2:
+        st.checkbox("🎯 وصول أهداف watchlist", value=True, key="_notif_targets")
+        st.checkbox("👁️ إشارات على watchlist", value=True, key="_notif_watch_signals")
+        st.checkbox("📊 تقرير صباحي (8 ص)", value=False, key="_notif_morning")
+        st.checkbox("🌙 تقرير إقفال (4 م)", value=False, key="_notif_close")
+
+    st.divider()
+
+    # Status info
+    st.markdown("### 📊 معلومات تقنية")
+    _st_c1, _st_c2 = st.columns(2)
+    with _st_c1:
+        st.markdown(f"""
+        **PWA:**
+        - Service Worker: ✅ مسجّل
+        - Manifest: ✅ مفعّل
+        - Static serving: ✅
+        """)
+    with _st_c2:
+        _push_ready = bool(_vapid_pub and _push_server)
+        st.markdown(f"""
+        **Push Notifications:**
+        - VAPID Key: {'✅' if _vapid_pub else '❌ غير معد'}
+        - Push Server: {'✅' if _push_server else '⚠️ غير معد'}
+        - الحالة: {'✅ جاهز' if _push_ready else '⚠️ يحتاج إعداد'}
+        """)

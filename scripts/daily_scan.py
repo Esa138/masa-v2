@@ -28,7 +28,7 @@ warnings.filterwarnings("ignore")
 
 def run_scan(market: str = "saudi") -> dict:
     """Run full market scan and log all signals."""
-    from data.markets import get_all_tickers, get_stock_name, get_stock_sector
+    from data.markets import get_all_tickers, get_stock_name, get_sector
     from core.scanner import scan_market
     from core.database import log_signal, init_database
 

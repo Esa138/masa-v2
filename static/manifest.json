@@ -1,0 +1,50 @@
+{
+  "name": "MASA QUANT — Order Flow Scanner",
+  "short_name": "MASA",
+  "description": "ماسح Order Flow ذكي للسوق السعودي والأمريكي",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0e1117",
+  "theme_color": "#00d2ff",
+  "lang": "ar",
+  "dir": "rtl",
+  "categories": ["finance", "business", "productivity"],
+  "icons": [
+    {
+      "src": "/app/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/app/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Order Flow",
+      "short_name": "مسح",
+      "description": "ابدأ مسح السوق",
+      "url": "/?page=Order+Flow",
+      "icons": [{"src": "/app/static/icon-192.png", "sizes": "192x192"}]
+    },
+    {
+      "name": "الفلتر الذهبي",
+      "short_name": "ذهبي",
+      "description": "أقوى الإشارات",
+      "url": "/?page=الفلتر+الذهبي",
+      "icons": [{"src": "/app/static/icon-192.png", "sizes": "192x192"}]
+    },
+    {
+      "name": "المساعد الذكي",
+      "short_name": "AI",
+      "description": "اسأل المساعد",
+      "url": "/?page=المساعد+الذكي",
+      "icons": [{"src": "/app/static/icon-192.png", "sizes": "192x192"}]
+    }
+  ]
+}

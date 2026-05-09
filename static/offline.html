@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MASA — لا يوجد اتصال</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, sans-serif;
+      background: #0e1117;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+      padding: 20px;
+    }
+    .icon { font-size: 5em; margin-bottom: 20px; }
+    h1 { color: #00d2ff; margin: 0 0 12px 0; }
+    p { color: #9ca3af; max-width: 400px; line-height: 1.7; }
+    button {
+      background: linear-gradient(135deg, #00d2ff, #0066ff);
+      color: #fff;
+      border: none;
+      padding: 14px 32px;
+      border-radius: 12px;
+      font-size: 1em;
+      font-weight: 700;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="icon">📡</div>
+  <h1>لا يوجد اتصال</h1>
+  <p>لا يمكن الوصول للخادم حالياً. تحقق من الإنترنت وحاول مرة أخرى.</p>
+  <button onclick="location.reload()">🔄 إعادة المحاولة</button>
+</body>
+</html>

@@ -2,6 +2,7 @@
 enableXsrfProtection = false
 enableCORS = false
 headless = true
+enableStaticServing = true
 
 [browser]
 gatherUsageStats = false

@@ -16,3 +16,4 @@ verify_accuracy.py
 wolf_backtest*.py
 zr_bluesky_backtest.py
 backtest_report.json
+logs/
