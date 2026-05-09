@@ -7948,8 +7948,44 @@ elif page == "🔔 الإشعارات":
     </div>
     ''', unsafe_allow_html=True)
 
+    # ── Telegram Section (priority — easier setup) ──
+    from core.telegram_notify import is_configured as _tg_ok, send_test_notification as _tg_test
+
+    st.markdown("### 📱 إشعارات Telegram (الأسهل)")
+
+    _tg_configured = _tg_ok()
+    if _tg_configured:
+        st.success("✅ Telegram مفعّل ومتصل بنجاح")
+        _tg_c1, _tg_c2 = st.columns([2, 1])
+        with _tg_c1:
+            st.caption("اضغط الزر لإرسال إشعار اختبار للتأكد من الربط")
+        with _tg_c2:
+            if st.button("🧪 إرسال اختبار", type="primary", use_container_width=True, key="_tg_test_btn"):
+                with st.spinner("📨 جاري الإرسال..."):
+                    if _tg_test():
+                        st.success("✅ تم — تحقق من تيليجرام")
+                    else:
+                        st.error("❌ فشل — تحقق من Token + Chat ID")
+    else:
+        st.warning("""
+        ⚠️ **Telegram غير مفعّل بعد** — لتفعيله:
+
+        1. **في تيليجرام:** ابحث عن `@BotFather` → `/newbot` → احصل على **Bot Token**
+        2. **احصل على Chat ID:** ابحث عن `@userinfobot` → `/start` → انسخ Id
+        3. **في Streamlit Cloud → Settings → Secrets، أضف:**
+
+        ```toml
+        TELEGRAM_BOT_TOKEN = "8123456789:AAH..."
+        TELEGRAM_CHAT_ID = "987654321"
+        ```
+
+        4. ابعث رسالة `/start` لبوتك (مرة وحدة)
+        """)
+
+    st.divider()
+
     # ── Step 1: PWA Install Check ──
-    st.markdown("### 📱 الخطوة 1: تثبيت التطبيق")
+    st.markdown("### 📱 الخطوة 1: تثبيت التطبيق (Web Push — اختياري)")
     st.markdown("""
     <div style="background:rgba(0,210,255,0.1);border:1px solid #00d2ff;
                 border-radius:10px;padding:14px;direction:rtl">
