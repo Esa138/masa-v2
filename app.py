@@ -3232,7 +3232,7 @@ with st.sidebar:
     st.divider()
 
     # Handle navigation from sector map → company analysis
-    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "🧭 بوصلة القطاعات", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "💬 المساعد الذكي", "📊 أداء النظام", "🔬 تشخيص الأداء", "♾️ إحصائيات ZR", "🔔 الإشعارات"]
+    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "🎯 إشارات ZR", "🧭 بوصلة القطاعات", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "💬 المساعد الذكي", "📊 أداء النظام", "🔬 تشخيص الأداء", "♾️ إحصائيات ZR", "🔔 الإشعارات"]
     if st.session_state.get("_goto_page"):
         st.session_state["page_nav"] = st.session_state.pop("_goto_page")
 
@@ -5600,6 +5600,246 @@ elif page == "🥇 الفلتر الذهبي":
 # ══════════════════════════════════════════════════════════════
 # PAGE: Sector Compass — بوصلة القطاعات
 # ══════════════════════════════════════════════════════════════
+
+# ══════════════════════════════════════════════════════════════
+# PAGE: ZR Entry Signals — إشارات دخول حسب موقع ZR
+# ══════════════════════════════════════════════════════════════
+
+elif page == "🎯 إشارات ZR":
+    st.markdown('''
+    <style>
+    [data-testid="stMarkdownContainer"] { direction: rtl; text-align: right; }
+    [data-testid="stMarkdownContainer"] ul, [data-testid="stMarkdownContainer"] ol { padding-right: 1.5em; padding-left: 0; }
+    </style>
+    ''', unsafe_allow_html=True)
+
+    st.markdown('''
+    <div style="text-align:center;padding:20px 0 10px 0;direction:rtl">
+        <span style="font-size:1.8em;font-weight:800;color:#fff">🎯 إشارات الدخول حسب موقع ZR</span>
+        <div style="color:#6b7280;font-size:0.92em;margin-top:6px">
+            تصنيف الإشارات حسب موقع السعر من سقف وقاع زيرو انعكاس
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    _zr_results = st.session_state.get("scan_results")
+    if _zr_results is None:
+        st.info("💡 اضغط **ابدأ المسح** من Order Flow أولاً لعرض الإشارات")
+        st.stop()
+
+    # Filter to enter signals only
+    _enters = [r for r in _zr_results if r.get("decision") == "enter"]
+
+    if not _enters:
+        st.warning("⚠️ لا توجد إشارات دخول في المسح الحالي")
+        st.stop()
+
+    # Categorize by ZR status
+    _zr_normal = []      # داخل النطاق
+    _zr_breakout = []    # اختراق جديد
+    _zr_bluesky = []     # فوق ZR (سماء زرقا)
+    _zr_floor = []       # عند قاع ZR
+
+    for r in _enters:
+        status = r.get("zr_status", "normal")
+        if status == "zr_breakout":
+            _zr_breakout.append(r)
+        elif status == "zr_bluesky":
+            _zr_bluesky.append(r)
+        elif status == "zr_floor":
+            _zr_floor.append(r)
+        else:
+            _zr_normal.append(r)
+
+    # ── Summary cards ──
+    _zr_c1, _zr_c2, _zr_c3, _zr_c4 = st.columns(4)
+    with _zr_c1:
+        st.markdown(f'''
+        <div style="background:rgba(33,150,243,0.1);border:2px solid #2196F3;
+                    border-radius:12px;padding:14px;text-align:center;direction:rtl">
+            <div style="color:#2196F3;font-size:0.85em;font-weight:700">🔵 سماء زرقا</div>
+            <div style="color:#fff;font-size:2em;font-weight:800;margin:6px 0">{len(_zr_bluesky)}</div>
+            <div style="color:#9ca3af;font-size:0.72em">السعر فوق ZR (مستقر)</div>
+        </div>
+        ''', unsafe_allow_html=True)
+    with _zr_c2:
+        st.markdown(f'''
+        <div style="background:rgba(0,230,118,0.1);border:2px solid #00E676;
+                    border-radius:12px;padding:14px;text-align:center;direction:rtl">
+            <div style="color:#00E676;font-size:0.85em;font-weight:700">🚀 اختراق جديد</div>
+            <div style="color:#fff;font-size:2em;font-weight:800;margin:6px 0">{len(_zr_breakout)}</div>
+            <div style="color:#9ca3af;font-size:0.72em">للتو فوق سقف ZR</div>
+        </div>
+        ''', unsafe_allow_html=True)
+    with _zr_c3:
+        st.markdown(f'''
+        <div style="background:rgba(255,215,0,0.1);border:2px solid #FFD700;
+                    border-radius:12px;padding:14px;text-align:center;direction:rtl">
+            <div style="color:#FFD700;font-size:0.85em;font-weight:700">📦 داخل النطاق</div>
+            <div style="color:#fff;font-size:2em;font-weight:800;margin:6px 0">{len(_zr_normal)}</div>
+            <div style="color:#9ca3af;font-size:0.72em">بين قاع وسقف ZR</div>
+        </div>
+        ''', unsafe_allow_html=True)
+    with _zr_c4:
+        st.markdown(f'''
+        <div style="background:rgba(255,152,0,0.1);border:2px solid #FF9800;
+                    border-radius:12px;padding:14px;text-align:center;direction:rtl">
+            <div style="color:#FF9800;font-size:0.85em;font-weight:700">🔻 عند القاع</div>
+            <div style="color:#fff;font-size:2em;font-weight:800;margin:6px 0">{len(_zr_floor)}</div>
+            <div style="color:#9ca3af;font-size:0.72em">عند قاع ZR</div>
+        </div>
+        ''', unsafe_allow_html=True)
+
+    st.divider()
+
+    # ── Render function ──
+    def _render_zr_card(r, category_color="#9ca3af"):
+        _name = r.get("name", "")
+        _ticker = r.get("ticker", "")
+        _sector = r.get("sector", "")
+        _price = r.get("price", r.get("last_close", 0))
+        _change = r.get("change_pct", 0)
+        _stop = r.get("stop_loss", 0)
+        _target = r.get("target", 0)
+        _rr = r.get("rr_ratio", 0)
+        _flow = r.get("flow_bias", 0)
+        _rsi = r.get("rsi", 50)
+        _phase = r.get("phase", "")
+        _location = r.get("location_label", "")
+        _zr_h = r.get("zr_high", 0)
+        _zr_l = r.get("zr_low", 0)
+        _zr_status_label = r.get("zr_status_label", "")
+        _days = r.get("days", 0)
+        _is_golden = (
+            r.get("phase") in ("accumulation", "spring")
+            and r.get("aggressor") == "buyers"
+            and abs(r.get("divergence", 0)) >= 25
+            and len(r.get("reasons_against", []) or []) == 0
+        )
+
+        _change_c = "#00E676" if _change >= 0 else "#FF5252"
+        _flow_c = "#00E676" if _flow > 20 else "#FFD700" if _flow > 0 else "#FF5252"
+
+        # RSI color
+        if _rsi < 30:
+            _rsi_c, _rsi_l = "#4FC3F7", "تجميع"
+        elif _rsi < 50:
+            _rsi_c, _rsi_l = "#FFB74D", "متعافي"
+        elif _rsi < 70:
+            _rsi_c, _rsi_l = "#00E676", "زخم ✨"
+        else:
+            _rsi_c, _rsi_l = "#FF5252", "تشبع ⚠️"
+
+        _golden_badge = (
+            '<span style="background:#FFD70022;color:#FFD700;padding:3px 10px;'
+            'border-radius:8px;font-size:0.7em;font-weight:700;border:1px solid #FFD70055;'
+            'margin-right:6px">🥇 ذهبية</span>'
+        ) if _is_golden else ""
+
+        # Distance to ZR levels
+        _dist_to_h = ((_zr_h - _price) / _price * 100) if _zr_h and _price else 0
+        _dist_to_l = ((_price - _zr_l) / _price * 100) if _zr_l and _price else 0
+
+        _card_html = (
+            f'<div style="background:linear-gradient(135deg,#0d1117,#161b22);'
+            f'border:1px solid {category_color}40;border-radius:12px;padding:14px 16px;'
+            f'margin:8px 0;direction:rtl">'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+            f'<div>'
+            f'<span style="font-size:1.1em;font-weight:800;color:#fff">{_name}</span> '
+            f'<span style="color:#6b7280;font-size:0.78em;margin-right:6px">{_ticker} • {_sector}</span>'
+            f'{_golden_badge}'
+            f'</div>'
+            f'<div style="display:flex;gap:12px;align-items:center">'
+            f'<span style="color:{_change_c};font-weight:600">{_change:+.1f}%</span>'
+            f'<span style="font-size:1.3em;font-weight:800;color:#fff">{_price:.2f}</span>'
+            f'</div></div>'
+            f'<div style="background:{category_color}15;border-radius:8px;padding:8px 12px;'
+            f'margin:8px 0;font-size:0.82em;color:{category_color};font-weight:600">'
+            f'{_zr_status_label or "📍 داخل النطاق"}'
+            f'</div>'
+            f'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0;'
+            f'font-size:0.78em;color:#9ca3af">'
+            f'<div>📈 Flow: <b style="color:{_flow_c}">{_flow:+.0f}</b></div>'
+            f'<div>🔋 RSI: <b style="color:{_rsi_c}">{_rsi:.0f}</b> ({_rsi_l})</div>'
+            f'<div>🌀 {_phase}</div>'
+            f'<div>📅 {_days}يوم</div>'
+            f'</div>'
+            f'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0;'
+            f'font-size:0.78em">'
+            f'<div style="color:#FF5252">🛑 وقف: <b>{_stop:.2f}</b></div>'
+            f'<div style="color:#00E676">🎯 هدف: <b>{_target:.2f}</b></div>'
+            f'<div style="color:#4FC3F7">📐 R:R: <b>{_rr:.1f}</b></div>'
+            f'</div>'
+            f'<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px;'
+            f'font-size:0.75em;color:#6b7280;border-top:1px solid #1f2937;padding-top:8px">'
+            f'<div>⛰ سقف ZR: <b style="color:#fff">{_zr_h:.2f}</b> '
+            f'<span style="color:#6b7280">({_dist_to_h:+.1f}%)</span></div>'
+            f'<div>🏞 قاع ZR: <b style="color:#fff">{_zr_l:.2f}</b> '
+            f'<span style="color:#6b7280">({_dist_to_l:+.1f}%)</span></div>'
+            f'</div>'
+            f'</div>'
+        )
+        return _card_html
+
+    # ── Tabs by ZR category ──
+    _tab_bs, _tab_bo, _tab_nr, _tab_fl, _tab_all = st.tabs([
+        f"🔵 سماء زرقا ({len(_zr_bluesky)})",
+        f"🚀 اختراق ({len(_zr_breakout)})",
+        f"📦 داخل النطاق ({len(_zr_normal)})",
+        f"🔻 عند القاع ({len(_zr_floor)})",
+        f"📋 الكل ({len(_enters)})",
+    ])
+
+    def _sort_by_flow(items):
+        return sorted(items, key=lambda r: -r.get("flow_bias", 0))
+
+    with _tab_bs:
+        if not _zr_bluesky:
+            st.info("لا توجد إشارات في فئة سماء زرقا حالياً")
+        else:
+            st.caption("📌 السعر فوق سقف ZR منذ 5+ أيام — تأكيد لتجاوز المقاومة")
+            for r in _sort_by_flow(_zr_bluesky):
+                st.markdown(_render_zr_card(r, "#2196F3"), unsafe_allow_html=True)
+
+    with _tab_bo:
+        if not _zr_breakout:
+            st.info("لا توجد إشارات اختراق جديدة حالياً")
+        else:
+            st.caption("📌 السعر تجاوز سقف ZR للتو — فرصة دخول مبكرة")
+            for r in _sort_by_flow(_zr_breakout):
+                st.markdown(_render_zr_card(r, "#00E676"), unsafe_allow_html=True)
+
+    with _tab_nr:
+        if not _zr_normal:
+            st.info("لا توجد إشارات داخل النطاق")
+        else:
+            st.caption("📌 السعر بين قاع وسقف ZR — تجميع داخل القناة")
+            for r in _sort_by_flow(_zr_normal):
+                st.markdown(_render_zr_card(r, "#FFD700"), unsafe_allow_html=True)
+
+    with _tab_fl:
+        if not _zr_floor:
+            st.info("لا توجد إشارات عند قاع ZR")
+        else:
+            st.caption("📌 السعر عند قاع ZR — منطقة دعم قوية، إمكانية ارتداد")
+            for r in _sort_by_flow(_zr_floor):
+                st.markdown(_render_zr_card(r, "#FF9800"), unsafe_allow_html=True)
+
+    with _tab_all:
+        st.caption(f"📌 جميع إشارات الدخول ({len(_enters)}) مرتبة حسب الموقع")
+        # Group with headers
+        for category, items, color, title in [
+            ("bs", _zr_bluesky, "#2196F3", "🔵 سماء زرقا"),
+            ("bo", _zr_breakout, "#00E676", "🚀 اختراق جديد"),
+            ("nr", _zr_normal, "#FFD700", "📦 داخل النطاق"),
+            ("fl", _zr_floor, "#FF9800", "🔻 عند القاع"),
+        ]:
+            if items:
+                st.markdown(f"#### {title} ({len(items)})")
+                for r in _sort_by_flow(items):
+                    st.markdown(_render_zr_card(r, color), unsafe_allow_html=True)
+
 
 elif page == "🧭 بوصلة القطاعات":
     from data.seasonality import (
