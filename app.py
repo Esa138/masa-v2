@@ -5642,7 +5642,10 @@ elif page == "🎯 إشارات ZR":
             f'<span style="background:rgba(79,195,247,0.08);color:#4FC3F7;'
             f'padding:6px 14px;border-radius:8px;font-size:0.82em;'
             f'border:1px solid rgba(79,195,247,0.25)">'
-            f'🕐 آخر مسح: {_scan_ts}</span></div>',
+            f'🕐 آخر مسح: {_scan_ts}</span>'
+            f'<span style="margin-right:8px;color:#9ca3af;font-size:0.75em">'
+            f'• كل بطاقة تعرض تاريخ إشارة الدخول الفعلي'
+            f'</span></div>',
             unsafe_allow_html=True,
         )
 
@@ -5759,14 +5762,26 @@ elif page == "🎯 إشارات ZR":
         _dist_to_h = ((_zr_h - _price) / _price * 100) if _zr_h and _price else 0
         _dist_to_l = ((_price - _zr_l) / _price * 100) if _zr_l and _price else 0
 
-        # Scan time stamp (from session)
-        _ts = st.session_state.get("scan_timestamp", "")
+        # Signal entry date — from maturity timeline (the "ادخل" event)
+        _signal_date = ""
+        _timeline = r.get("maturity_timeline", []) or []
+        # Find the LATEST entry with action="ادخل" (signal triggered)
+        for _entry in reversed(_timeline):
+            if _entry.get("action") == "ادخل":
+                _signal_date = _entry.get("date", "")
+                break
+        # Fallback: last timeline entry, or scan timestamp
+        if not _signal_date and _timeline:
+            _signal_date = _timeline[-1].get("date", "")
+        if not _signal_date:
+            _signal_date = st.session_state.get("scan_timestamp", "")[:10]
+
         _ts_badge = (
-            f'<span style="color:#4FC3F7;font-size:0.72em;'
-            f'background:rgba(79,195,247,0.08);padding:2px 8px;border-radius:6px;'
-            f'border:1px solid rgba(79,195,247,0.2);margin-right:6px">'
-            f'🕐 {_ts}</span>'
-        ) if _ts else ""
+            f'<span style="color:#00E676;font-size:0.72em;'
+            f'background:rgba(0,230,118,0.08);padding:2px 8px;border-radius:6px;'
+            f'border:1px solid rgba(0,230,118,0.25);margin-right:6px">'
+            f'📅 ادخل: {_signal_date}</span>'
+        ) if _signal_date else ""
 
         _card_html = (
             f'<div style="background:linear-gradient(135deg,#0d1117,#161b22);'
