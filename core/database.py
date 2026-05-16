@@ -200,7 +200,16 @@ def _get_platform_tag():
 
 
 def _is_golden_signal(signal: dict) -> bool:
-    """Check if signal matches the golden filter formula."""
+    """
+    Check if signal matches the golden filter formula.
+
+    Conditions (all must be true):
+    1. Phase: accumulation OR spring
+    2. Aggressor: buyer attacking
+    3. Divergence >= 25 (strong bullish)
+    4. Zero "against" reasons (clean signal)
+    5. RSI > 50 (momentum zone — V3 data shows higher win rate)
+    """
     is_accum = signal.get("accum_level", "") in ("accumulation", "spring")
     reasons_for = signal.get("reasons_for", [])
     reasons_against = signal.get("reasons_against", [])
@@ -223,7 +232,15 @@ def _is_golden_signal(signal: dict) -> bool:
                 div_val = int(m.group(1))
     strong_div = div_val >= 25
 
-    return is_accum and has_buyer and strong_div and zero_against
+    # RSI > 50 — required momentum zone
+    rsi = signal.get("rsi", 0) or 0
+    try:
+        rsi = float(rsi)
+    except Exception:
+        rsi = 0
+    rsi_ok = rsi > 50
+
+    return is_accum and has_buyer and strong_div and zero_against and rsi_ok
 
 
 def log_signal(signal: dict) -> bool:

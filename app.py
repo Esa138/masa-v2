@@ -5417,6 +5417,8 @@ elif page == "🥇 الفلتر الذهبي":
             _has_div = _div >= 25
             _reasons_against = r.get("reasons_against", [])
             _zero_against = len(_reasons_against) == 0
+            _rsi_val = r.get("rsi", 0) or 0
+            _rsi_ok = _rsi_val > 50
 
             _entry = {
                 "ticker": r["ticker"],
@@ -5426,7 +5428,7 @@ elif page == "🥇 الفلتر الذهبي":
                 "change": r.get("change_pct", 0),
                 "flow": r.get("flow_bias", 0),
                 "div": r.get("divergence", 0),
-                "rsi": r.get("rsi", 0),
+                "rsi": _rsi_val,
                 "phase": r.get("phase", ""),
                 "cdv": r.get("cdv_trend", ""),
                 "location": r.get("location", ""),
@@ -5440,9 +5442,10 @@ elif page == "🥇 الفلتر الذهبي":
                 "is_buyer": _is_buyer,
                 "has_div": _has_div,
                 "zero_against": _zero_against,
+                "rsi_ok": _rsi_ok,
             }
 
-            if _is_accum and _is_buyer and _has_div and _zero_against:
+            if _is_accum and _is_buyer and _has_div and _zero_against and _rsi_ok:
                 _golden.append(_entry)
             else:
                 _normal.append(_entry)
@@ -5480,11 +5483,12 @@ elif page == "🥇 الفلتر الذهبي":
         st.markdown('''
         <div style="background:rgba(255,215,0,0.05);border:1px solid #FFD70030;border-radius:10px;
                     padding:12px 16px;margin-bottom:16px;direction:rtl;font-size:0.85em;color:#9ca3af">
-            <b style="color:#FFD700">الشروط الأربعة:</b>
+            <b style="color:#FFD700">الشروط الخمسة:</b>
             ✅ تجميع (accumulation/spring) &nbsp;+&nbsp;
             ✅ المشتري مهاجم (buyers) &nbsp;+&nbsp;
             ✅ Divergence ≥ 25 &nbsp;+&nbsp;
-            ✅ صفر أسباب حذر
+            ✅ صفر أسباب حذر &nbsp;+&nbsp;
+            ✅ <b style="color:#00E676">RSI > 50</b> (منطقة الزخم)
         </div>
         ''', unsafe_allow_html=True)
 
@@ -5737,6 +5741,7 @@ elif page == "🎯 إشارات ZR":
             and r.get("aggressor") == "buyers"
             and abs(r.get("divergence", 0)) >= 25
             and len(r.get("reasons_against", []) or []) == 0
+            and (r.get("rsi", 0) or 0) > 50
         )
 
         _change_c = "#00E676" if _change >= 0 else "#FF5252"
