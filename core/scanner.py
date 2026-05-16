@@ -398,7 +398,12 @@ def scan_market(
             _ma50 = compute_ma(close, 50)
             n_bars = len(close)
             _ma200 = compute_ma(close, min(200, n_bars - 1)) if n_bars >= 50 else _ma50
+            # SMA 600 — long-term trend filter (requires ~2.4 years history)
+            _ma600 = compute_ma(close, min(600, n_bars - 1)) if n_bars >= 600 else None
             _rsi = compute_rsi(close, 14)
+
+            # Last MA600 value (for filter logic)
+            _ma600_last = float(_ma600.iloc[-1]) if _ma600 is not None and pd.notna(_ma600.iloc[-1]) else None
 
             chart_ma20 = [round(float(v), 2) if pd.notna(v) else None for v in _ma20.iloc[-chart_days:]]
             chart_ma50 = [round(float(v), 2) if pd.notna(v) else None for v in _ma50.iloc[-chart_days:]]
@@ -428,6 +433,8 @@ def scan_market(
                 "evidence": orderflow["evidence"],
                 "days": orderflow["days"],
                 "rsi": orderflow["rsi"],
+                "ma600": _ma600_last,
+                "above_ma600": (last_close > _ma600_last) if _ma600_last else None,
                 "volume_ratio": orderflow["volume_ratio"],
                 "contraction": orderflow["contraction"],
                 # Location

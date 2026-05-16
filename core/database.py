@@ -208,7 +208,8 @@ def _is_golden_signal(signal: dict) -> bool:
     2. Aggressor: buyer attacking
     3. Divergence >= 25 (strong bullish)
     4. Zero "against" reasons (clean signal)
-    5. RSI > 50 (momentum zone — V3 data shows higher win rate)
+    5. RSI > 50 (momentum zone)
+    6. Price > SMA 600 (long-term uptrend)
     """
     is_accum = signal.get("accum_level", "") in ("accumulation", "spring")
     reasons_for = signal.get("reasons_for", [])
@@ -232,7 +233,7 @@ def _is_golden_signal(signal: dict) -> bool:
                 div_val = int(m.group(1))
     strong_div = div_val >= 25
 
-    # RSI > 50 — required momentum zone
+    # RSI > 50
     rsi = signal.get("rsi", 0) or 0
     try:
         rsi = float(rsi)
@@ -240,7 +241,10 @@ def _is_golden_signal(signal: dict) -> bool:
         rsi = 0
     rsi_ok = rsi > 50
 
-    return is_accum and has_buyer and strong_div and zero_against and rsi_ok
+    # Price above SMA 600
+    above_ma600 = signal.get("above_ma600", False) is True
+
+    return is_accum and has_buyer and strong_div and zero_against and rsi_ok and above_ma600
 
 
 def log_signal(signal: dict) -> bool:
