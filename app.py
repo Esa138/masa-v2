@@ -3321,6 +3321,13 @@ if page == "🔬 Order Flow":
         results = compute_relative_flow(results)
         st.session_state.scan_results = results
         st.session_state.market_health = health
+        # Save scan timestamp for display
+        try:
+            from core.utils import SAUDI_TZ
+            _now = datetime.datetime.now(SAUDI_TZ)
+        except Exception:
+            _now = datetime.datetime.now()
+        st.session_state.scan_timestamp = _now.strftime("%Y-%m-%d %H:%M")
         # Pre-compute composite index for breakout overlay
         comp_d, comp_v, _, _ = build_composite_index(results)
         st.session_state.composite_dates = comp_d
@@ -5627,6 +5634,18 @@ elif page == "🎯 إشارات ZR":
         st.info("💡 اضغط **ابدأ المسح** من Order Flow أولاً لعرض الإشارات")
         st.stop()
 
+    # Scan timestamp badge
+    _scan_ts = st.session_state.get("scan_timestamp", "")
+    if _scan_ts:
+        st.markdown(
+            f'<div style="text-align:center;direction:rtl;margin:-8px 0 14px 0">'
+            f'<span style="background:rgba(79,195,247,0.08);color:#4FC3F7;'
+            f'padding:6px 14px;border-radius:8px;font-size:0.82em;'
+            f'border:1px solid rgba(79,195,247,0.25)">'
+            f'🕐 آخر مسح: {_scan_ts}</span></div>',
+            unsafe_allow_html=True,
+        )
+
     # Filter to enter signals only
     _enters = [r for r in _zr_results if r.get("decision") == "enter"]
 
@@ -5740,6 +5759,15 @@ elif page == "🎯 إشارات ZR":
         _dist_to_h = ((_zr_h - _price) / _price * 100) if _zr_h and _price else 0
         _dist_to_l = ((_price - _zr_l) / _price * 100) if _zr_l and _price else 0
 
+        # Scan time stamp (from session)
+        _ts = st.session_state.get("scan_timestamp", "")
+        _ts_badge = (
+            f'<span style="color:#4FC3F7;font-size:0.72em;'
+            f'background:rgba(79,195,247,0.08);padding:2px 8px;border-radius:6px;'
+            f'border:1px solid rgba(79,195,247,0.2);margin-right:6px">'
+            f'🕐 {_ts}</span>'
+        ) if _ts else ""
+
         _card_html = (
             f'<div style="background:linear-gradient(135deg,#0d1117,#161b22);'
             f'border:1px solid {category_color}40;border-radius:12px;padding:14px 16px;'
@@ -5749,6 +5777,7 @@ elif page == "🎯 إشارات ZR":
             f'<span style="font-size:1.1em;font-weight:800;color:#fff">{_name}</span> '
             f'<span style="color:#6b7280;font-size:0.78em;margin-right:6px">{_ticker} • {_sector}</span>'
             f'{_golden_badge}'
+            f'{_ts_badge}'
             f'</div>'
             f'<div style="display:flex;gap:12px;align-items:center">'
             f'<span style="color:{_change_c};font-weight:600">{_change:+.1f}%</span>'
