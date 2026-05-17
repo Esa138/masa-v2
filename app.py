@@ -5420,9 +5420,6 @@ elif page == "🥇 الفلتر الذهبي":
             _zero_against = len(_reasons_against) == 0
             _rsi_val = r.get("rsi", 0) or 0
             _rsi_ok = _rsi_val > 50
-            # SMA 600 — long-term trend filter
-            _ma600 = r.get("ma600")
-            _above_ma600 = r.get("above_ma600", False) is True
 
             _entry = {
                 "ticker": r["ticker"],
@@ -5440,8 +5437,6 @@ elif page == "🥇 الفلتر الذهبي":
                 "stop": r.get("stop_loss", 0),
                 "target": r.get("target", 0),
                 "rr": r.get("rr_ratio", 0),
-                "ma600": _ma600,
-                "above_ma600": _above_ma600,
                 "reasons_for": r.get("reasons_for", []),
                 "reasons_against": _reasons_against,
                 "is_accum": _is_accum,
@@ -5451,7 +5446,7 @@ elif page == "🥇 الفلتر الذهبي":
                 "rsi_ok": _rsi_ok,
             }
 
-            if _is_accum and _is_buyer and _has_div and _zero_against and _rsi_ok and _above_ma600:
+            if _is_accum and _is_buyer and _has_div and _zero_against and _rsi_ok:
                 _golden.append(_entry)
             else:
                 _normal.append(_entry)
@@ -5489,13 +5484,12 @@ elif page == "🥇 الفلتر الذهبي":
         st.markdown('''
         <div style="background:rgba(255,215,0,0.05);border:1px solid #FFD70030;border-radius:10px;
                     padding:12px 16px;margin-bottom:16px;direction:rtl;font-size:0.85em;color:#9ca3af">
-            <b style="color:#FFD700">الشروط الستة:</b>
+            <b style="color:#FFD700">الشروط الخمسة:</b>
             ✅ تجميع (accumulation/spring) &nbsp;+&nbsp;
             ✅ المشتري مهاجم (buyers) &nbsp;+&nbsp;
             ✅ Divergence ≥ 25 &nbsp;+&nbsp;
             ✅ صفر أسباب حذر &nbsp;+&nbsp;
-            ✅ RSI > 50 (الزخم) &nbsp;+&nbsp;
-            ✅ <b style="color:#00E676">السعر فوق SMA 600</b> (اتجاه طويل صاعد)
+            ✅ <b style="color:#00E676">RSI > 50</b> (منطقة الزخم)
         </div>
         ''', unsafe_allow_html=True)
 
@@ -5749,7 +5743,6 @@ elif page == "🎯 إشارات ZR":
             and abs(r.get("divergence", 0)) >= 25
             and len(r.get("reasons_against", []) or []) == 0
             and (r.get("rsi", 0) or 0) > 50
-            and r.get("above_ma600", False) is True
         )
 
         _change_c = "#00E676" if _change >= 0 else "#FF5252"

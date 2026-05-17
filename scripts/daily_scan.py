@@ -27,14 +27,13 @@ warnings.filterwarnings("ignore")
 
 
 def _is_golden_signal(r: dict) -> bool:
-    """Golden: accum/spring + buyer + div>=25 + 0 against + RSI>50 + price>SMA600."""
+    """Golden: accum/spring + buyer + div>=25 + 0 against + RSI>50."""
     is_accum = r.get("phase") in ("accumulation", "spring")
     is_buyer = r.get("aggressor") == "buyers"
     has_div = abs(r.get("divergence", 0)) >= 25
     zero_against = len(r.get("reasons_against", []) or []) == 0
     rsi_ok = (r.get("rsi", 0) or 0) > 50
-    above_ma600 = r.get("above_ma600", False) is True
-    return is_accum and is_buyer and has_div and zero_against and rsi_ok and above_ma600
+    return is_accum and is_buyer and has_div and zero_against and rsi_ok
 
 
 def run_scan(market: str = "saudi") -> dict:
