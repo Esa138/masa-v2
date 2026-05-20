@@ -8477,13 +8477,41 @@ elif page == "⭐ التلاقي الذهبي":
             _golden_cnt = sum(1 for r in _scan_rows if r['_final'])
             _strong_cnt = sum(1 for r in _scan_rows if r['_passed'] >= 4)
 
-            _m1, _m2, _m3 = st.columns(3)
-            _m1.metric("إجمالي مفحوص", len(_scan_rows))
-            _m2.metric("🟢 إشارات ذهبية", _golden_cnt)
-            _m3.metric("⭐ قوية (4+ فلاتر)", _strong_cnt)
+            # Strong picks (golden + 4+ filters)
+            _top_picks = [r for r in _scan_rows if r['_final'] or r['_passed'] >= 4]
+            _top_picks.sort(key=lambda r: (r['_final'], r['_passed']), reverse=True)
+
+            def _render_summary(_loc: str):
+                _m1, _m2, _m3 = st.columns(3)
+                _m1.metric("إجمالي مفحوص", len(_scan_rows))
+                _m2.metric("🟢 إشارات ذهبية", _golden_cnt)
+                _m3.metric("⭐ قوية (4+ فلاتر)", _strong_cnt)
+                if _top_picks:
+                    _chips_html = "".join([
+                        f"<span style='display:inline-block;margin:3px;padding:6px 12px;"
+                        f"background:{'#1b5e20' if p['_final'] else '#37474f'};"
+                        f"border:1px solid {'#4caf50' if p['_final'] else '#78909c'};"
+                        f"border-radius:16px;font-size:0.85em;color:#fff'>"
+                        f"{'🟢' if p['_final'] else '⭐'} {p['السهم']} "
+                        f"<span style='color:#b0bec5'>({p['الرمز']})</span> "
+                        f"<b>{p['السعر']}</b> · {p['_passed']}/6</span>"
+                        for p in _top_picks
+                    ])
+                    st.markdown(
+                        f"<div style='padding:8px 0'><div style='color:#9ca3af;font-size:0.85em;margin-bottom:6px'>"
+                        f"⭐ أقوى الأسهم ({len(_top_picks)}):</div>{_chips_html}</div>",
+                        unsafe_allow_html=True,
+                    )
+
+            # ABOVE table
+            _render_summary("top")
 
             st.dataframe(_df_scan, use_container_width=True, hide_index=True, height=600)
             st.caption("💡 الترتيب: الإشارات الذهبية أولاً، ثم الأقوى بعدد الفلاتر المُحققة.")
+
+            # BELOW table
+            st.markdown("---")
+            _render_summary("bottom")
 
     # ─────────────────────────────────────────────
     # SINGLE STOCK MODE
