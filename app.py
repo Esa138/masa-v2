@@ -8574,8 +8574,41 @@ elif page == "⭐ التلاقي الذهبي":
             if _filters.volume_ratio is not None:
                 st.write(f"- نسبة الحجم: {_filters.volume_ratio:.2f}×")
 
-        # ── Zones table
-        st.markdown("### 🗺️ مناطق التلاقي")
+        # ── Zone Watch: nearest support + nearest resistance + status
+        st.markdown("### 🎯 مراقبة المناطق")
+        _all_zones = _result['zones']
+        _sup_sorted = sorted([z for z in _all_zones if not z.is_resistance], key=lambda z: z.distance_from_price_pct)
+        _res_sorted = sorted([z for z in _all_zones if z.is_resistance], key=lambda z: z.distance_from_price_pct)
+
+        def _zone_card(_z, _title):
+            _col = _z.strength.color
+            return (
+                f"<div style='border-right:6px solid {_col};padding:12px 14px;background:#1a1a1a;border-radius:6px;margin:6px 0'>"
+                f"<div style='color:#9ca3af;font-size:0.82em'>{_title}</div>"
+                f"<div style='font-size:1.4em;font-weight:700;margin:4px 0'>{_z.status} — {_z.price:.2f}</div>"
+                f"<div style='color:#d1d5db;font-size:0.9em'>"
+                f"البُعد: <b>{_z.signed_distance_pct:+.2f}%</b> · "
+                f"الفريمات: {_z.tf_names} · "
+                f"القوة: {_z.strength.label} {_z.strength.stars}"
+                f"</div></div>"
+            )
+
+        _zwc1, _zwc2 = st.columns(2)
+        with _zwc1:
+            if _sup_sorted:
+                st.markdown(_zone_card(_sup_sorted[0], "🟢 أقرب دعم"), unsafe_allow_html=True)
+            else:
+                st.info("ما فيه دعم قريب")
+        with _zwc2:
+            if _res_sorted:
+                st.markdown(_zone_card(_res_sorted[0], "🔴 أقرب مقاومة"), unsafe_allow_html=True)
+            else:
+                st.info("ما فيه مقاومة قريبة")
+
+        st.caption("✅ ملموس = داخل نطاق اللمس · 🎯 قريب = ≤ 3× نطاق اللمس · ⚡ مكسور = السعر تجاوز المنطقة · ⏸️ بعيد")
+
+        # ── Full zones table
+        st.markdown("### 🗺️ كل مناطق التلاقي")
         _zones = _result['zones']
         if not _zones:
             st.info("ما فيه مناطق تلاقي ضمن النطاق المحدد.")

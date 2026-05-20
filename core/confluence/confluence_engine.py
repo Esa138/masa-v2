@@ -22,20 +22,21 @@ class ConfluenceZone:
     strength: StrengthInfo
     distance_from_price_pct: float
     is_touched: bool
+    status: str = "⏸️ بعيد"      # ✅ ملموس / 🎯 قريب / ⚡ مكسور / ⏸️ بعيد
+    signed_distance_pct: float = 0.0  # +ve = price above zone, -ve = below
 
     def to_dict(self) -> dict:
         return {
+            'الحالة': self.status,
             'السعر': round(self.price, 2),
             'النوع': 'مقاومة' if self.is_resistance else 'دعم',
+            'البعد': f"{self.signed_distance_pct:+.2f}%",
             'الفريمات': self.tf_names,
-            'عدد_الفريمات': self.tf_count,
             'القوة': self.strength.label,
             'النجوم': self.strength.stars,
             'الموثوقية': self.strength.reliability,
             'المخاطرة_المقترحة': f"{self.strength.risk_pct}%",
             'مدة_الاحتفاظ': self.strength.holding_days,
-            'البعد_عن_السعر': f"{self.distance_from_price_pct:.2f}%",
-            'ملموسة': '✅' if self.is_touched else '⏸️',
             'اللون': self.strength.color,
         }
 
@@ -132,8 +133,21 @@ class ConfluenceEngine:
 
             strength = classify_strength(cluster.mask)
             dist_pct = abs(current_price - cluster.price) / current_price * 100 if current_price else 0
+            signed_dist = (current_price - cluster.price) / current_price * 100 if current_price else 0
             touch_threshold = current_price * self.touch_pct / 100 if current_price else 0
             is_touched = abs(current_price - cluster.price) <= touch_threshold
+
+            # Status: broken / touched / approaching / far
+            if is_touched:
+                status = "✅ ملموس"
+            elif cluster.is_resistance and current_price > cluster.price + touch_threshold:
+                status = "⚡ مكسور (اختراق)"
+            elif (not cluster.is_resistance) and current_price < cluster.price - touch_threshold:
+                status = "⚡ مكسور (هبوط)"
+            elif dist_pct <= self.touch_pct * 3:  # within 3x touch threshold
+                status = "🎯 قريب"
+            else:
+                status = "⏸️ بعيد"
 
             zones.append(ConfluenceZone(
                 price=cluster.price,
@@ -144,6 +158,8 @@ class ConfluenceEngine:
                 strength=strength,
                 distance_from_price_pct=dist_pct,
                 is_touched=is_touched,
+                status=status,
+                signed_distance_pct=signed_dist,
             ))
         return zones
 
