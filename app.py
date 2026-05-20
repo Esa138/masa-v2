@@ -8386,7 +8386,6 @@ elif page == "⭐ التلاقي الذهبي":
     with _mc2:
         _stocks_dict = _market_options[_conf_market]
         if _stocks_dict:
-            # Show "name (ticker)" but return ticker
             _conf_ticker = st.selectbox(
                 "السهم",
                 options=list(_stocks_dict.keys()),
@@ -8414,7 +8413,82 @@ elif page == "⭐ التلاقي الذهبي":
             format_func=lambda x: {'D':'يومي','240':'4 ساعات','60':'ساعة','15':'15د','5':'5د'}.get(x, x),
         )
 
-    if st.button(f"🔍 حلّل {_conf_ticker}", type="primary", use_container_width=True):
+    _btn_c1, _btn_c2 = st.columns(2)
+    with _btn_c1:
+        _do_single = st.button(f"🔍 حلّل {_conf_ticker}", type="primary", use_container_width=True, key="conf_single_btn")
+    with _btn_c2:
+        _do_scan = st.button(f"📊 امسح كل السوق ({len(_stocks_dict)} سهم)", use_container_width=True, key="conf_scan_btn")
+
+    # ─────────────────────────────────────────────
+    # MARKET SCAN MODE
+    # ─────────────────────────────────────────────
+    if _do_scan and _stocks_dict:
+        st.markdown("---")
+        st.markdown(f"### 📊 مسح {_conf_market}")
+
+        # For scan we use lighter TF set (D + 4H) for speed
+        _scan_tfs = ['D', '240']
+        _tickers = list(_stocks_dict.keys())
+        _scan_rows = []
+        _progress = st.progress(0.0, text="بدء المسح...")
+        _engine_scan = ConfluenceEngine(cluster_pct=_conf_cluster_pct, max_dist_pct=_conf_max_dist)
+
+        for _i, _tk in enumerate(_tickers):
+            _progress.progress((_i + 1) / len(_tickers), text=f"تحليل {_tk} ({_i+1}/{len(_tickers)})...")
+            try:
+                _tfd = fetch_multi_tf_data(_tk, timeframes=_scan_tfs)
+                if not _tfd:
+                    continue
+                _ref = next((t for t in ['240', 'D'] if t in _tfd), None)
+                if _ref is None:
+                    continue
+                _cp = float(_tfd[_ref]['close'].iloc[-1])
+                _res = _engine_scan.analyze(_tfd, _cp)
+                _flt = apply_all_filters(_res, _tfd[_ref])
+                _scan_rows.append({
+                    'السهم': _stocks_dict.get(_tk, _tk),
+                    'الرمز': _tk,
+                    'السعر': round(_cp, 2),
+                    'الإشارة': '🟢 شراء ⭐' if _flt.final_buy_signal else '⏸️',
+                    'فلاتر': _flt.passed_count(),
+                    'الاتجاه': '✅' if _flt.trend_ok_buy else '❌',
+                    'الميل': '✅' if _flt.slope_ok_buy else '❌',
+                    'التلاقي': '⭐' if _flt.confluence_ok_buy else '❌',
+                    'المسافة': '✅' if _flt.distance_ok_buy else '❌',
+                    'الشمعة': '✅' if _flt.candle_ok_buy else '❌',
+                    'الحجم': '✅' if _flt.volume_ok else '➖',
+                    'بُعد_Gamma%': round(_flt.current_distance_pct, 2),
+                    'مناطق_التلاقي': len(_res['zones']),
+                    '_final': _flt.final_buy_signal,
+                    '_passed': _flt.passed_count(),
+                })
+            except Exception:
+                continue
+
+        _progress.empty()
+
+        if not _scan_rows:
+            st.warning("ما طلعت نتائج. جرّب سوقاً آخر.")
+        else:
+            _df_scan = pd.DataFrame(_scan_rows)
+            _df_scan = _df_scan.sort_values(['_final', '_passed'], ascending=[False, False])
+            _df_scan = _df_scan.drop(columns=['_final', '_passed'])
+
+            _golden_cnt = sum(1 for r in _scan_rows if r['_final'])
+            _strong_cnt = sum(1 for r in _scan_rows if r['_passed'] >= 4)
+
+            _m1, _m2, _m3 = st.columns(3)
+            _m1.metric("إجمالي مفحوص", len(_scan_rows))
+            _m2.metric("🟢 إشارات ذهبية", _golden_cnt)
+            _m3.metric("⭐ قوية (4+ فلاتر)", _strong_cnt)
+
+            st.dataframe(_df_scan, use_container_width=True, hide_index=True, height=600)
+            st.caption("💡 الترتيب: الإشارات الذهبية أولاً، ثم الأقوى بعدد الفلاتر المُحققة.")
+
+    # ─────────────────────────────────────────────
+    # SINGLE STOCK MODE
+    # ─────────────────────────────────────────────
+    if _do_single:
         with st.spinner(f"جاري تحميل بيانات {_conf_ticker} لـ {len(_conf_tfs)} فريم..."):
             _tf_data = fetch_multi_tf_data(_conf_ticker, timeframes=_conf_tfs)
 
