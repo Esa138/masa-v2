@@ -8480,28 +8480,32 @@ elif page == "⭐ التلاقي الذهبي":
                 _res = _engine_scan.analyze(_tfd, _cp)
                 _flt = apply_all_filters(_res, _tfd[_ref])
 
-                # Purple SUPPORT alert: only multi-TF Pure Strong supports
-                # (buy opportunity zones). Resistances at the same tier are
-                # ceiling zones — we don't flag those as buy alerts.
+                # Purple alert: Pure Strong (#ba68c8) + Mixed Strong (#7e57c2)
+                # tiers are both PURPLE in Pine. Include support AND resistance
+                # because data differences between yfinance and TADAWUL can flip
+                # the classification — a pivot low slightly above current price
+                # is technically resistance but still marks the strong zone.
                 _purple_zones = [
                     z for z in _res['zones']
-                    if z.strength.tier == _ST.PURE_STRONG
+                    if z.strength.tier in (_ST.PURE_STRONG, _ST.MIXED_STRONG)
                     and z.tf_count >= 2
-                    and not z.is_resistance
                     and z.status in ('✅ ملموس', '🎯 قريب')
                 ]
                 _purple_status = ""
                 _purple_price = None
+                _purple_kind = ""
                 if _purple_zones:
                     _pz = min(_purple_zones, key=lambda z: z.distance_from_price_pct)
                     _purple_status = _pz.status
                     _purple_price = round(_pz.price, 2)
+                    _purple_kind = "🔴 مقاومة" if _pz.is_resistance else "🟢 دعم"
 
                 _row = {
                     'السهم': _stocks_dict.get(_tk, _tk),
                     'الرمز': _tk,
                     'السعر': round(_cp, 2),
                     '🟣 بنفسجية': _purple_status if _purple_status else '—',
+                    'النوع': _purple_kind if _purple_kind else '—',
                     'سعر_البنفسجية': _purple_price if _purple_price else '—',
                     'الإشارة': '🟢 شراء ⭐' if _flt.final_buy_signal else '⏸️',
                     'فلاتر': _flt.passed_count(),
@@ -8637,11 +8641,10 @@ elif page == "⭐ التلاقي الذهبي":
 
         # ── Purple zone alert banner
         from core.confluence import StrengthTier as _ST_single
-        # Show banner for ANY tier=PURE_STRONG multi-TF zone (support or resistance)
-        # — useful info either way on the detail page.
+        # Banner: any multi-TF Pure Strong OR Mixed Strong zone (both purple in Pine)
         _purple_hits = [
             z for z in _result['zones']
-            if z.strength.tier == _ST_single.PURE_STRONG
+            if z.strength.tier in (_ST_single.PURE_STRONG, _ST_single.MIXED_STRONG)
             and z.tf_count >= 2
             and z.status in ('✅ ملموس', '🎯 قريب')
         ]
