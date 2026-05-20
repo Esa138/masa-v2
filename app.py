@@ -3232,7 +3232,7 @@ with st.sidebar:
     st.divider()
 
     # Handle navigation from sector map → company analysis
-    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "🎯 إشارات ZR", "🧭 بوصلة القطاعات", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "💬 المساعد الذكي", "📊 أداء النظام", "🔬 تشخيص الأداء", "♾️ إحصائيات ZR", "🔔 الإشعارات"]
+    _pages = ["🔬 Order Flow", "🗺️ خريطة القطاعات", "⚡ الارتدادات والاختراقات", "🚀 مؤشر الاختراقات", "🏆 القطاع القائد", "🔍 تحليل شركة", "⭐ قائمة المتابعة", "🥇 الفلتر الذهبي", "⭐ التلاقي الذهبي", "🎯 إشارات ZR", "🧭 بوصلة القطاعات", "📅 تقويم النتائج", "📰 أخبار السوق", "🤖 تقارير AI", "💬 المساعد الذكي", "📊 أداء النظام", "🔬 تشخيص الأداء", "♾️ إحصائيات ZR", "🔔 الإشعارات"]
     if st.session_state.get("_goto_page"):
         st.session_state["page_nav"] = st.session_state.pop("_goto_page")
 
@@ -8342,3 +8342,134 @@ elif page == "🔔 الإشعارات":
         - Push Server: {'✅' if _push_server else '⚠️ غير معد'}
         - الحالة: {'✅ جاهز' if _push_ready else '⚠️ يحتاج إعداد'}
         """)
+
+
+# ══════════════════════════════════════════════════════════════
+# PAGE: Confluence — التلاقي الذهبي v7.2
+# ══════════════════════════════════════════════════════════════
+
+elif page == "⭐ التلاقي الذهبي":
+
+    st.markdown('''
+    <div style="text-align:center;padding:20px 0">
+        <span style="font-size:2em;font-weight:800;color:#ba68c8">⭐ التلاقي الذهبي v7.2</span>
+        <div style="color:#6b7280;font-size:0.9em;margin-top:6px">
+            مناطق دعم/مقاومة متعددة الفريمات (D · 4H · 1H · 15m · 5m) + Gamma 600 + 6 فلاتر جودة
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    try:
+        from core.confluence import (
+            ConfluenceEngine, apply_all_filters,
+            fetch_multi_tf_data, TIER_INFO, StrengthTier,
+        )
+    except Exception as _e:
+        st.error(f"تعذّر تحميل وحدة التلاقي: {_e}")
+        st.stop()
+
+    _c_col1, _c_col2, _c_col3 = st.columns([2, 1, 1])
+    with _c_col1:
+        _conf_ticker = st.text_input(
+            "الرمز (Yahoo Finance)",
+            value="2222.SR",
+            help="مثل: 2222.SR للسعودي، AAPL للأمريكي، BTC-USD للعملات",
+            key="conf_ticker_input",
+        )
+    with _c_col2:
+        _conf_cluster_pct = st.slider("عرض التجميع %", 0.1, 2.0, 0.5, 0.1)
+    with _c_col3:
+        _conf_max_dist = st.slider("أقصى بُعد %", 2.0, 30.0, 10.0, 1.0)
+
+    _conf_tfs = st.multiselect(
+        "الفريمات",
+        options=['D', '240', '60', '15', '5'],
+        default=['D', '240', '60', '15'],
+        format_func=lambda x: {'D':'يومي','240':'4 ساعات','60':'ساعة','15':'15د','5':'5د'}.get(x, x),
+    )
+
+    if st.button("🔍 تحليل التلاقي", type="primary", use_container_width=True):
+        with st.spinner(f"جاري تحميل بيانات {_conf_ticker} لـ {len(_conf_tfs)} فريم..."):
+            _tf_data = fetch_multi_tf_data(_conf_ticker, timeframes=_conf_tfs)
+
+        if not _tf_data:
+            st.error("ما قدرت أجيب بيانات. تأكد من صحة الرمز.")
+            st.stop()
+
+        # Current price = last close of lowest available TF
+        _ref_tf = next((t for t in ['5','15','60','240','D'] if t in _tf_data), None)
+        if _ref_tf is None:
+            st.error("بيانات غير متاحة.")
+            st.stop()
+
+        _current_price = float(_tf_data[_ref_tf]['close'].iloc[-1])
+
+        _engine = ConfluenceEngine(
+            cluster_pct=_conf_cluster_pct,
+            max_dist_pct=_conf_max_dist,
+        )
+        _result = _engine.analyze(_tf_data, _current_price)
+
+        # Quality filters use the lowest active TF dataframe
+        _filters = apply_all_filters(_result, _tf_data[_ref_tf])
+
+        # ── Header summary
+        st.markdown("---")
+        _h1, _h2, _h3, _h4 = st.columns(4)
+        with _h1:
+            st.metric("السعر الحالي", f"{_current_price:,.2f}")
+        with _h2:
+            st.metric("فريمات نشطة", _result['active_tfs'])
+        with _h3:
+            st.metric("فوق Gamma", f"{_result['gamma_above_count']}/{_result['active_tfs']}")
+        with _h4:
+            _signal_label = "🟢 شراء ⭐" if _filters.final_buy_signal else "⏸️ انتظار"
+            st.metric("الإشارة", _signal_label)
+
+        # ── 6-filter quality gate
+        st.markdown("### 🛡️ بوابة الجودة (6 فلاتر)")
+        _sum = _filters.summary()
+        _f_cols = st.columns(6)
+        _labels = [k for k in _sum.keys() if k not in ('الإشارة','نسبة_التحقق')]
+        for _i, _k in enumerate(_labels):
+            with _f_cols[_i]:
+                st.markdown(f"<div style='text-align:center'><div style='font-size:0.85em;color:#6b7280'>{_k}</div><div style='font-size:1.6em'>{_sum[_k]}</div></div>", unsafe_allow_html=True)
+
+        st.markdown(f"**نسبة التحقق:** `{_sum['نسبة_التحقق']}`")
+
+        with st.expander("تفاصيل الفلاتر"):
+            st.write(f"- الاتجاه: صعود {_filters.trend_count_up} | هبوط {_filters.trend_count_down}")
+            st.write(f"- ميل قاما: يومي = {_filters.gamma_slope_d} | 4H = {_filters.gamma_slope_h4}")
+            st.write(f"- التلاقي ZR↔Gamma: {_filters.floor_at_gamma_count} مستوى")
+            st.write(f"- المسافة من Gamma: {_filters.current_distance_pct:.2f}%")
+            st.write(f"- نوع الشمعة: {_filters.candle_type or 'لا يوجد'}")
+            if _filters.volume_ratio is not None:
+                st.write(f"- نسبة الحجم: {_filters.volume_ratio:.2f}×")
+
+        # ── Zones table
+        st.markdown("### 🗺️ مناطق التلاقي")
+        _zones = _result['zones']
+        if not _zones:
+            st.info("ما فيه مناطق تلاقي ضمن النطاق المحدد.")
+        else:
+            _rows = [z.to_dict() for z in _zones]
+            _df_zones = pd.DataFrame(_rows)
+            st.dataframe(_df_zones, use_container_width=True, hide_index=True)
+
+        # ── Per-TF breakdown
+        with st.expander("📊 تفاصيل كل فريم"):
+            for _tf_name, _tf_d in _result['per_tf'].items():
+                _zr = _tf_d.get('zr', {})
+                st.markdown(f"**{_tf_name}** — Gamma: `{_tf_d.get('gamma_current')}` | الميل: {_tf_d.get('gamma_slope')} | فوق Gamma: {'✅' if _tf_d.get('price_above_gamma') else '❌'}")
+                st.write({k: round(v, 2) if isinstance(v, (int, float)) and v else v for k, v in _zr.items()})
+
+        # ── Legend
+        with st.expander("🎓 دليل التصنيفات"):
+            for _tier, _info in TIER_INFO.items():
+                st.markdown(
+                    f"<div style='border-right:6px solid {_info.color};padding:6px 12px;margin:4px 0;background:#1a1a1a;border-radius:4px'>"
+                    f"<b>{_info.label}</b> {_info.stars} — موثوقية {_info.reliability}/5 — "
+                    f"مخاطرة {_info.risk_pct}% — احتفاظ {_info.holding_days}"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
