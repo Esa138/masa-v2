@@ -5,7 +5,7 @@ import pandas as pd
 from dataclasses import dataclass
 from typing import Dict, List
 
-from .zero_reversal import compute_zr1_zr2
+from .zero_reversal import compute_zr1_zr2, find_all_pivot_levels
 from .gamma import compute_gamma, gamma_slope
 from .clustering import cluster_levels, Cluster, TF_BITS
 from .strength_tier import classify_strength, StrengthInfo
@@ -65,12 +65,14 @@ class ConfluenceEngine:
                 continue
 
             zr = compute_zr1_zr2(df)
+            pivots = find_all_pivot_levels(df, bars=400, confirm_len=10, max_levels=25)
             gamma = compute_gamma(df, length=600, ma_type='HMA')
 
             gamma_val = float(gamma.iloc[-1]) if len(gamma) > 0 and pd.notna(gamma.iloc[-1]) else None
 
             per_tf_data[tf_name] = {
                 'zr': zr,
+                'pivots': pivots,
                 'gamma_current': gamma_val,
                 'gamma_slope': gamma_slope(gamma, lookback=5),
                 'price_above_gamma': (current_price > gamma_val) if gamma_val else None,
@@ -105,21 +107,45 @@ class ConfluenceEngine:
         }
 
     def _collect_raw_levels(self, per_tf_data: dict, current_price: float) -> List[dict]:
-        """Gather all ZR levels from all timeframes."""
+        """Gather all ZR + all pivot levels from all timeframes."""
         levels = []
         for tf_name, data in per_tf_data.items():
             tf_bit = TF_BITS[tf_name]
-            zr = data['zr']
+
+            # 1) Main ZR ceiling/floor (still useful as anchor)
+            zr = data.get('zr', {})
             for key, price in zr.items():
                 if price is None or pd.isna(price) or price <= 0:
                     continue
-                # Level above current = resistance, below = support
                 is_res = current_price < price
                 levels.append({
                     'price': price,
                     'is_resistance': is_res,
                     'tf_bit': tf_bit,
                     'source': f"{tf_name}-{key}",
+                })
+
+            # 2) All pivot highs/lows in window — much richer S/R map
+            pivots = data.get('pivots', {})
+            for h in pivots.get('highs', []):
+                if h is None or pd.isna(h) or h <= 0:
+                    continue
+                is_res = current_price < h
+                levels.append({
+                    'price': h,
+                    'is_resistance': is_res,
+                    'tf_bit': tf_bit,
+                    'source': f"{tf_name}-pH",
+                })
+            for l in pivots.get('lows', []):
+                if l is None or pd.isna(l) or l <= 0:
+                    continue
+                is_res = current_price < l
+                levels.append({
+                    'price': l,
+                    'is_resistance': is_res,
+                    'tf_bit': tf_bit,
+                    'source': f"{tf_name}-pL",
                 })
         return levels
 

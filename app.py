@@ -8455,8 +8455,9 @@ elif page == "⭐ التلاقي الذهبي":
         # Purple-zone filter option
         _only_purple = st.checkbox("🟣 اعرض فقط الأسهم القريبة/الواصلة لمنطقة قوي خالص (بنفسجية)", value=False, key="conf_only_purple")
 
-        # For scan we use lighter TF set (D + 4H) for speed
-        _scan_tfs = ['D', '240']
+        # Use D + 4H + 1H for richer/correct tier classification
+        # (without 60, every D·240 cluster gets labeled "Pure Strong")
+        _scan_tfs = ['D', '240', '60']
         _tickers = list(_stocks_dict.keys())
         _scan_rows = []
         _progress = st.progress(0.0, text="بدء المسح...")

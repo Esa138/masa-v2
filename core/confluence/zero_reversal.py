@@ -79,3 +79,36 @@ def compute_zr1_zr2(df: pd.DataFrame) -> dict:
         'z2h': zr2['ceiling'],
         'z2l': zr2['floor'],
     }
+
+
+def find_all_pivot_levels(
+    df: pd.DataFrame,
+    bars: int = 400,
+    confirm_len: int = 10,
+    max_levels: int = 30,
+) -> dict:
+    """
+    Return ALL pivot highs and lows in the recent window — not just extremes.
+
+    A smaller confirm_len (10 vs 25) catches more swing points,
+    giving the engine many candidate S/R levels per timeframe.
+    """
+    if df.empty or len(df) < confirm_len * 2:
+        return {'highs': [], 'lows': []}
+
+    ph, pl = find_pivots(df, confirm_len, confirm_len)
+    recent_window = df.tail(bars)
+
+    highs = ph.loc[recent_window.index].dropna().tolist()
+    lows = pl.loc[recent_window.index].dropna().tolist()
+
+    # Cap to most recent N pivots to keep clustering tractable
+    if len(highs) > max_levels:
+        highs = highs[-max_levels:]
+    if len(lows) > max_levels:
+        lows = lows[-max_levels:]
+
+    return {
+        'highs': [float(h) for h in highs],
+        'lows': [float(l) for l in lows],
+    }
