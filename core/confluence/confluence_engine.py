@@ -144,7 +144,7 @@ class ConfluenceEngine:
                 status = "⚡ مكسور (اختراق)"
             elif (not cluster.is_resistance) and current_price < cluster.price - touch_threshold:
                 status = "⚡ مكسور (هبوط)"
-            elif dist_pct <= self.touch_pct * 3:  # within 3x touch threshold
+            elif dist_pct <= max(self.touch_pct * 6, 3.0):  # within ~3%
                 status = "🎯 قريب"
             else:
                 status = "⏸️ بعيد"

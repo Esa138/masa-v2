@@ -8426,12 +8426,18 @@ elif page == "⭐ التلاقي الذهبي":
         st.markdown("---")
         st.markdown(f"### 📊 مسح {_conf_market}")
 
+        # Purple-zone filter option
+        _only_purple = st.checkbox("🟣 اعرض فقط الأسهم القريبة/الواصلة لمنطقة قوي خالص (بنفسجية)", value=False, key="conf_only_purple")
+
         # For scan we use lighter TF set (D + 4H) for speed
         _scan_tfs = ['D', '240']
         _tickers = list(_stocks_dict.keys())
         _scan_rows = []
         _progress = st.progress(0.0, text="بدء المسح...")
         _engine_scan = ConfluenceEngine(cluster_pct=_conf_cluster_pct, max_dist_pct=_conf_max_dist)
+
+        # Lazy import for tier check
+        from core.confluence import StrengthTier as _ST
 
         for _i, _tk in enumerate(_tickers):
             _progress.progress((_i + 1) / len(_tickers), text=f"تحليل {_tk} ({_i+1}/{len(_tickers)})...")
@@ -8445,10 +8451,25 @@ elif page == "⭐ التلاقي الذهبي":
                 _cp = float(_tfd[_ref]['close'].iloc[-1])
                 _res = _engine_scan.analyze(_tfd, _cp)
                 _flt = apply_all_filters(_res, _tfd[_ref])
-                _scan_rows.append({
+
+                # Detect Pure Strong (purple) zones touched or near current price
+                _purple_zones = [
+                    z for z in _res['zones']
+                    if z.strength.tier == _ST.PURE_STRONG and z.status in ('✅ ملموس', '🎯 قريب')
+                ]
+                _purple_status = ""
+                _purple_price = None
+                if _purple_zones:
+                    _pz = min(_purple_zones, key=lambda z: z.distance_from_price_pct)
+                    _purple_status = _pz.status
+                    _purple_price = round(_pz.price, 2)
+
+                _row = {
                     'السهم': _stocks_dict.get(_tk, _tk),
                     'الرمز': _tk,
                     'السعر': round(_cp, 2),
+                    '🟣 بنفسجية': _purple_status if _purple_status else '—',
+                    'سعر_البنفسجية': _purple_price if _purple_price else '—',
                     'الإشارة': '🟢 شراء ⭐' if _flt.final_buy_signal else '⏸️',
                     'فلاتر': _flt.passed_count(),
                     'الاتجاه': '✅' if _flt.trend_ok_buy else '❌',
@@ -8461,7 +8482,11 @@ elif page == "⭐ التلاقي الذهبي":
                     'مناطق_التلاقي': len(_res['zones']),
                     '_final': _flt.final_buy_signal,
                     '_passed': _flt.passed_count(),
-                })
+                    '_has_purple': bool(_purple_zones),
+                }
+                if _only_purple and not _purple_zones:
+                    continue
+                _scan_rows.append(_row)
             except Exception:
                 continue
 
@@ -8471,21 +8496,24 @@ elif page == "⭐ التلاقي الذهبي":
             st.warning("ما طلعت نتائج. جرّب سوقاً آخر.")
         else:
             _df_scan = pd.DataFrame(_scan_rows)
-            _df_scan = _df_scan.sort_values(['_final', '_passed'], ascending=[False, False])
-            _df_scan = _df_scan.drop(columns=['_final', '_passed'])
+            # Sort: purple zone first, then golden, then by filters passed
+            _df_scan = _df_scan.sort_values(['_has_purple', '_final', '_passed'], ascending=[False, False, False])
+            _df_scan = _df_scan.drop(columns=['_final', '_passed', '_has_purple'])
 
             _golden_cnt = sum(1 for r in _scan_rows if r['_final'])
             _strong_cnt = sum(1 for r in _scan_rows if r['_passed'] >= 4)
+            _purple_cnt = sum(1 for r in _scan_rows if r['_has_purple'])
 
             # Strong picks (golden + 4+ filters)
             _top_picks = [r for r in _scan_rows if r['_final'] or r['_passed'] >= 4]
             _top_picks.sort(key=lambda r: (r['_final'], r['_passed']), reverse=True)
 
             def _render_summary(_loc: str):
-                _m1, _m2, _m3 = st.columns(3)
+                _m1, _m2, _m3, _m4 = st.columns(4)
                 _m1.metric("إجمالي مفحوص", len(_scan_rows))
                 _m2.metric("🟢 إشارات ذهبية", _golden_cnt)
                 _m3.metric("⭐ قوية (4+ فلاتر)", _strong_cnt)
+                _m4.metric("🟣 في منطقة بنفسجية", _purple_cnt)
                 if _top_picks:
                     _chips_html = "".join([
                         f"<span style='display:inline-block;margin:3px;padding:6px 12px;"
@@ -8573,6 +8601,26 @@ elif page == "⭐ التلاقي الذهبي":
             st.write(f"- نوع الشمعة: {_filters.candle_type or 'لا يوجد'}")
             if _filters.volume_ratio is not None:
                 st.write(f"- نسبة الحجم: {_filters.volume_ratio:.2f}×")
+
+        # ── Purple zone alert banner
+        from core.confluence import StrengthTier as _ST_single
+        _purple_hits = [
+            z for z in _result['zones']
+            if z.strength.tier == _ST_single.PURE_STRONG and z.status in ('✅ ملموس', '🎯 قريب')
+        ]
+        if _purple_hits:
+            _pz = min(_purple_hits, key=lambda z: z.distance_from_price_pct)
+            _typ = "مقاومة" if _pz.is_resistance else "دعم"
+            st.markdown(
+                f"<div style='background:linear-gradient(90deg,#7b1fa2,#ba68c8);"
+                f"padding:16px 20px;border-radius:8px;margin:10px 0;color:#fff'>"
+                f"<div style='font-size:1.4em;font-weight:800'>🟣 السعر {_pz.status} منطقة قوي خالص!</div>"
+                f"<div style='margin-top:6px;font-size:1.05em'>"
+                f"النوع: <b>{_typ}</b> · السعر: <b>{_pz.price:.2f}</b> · البُعد: <b>{_pz.signed_distance_pct:+.2f}%</b> · "
+                f"الفريمات: <b>{_pz.tf_names}</b> · النجوم: {_pz.strength.stars}"
+                f"</div></div>",
+                unsafe_allow_html=True,
+            )
 
         # ── Zone Watch: nearest support + nearest resistance + status
         st.markdown("### 🎯 مراقبة المناطق")
