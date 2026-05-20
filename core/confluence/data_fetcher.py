@@ -44,8 +44,15 @@ def _normalize_df(df: pd.DataFrame) -> pd.DataFrame:
     return df.dropna(subset=['close'])
 
 
-def _resample_to_4h(df: pd.DataFrame) -> pd.DataFrame:
-    """Resample 1h OHLCV into 4h bars."""
+def _resample_to_4h(df: pd.DataFrame, ticker: str = "") -> pd.DataFrame:
+    """
+    Resample 1h OHLCV into 4h bars aligned to the market session.
+
+    Saudi market (TADAWUL) opens 10:00 Riyadh (07:00 UTC) and closes 15:00.
+    TradingView's 4h Saudi bars start at session open, so we must align
+    the resampling origin to 07:00 UTC instead of the default midnight.
+    For US/crypto we use default alignment.
+    """
     if df is None or df.empty:
         return df
     agg = {
@@ -53,6 +60,13 @@ def _resample_to_4h(df: pd.DataFrame) -> pd.DataFrame:
         'close': 'last', 'volume': 'sum',
     }
     cols = {k: v for k, v in agg.items() if k in df.columns}
+
+    # Saudi tickers: align 4h bars to 07:00 UTC (10:00 Riyadh, market open)
+    is_saudi = ticker.upper().endswith('.SR')
+    if is_saudi:
+        # offset='7h' shifts the 4h bin boundaries by 7 hours from midnight
+        return df.resample('4h', origin='start_day', offset='7h').agg(cols).dropna(subset=['close'])
+
     return df.resample('4h').agg(cols).dropna(subset=['close'])
 
 
@@ -77,7 +91,7 @@ def fetch_single_tf(ticker: str, tf: str) -> pd.DataFrame:
     df = _normalize_df(df)
 
     if tf == '240' and not df.empty:
-        df = _resample_to_4h(df)
+        df = _resample_to_4h(df, ticker=ticker)
 
     return df
 
