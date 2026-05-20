@@ -65,7 +65,9 @@ class ConfluenceEngine:
                 continue
 
             zr = compute_zr1_zr2(df)
-            pivots = find_all_pivot_levels(df, bars=400, confirm_len=10, max_levels=25)
+            # confirm_len=15 balances signal vs. noise for swing pivots.
+            # bars=500 covers ~2y of daily data so historical zones are captured.
+            pivots = find_all_pivot_levels(df, bars=500, confirm_len=15, max_levels=40)
             gamma = compute_gamma(df, length=600, ma_type='HMA')
 
             gamma_val = float(gamma.iloc[-1]) if len(gamma) > 0 and pd.notna(gamma.iloc[-1]) else None
