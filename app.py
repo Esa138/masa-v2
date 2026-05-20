@@ -8454,8 +8454,13 @@ elif page == "⭐ التلاقي الذهبي":
         st.markdown("---")
         st.markdown(f"### 📊 مسح {_conf_market}")
 
-        # Purple-zone filter option
-        _only_purple = st.checkbox("🟣 اعرض فقط الأسهم القريبة/الواصلة لمنطقة قوي خالص (بنفسجية)", value=False, key="conf_only_purple")
+        # Purple-zone filter — checked by default since the user's main use case
+        # is finding stocks at/near major purple confluence zones
+        _only_purple = st.checkbox(
+            "🟣 اعرض فقط الأسهم في منطقة بنفسجية (قوي خالص + مختلط قوي)",
+            value=True, key="conf_only_purple",
+            help="إلغاء التحديد لرؤية كل الأسهم",
+        )
 
         # Scan uses D + 4H + 1H (covers all purple-tier detection).
         # 15m/5m skipped for speed; they don't change Pure/Mixed Strong
@@ -8531,38 +8536,40 @@ elif page == "⭐ التلاقي الذهبي":
                     z for z in _res['zones']
                     if z.strength.tier in (_ST.PURE_STRONG, _ST.MIXED_STRONG)
                     and z.tf_count >= 2
-                    and (z.mask & 1)  # Daily must be part of the confluence
+                    and (z.mask & 1)
                     and (z.status.startswith('✅') or z.status.startswith('🎯') or z.status.startswith('🔄') or z.status.startswith('💥'))
                 ]
-                _purple_status = ""
-                _purple_price = None
-                _purple_kind = ""
+                _p_status = '—'
+                _p_kind = '—'
+                _p_price = '—'
+                _p_tfs = '—'
+                _p_tier = '—'
+                _p_dist = '—'
                 if _purple_zones:
                     _pz = min(_purple_zones, key=lambda z: z.distance_from_price_pct)
-                    _purple_status = _pz.status
-                    _purple_price = round(_pz.price, 2)
-                    _purple_kind = "🔴 مقاومة" if _pz.is_resistance else "🟢 دعم"
+                    _p_status = _pz.status
+                    _p_kind = "🟢 دعم" if not _pz.is_resistance else "🔴 مقاومة"
+                    _p_price = round(_pz.price, 2)
+                    _p_tfs = _pz.tf_names
+                    _p_tier = f"{_pz.strength.label} {_pz.strength.stars}".strip()
+                    _p_dist = f"{_pz.signed_distance_pct:+.2f}%"
 
                 _row = {
                     'السهم': _stocks_dict.get(_tk, _tk),
                     'الرمز': _tk,
                     'السعر': round(_cp, 2),
-                    '🟣 بنفسجية': _purple_status if _purple_status else '—',
-                    'النوع': _purple_kind if _purple_kind else '—',
-                    'سعر_البنفسجية': _purple_price if _purple_price else '—',
-                    'الإشارة': '🟢 شراء ⭐' if _flt.final_buy_signal else '⏸️',
+                    '🟣 الحالة': _p_status,
+                    'النوع': _p_kind,
+                    'سعر المنطقة': _p_price,
+                    'البُعد': _p_dist,
+                    'الفريمات': _p_tfs,
+                    'التصنيف': _p_tier,
                     'فلاتر': _flt.passed_count(),
-                    'الاتجاه': '✅' if _flt.trend_ok_buy else '❌',
-                    'الميل': '✅' if _flt.slope_ok_buy else '❌',
-                    'التلاقي': '⭐' if _flt.confluence_ok_buy else '❌',
-                    'المسافة': '✅' if _flt.distance_ok_buy else '❌',
-                    'الشمعة': '✅' if _flt.candle_ok_buy else '❌',
-                    'الحجم': '✅' if _flt.volume_ok else '➖',
-                    'بُعد_Gamma%': round(_flt.current_distance_pct, 2),
-                    'مناطق_التلاقي': len(_res['zones']),
+                    'الإشارة': '🟢 شراء ⭐' if _flt.final_buy_signal else '⏸️',
                     '_final': _flt.final_buy_signal,
                     '_passed': _flt.passed_count(),
                     '_has_purple': bool(_purple_zones),
+                    '_purple_dist': min((z.distance_from_price_pct for z in _purple_zones), default=999),
                 }
                 if _only_purple and not _purple_zones:
                     continue
@@ -8576,17 +8583,36 @@ elif page == "⭐ التلاقي الذهبي":
             st.warning("ما طلعت نتائج. جرّب سوقاً آخر.")
         else:
             _df_scan = pd.DataFrame(_scan_rows)
-            # Sort: purple zone first, then golden, then by filters passed
-            _df_scan = _df_scan.sort_values(['_has_purple', '_final', '_passed'], ascending=[False, False, False])
-            _df_scan = _df_scan.drop(columns=['_final', '_passed', '_has_purple'])
+            # Sort by purple-priority: in zone first, then by distance to zone
+            _status_rank = {'✅': 0, '🔄': 1, '💥': 2, '🎯': 3, '⏸️': 9}
+            _df_scan['_status_rank'] = _df_scan['🟣 الحالة'].apply(
+                lambda s: _status_rank.get(str(s)[:1] if str(s) else '⏸️', 9)
+            )
+            _df_scan = _df_scan.sort_values(
+                ['_has_purple', '_status_rank', '_purple_dist', '_final', '_passed'],
+                ascending=[False, True, True, False, False],
+            )
+            _df_scan = _df_scan.drop(columns=['_final', '_passed', '_has_purple', '_purple_dist', '_status_rank'])
 
             _golden_cnt = sum(1 for r in _scan_rows if r['_final'])
             _strong_cnt = sum(1 for r in _scan_rows if r['_passed'] >= 4)
             _purple_cnt = sum(1 for r in _scan_rows if r['_has_purple'])
 
-            # Strong picks (golden + 4+ filters)
-            _top_picks = [r for r in _scan_rows if r['_final'] or r['_passed'] >= 4]
-            _top_picks.sort(key=lambda r: (r['_final'], r['_passed']), reverse=True)
+            # Purple picks — sorted by status priority (in-zone first, then bounce)
+            _purple_picks = [r for r in _scan_rows if r['_has_purple']]
+            _purple_picks.sort(key=lambda r: (
+                _status_rank.get(str(r['🟣 الحالة'])[:1] if str(r['🟣 الحالة']) else '⏸️', 9),
+                r['_purple_dist'],
+            ))
+
+            def _chip_bg(status: str) -> str:
+                first = status[:1] if status else ''
+                return {
+                    '✅': '#6a1b9a',  # in zone — bright purple
+                    '🔄': '#4a148c',  # bounce — deep purple
+                    '💥': '#b71c1c',  # broken — red
+                    '🎯': '#37474f',  # approaching — gray
+                }.get(first, '#263238')
 
             def _render_summary(_loc: str):
                 _m1, _m2, _m3, _m4 = st.columns(4)
@@ -8594,20 +8620,22 @@ elif page == "⭐ التلاقي الذهبي":
                 _m2.metric("🟢 إشارات ذهبية", _golden_cnt)
                 _m3.metric("⭐ قوية (4+ فلاتر)", _strong_cnt)
                 _m4.metric("🟣 في منطقة بنفسجية", _purple_cnt)
-                if _top_picks:
+
+                if _purple_picks:
                     _chips_html = "".join([
-                        f"<span style='display:inline-block;margin:3px;padding:6px 12px;"
-                        f"background:{'#1b5e20' if p['_final'] else '#37474f'};"
-                        f"border:1px solid {'#4caf50' if p['_final'] else '#78909c'};"
-                        f"border-radius:16px;font-size:0.85em;color:#fff'>"
-                        f"{'🟢' if p['_final'] else '⭐'} {p['السهم']} "
-                        f"<span style='color:#b0bec5'>({p['الرمز']})</span> "
-                        f"<b>{p['السعر']}</b> · {p['_passed']}/6</span>"
-                        for p in _top_picks
+                        f"<span style='display:inline-block;margin:3px;padding:7px 13px;"
+                        f"background:{_chip_bg(p['🟣 الحالة'])};"
+                        f"border-radius:14px;font-size:0.88em;color:#fff'>"
+                        f"{p['🟣 الحالة']} <b>{p['السهم']}</b> "
+                        f"<span style='color:#cfd8dc;font-size:0.85em'>({p['الرمز']})</span> "
+                        f"<span style='color:#fff;font-weight:600'>{p['السعر']}</span> "
+                        f"<span style='color:#b39ddb'>← {p['سعر المنطقة']}</span> "
+                        f"<span style='color:#9fa8da'>{p['البُعد']}</span></span>"
+                        for p in _purple_picks
                     ])
                     st.markdown(
-                        f"<div style='padding:8px 0'><div style='color:#9ca3af;font-size:0.85em;margin-bottom:6px'>"
-                        f"⭐ أقوى الأسهم ({len(_top_picks)}):</div>{_chips_html}</div>",
+                        f"<div style='padding:8px 0'><div style='color:#ba68c8;font-size:0.9em;margin-bottom:6px;font-weight:600'>"
+                        f"🟣 الأسهم في مناطق بنفسجية ({len(_purple_picks)}):</div>{_chips_html}</div>",
                         unsafe_allow_html=True,
                     )
 
