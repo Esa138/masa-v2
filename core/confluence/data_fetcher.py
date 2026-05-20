@@ -8,12 +8,14 @@ from typing import Dict, Optional
 
 
 # TF name -> (yfinance interval, period)
+# Periods extended so ZR1 (400-bar) window captures historical highs/lows
+# matching the Pine indicator on TradingView.
 TF_CONFIG = {
-    'D':   {'interval': '1d',  'period': '2y'},
-    '240': {'interval': '1h',  'period': '730d'},  # resampled to 4h
-    '60':  {'interval': '1h',  'period': '730d'},
-    '15':  {'interval': '15m', 'period': '60d'},
-    '5':   {'interval': '5m',  'period': '60d'},
+    'D':   {'interval': '1d',  'period': '5y'},    # ~1250 bars
+    '240': {'interval': '1h',  'period': '730d'},  # ~4380 1h → ~1095 4h bars
+    '60':  {'interval': '1h',  'period': '730d'},  # ~4380 bars
+    '15':  {'interval': '15m', 'period': '60d'},   # yfinance limit
+    '5':   {'interval': '5m',  'period': '60d'},   # yfinance limit
 }
 
 

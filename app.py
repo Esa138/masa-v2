@@ -8457,9 +8457,8 @@ elif page == "⭐ التلاقي الذهبي":
         # Purple-zone filter option
         _only_purple = st.checkbox("🟣 اعرض فقط الأسهم القريبة/الواصلة لمنطقة قوي خالص (بنفسجية)", value=False, key="conf_only_purple")
 
-        # Use D + 4H + 1H for richer/correct tier classification
-        # (without 60, every D·240 cluster gets labeled "Pure Strong")
-        _scan_tfs = ['D', '240', '60']
+        # All 5 TFs to match Pine v7.2 exactly (D·240·60·15·5)
+        _scan_tfs = ['D', '240', '60', '15', '5']
         _tickers = list(_stocks_dict.keys())
         _scan_rows = []
         _progress = st.progress(0.0, text="بدء المسح...")
@@ -8481,10 +8480,13 @@ elif page == "⭐ التلاقي الذهبي":
                 _res = _engine_scan.analyze(_tfd, _cp)
                 _flt = apply_all_filters(_res, _tfd[_ref])
 
-                # Detect Pure Strong (purple) zones touched or near current price
+                # Detect Pure Strong (purple) zones: must be multi-TF confluence
+                # (matches Pine's minBoxTFs=2 — single-TF purple is just a line)
                 _purple_zones = [
                     z for z in _res['zones']
-                    if z.strength.tier == _ST.PURE_STRONG and z.status in ('✅ ملموس', '🎯 قريب')
+                    if z.strength.tier == _ST.PURE_STRONG
+                    and z.tf_count >= 2
+                    and z.status in ('✅ ملموس', '🎯 قريب')
                 ]
                 _purple_status = ""
                 _purple_price = None
@@ -8635,7 +8637,9 @@ elif page == "⭐ التلاقي الذهبي":
         from core.confluence import StrengthTier as _ST_single
         _purple_hits = [
             z for z in _result['zones']
-            if z.strength.tier == _ST_single.PURE_STRONG and z.status in ('✅ ملموس', '🎯 قريب')
+            if z.strength.tier == _ST_single.PURE_STRONG
+            and z.tf_count >= 2
+            and z.status in ('✅ ملموس', '🎯 قريب')
         ]
         if _purple_hits:
             _pz = min(_purple_hits, key=lambda z: z.distance_from_price_pct)
