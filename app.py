@@ -8368,6 +8368,32 @@ elif page == "⭐ التلاقي الذهبي":
         st.error(f"تعذّر تحميل وحدة التلاقي: {_e}")
         st.stop()
 
+    # ── Always-visible color legend
+    with st.container():
+        _lg_cols = st.columns(5)
+        _order = [
+            StrengthTier.PURE_STRONG,
+            StrengthTier.MIXED_STRONG,
+            StrengthTier.PURE_MEDIUM,
+            StrengthTier.MIXED_MEDIUM,
+            StrengthTier.PURE_FAST,
+        ]
+        for _i, _t in enumerate(_order):
+            _inf = TIER_INFO[_t]
+            with _lg_cols[_i]:
+                st.markdown(
+                    f"<div style='background:{_inf.color};border-radius:8px;padding:10px;"
+                    f"text-align:center;color:#fff;height:115px'>"
+                    f"<div style='font-size:0.95em;font-weight:700'>{_inf.label}</div>"
+                    f"<div style='font-size:1.1em;margin:4px 0'>{_inf.stars or '—'}</div>"
+                    f"<div style='font-size:0.72em;opacity:0.92'>موثوقية {_inf.reliability}/5 · "
+                    f"مخاطرة {_inf.risk_pct}%</div>"
+                    f"<div style='font-size:0.7em;opacity:0.85;margin-top:2px'>{_inf.holding_days}</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+        st.caption("🎨 دليل ألوان مناطق التلاقي — كل لون يعكس قوة المنطقة وفريماتها")
+
     # Import market lists for dropdown
     try:
         from data.markets import SAUDI_STOCKS, US_STOCKS, CRYPTO_STOCKS
