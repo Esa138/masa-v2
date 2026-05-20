@@ -8480,12 +8480,14 @@ elif page == "⭐ التلاقي الذهبي":
                 _res = _engine_scan.analyze(_tfd, _cp)
                 _flt = apply_all_filters(_res, _tfd[_ref])
 
-                # Detect Pure Strong (purple) zones: must be multi-TF confluence
-                # (matches Pine's minBoxTFs=2 — single-TF purple is just a line)
+                # Purple SUPPORT alert: only multi-TF Pure Strong supports
+                # (buy opportunity zones). Resistances at the same tier are
+                # ceiling zones — we don't flag those as buy alerts.
                 _purple_zones = [
                     z for z in _res['zones']
                     if z.strength.tier == _ST.PURE_STRONG
                     and z.tf_count >= 2
+                    and not z.is_resistance
                     and z.status in ('✅ ملموس', '🎯 قريب')
                 ]
                 _purple_status = ""
@@ -8635,6 +8637,8 @@ elif page == "⭐ التلاقي الذهبي":
 
         # ── Purple zone alert banner
         from core.confluence import StrengthTier as _ST_single
+        # Show banner for ANY tier=PURE_STRONG multi-TF zone (support or resistance)
+        # — useful info either way on the detail page.
         _purple_hits = [
             z for z in _result['zones']
             if z.strength.tier == _ST_single.PURE_STRONG
