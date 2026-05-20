@@ -5,7 +5,7 @@ import pandas as pd
 from dataclasses import dataclass
 from typing import Dict, List
 
-from .zero_reversal import compute_zr1_zr2, find_all_pivot_levels
+from .zero_reversal import compute_zr1_zr2
 from .gamma import compute_gamma, gamma_slope
 from .clustering import cluster_levels, Cluster, TF_BITS
 from .strength_tier import classify_strength, StrengthInfo
@@ -46,10 +46,10 @@ class ConfluenceEngine:
 
     def __init__(
         self,
-        cluster_pct: float = 0.5,
-        touch_pct: float = 0.5,
-        max_dist_pct: float = 10.0,
-        min_box_tfs: int = 2,
+        cluster_pct: float = 0.5,    # Pine default
+        touch_pct: float = 0.5,      # Pine default
+        max_dist_pct: float = 100.0, # Pine default = no filtering
+        min_box_tfs: int = 2,        # Pine default
     ):
         self.cluster_pct = cluster_pct
         self.touch_pct = touch_pct
@@ -64,17 +64,16 @@ class ConfluenceEngine:
             if tf_name not in TF_BITS or df is None or df.empty:
                 continue
 
+            # Match Pine exactly: only ZR1 + ZR2 ceiling/floor per TF.
+            # ZR1 = highest pivot high & lowest pivot low in last 400 bars (confirm=25).
+            # ZR2 = same with bars=300, confirm=30.
             zr = compute_zr1_zr2(df)
-            # confirm_len=15 balances signal vs. noise for swing pivots.
-            # bars=500 covers ~2y of daily data so historical zones are captured.
-            pivots = find_all_pivot_levels(df, bars=500, confirm_len=15, max_levels=40)
             gamma = compute_gamma(df, length=600, ma_type='HMA')
 
             gamma_val = float(gamma.iloc[-1]) if len(gamma) > 0 and pd.notna(gamma.iloc[-1]) else None
 
             per_tf_data[tf_name] = {
                 'zr': zr,
-                'pivots': pivots,
                 'gamma_current': gamma_val,
                 'gamma_slope': gamma_slope(gamma, lookback=5),
                 'price_above_gamma': (current_price > gamma_val) if gamma_val else None,
@@ -109,16 +108,15 @@ class ConfluenceEngine:
         }
 
     def _collect_raw_levels(self, per_tf_data: dict, current_price: float) -> List[dict]:
-        """Gather all ZR + all pivot levels from all timeframes."""
+        """Gather z1h/z1l/z2h/z2l from each TF — matches Pine f_addCluster calls."""
         levels = []
         for tf_name, data in per_tf_data.items():
             tf_bit = TF_BITS[tf_name]
-
-            # 1) Main ZR ceiling/floor (still useful as anchor)
             zr = data.get('zr', {})
             for key, price in zr.items():
                 if price is None or pd.isna(price) or price <= 0:
                     continue
+                # Pine: bool isRes = close < price
                 is_res = current_price < price
                 levels.append({
                     'price': price,
@@ -126,36 +124,15 @@ class ConfluenceEngine:
                     'tf_bit': tf_bit,
                     'source': f"{tf_name}-{key}",
                 })
-
-            # 2) All pivot highs/lows in window — much richer S/R map
-            pivots = data.get('pivots', {})
-            for h in pivots.get('highs', []):
-                if h is None or pd.isna(h) or h <= 0:
-                    continue
-                is_res = current_price < h
-                levels.append({
-                    'price': h,
-                    'is_resistance': is_res,
-                    'tf_bit': tf_bit,
-                    'source': f"{tf_name}-pH",
-                })
-            for l in pivots.get('lows', []):
-                if l is None or pd.isna(l) or l <= 0:
-                    continue
-                is_res = current_price < l
-                levels.append({
-                    'price': l,
-                    'is_resistance': is_res,
-                    'tf_bit': tf_bit,
-                    'source': f"{tf_name}-pL",
-                })
         return levels
 
     def _build_zones(self, clusters: List[Cluster], current_price: float) -> List[ConfluenceZone]:
         """Convert clusters to ConfluenceZones with strength tiers."""
         zones = []
         for cluster in clusters:
-            # Skip weak single-TF clusters unless from D/240
+            # Pine: showCluster requires tf_count >= min_box_tfs (default 2),
+            # else fall through to showAllLevelsV2 (still display as a single line).
+            # We keep single-TF clusters from D/240 (strong source); skip the rest.
             if cluster.tf_count < self.min_box_tfs and not self._is_strong_single(cluster):
                 continue
 

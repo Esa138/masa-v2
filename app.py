@@ -8421,19 +8421,19 @@ elif page == "⭐ التلاقي الذهبي":
         else:
             _conf_ticker = st.text_input("الرمز", value="2222.SR", key="conf_ticker_input")
 
-    # Defaults tuned to match TradingView Pine indicator output
-    _conf_cluster_pct = 1.5
-    _conf_max_dist = 25.0
-    _conf_tfs = ['D', '240', '60', '15']
+    # Defaults match Pine v7.2 exactly
+    _conf_cluster_pct = 0.5
+    _conf_max_dist = 100.0
+    _conf_tfs = ['D', '240', '60', '15', '5']
 
     with st.expander("⚙️ إعدادات متقدمة (اختياري)"):
         _ac1, _ac2 = st.columns(2)
         with _ac1:
-            _conf_cluster_pct = st.slider("عرض التجميع %", 0.1, 3.0, 1.5, 0.1,
-                help="نسبة دمج المستويات المتقاربة. 1.5% يطابق TradingView")
+            _conf_cluster_pct = st.slider("عرض التجميع %", 0.1, 5.0, 0.5, 0.1,
+                help="نسبة دمج المستويات المتقاربة (Pine: 0.5)")
         with _ac2:
-            _conf_max_dist = st.slider("أقصى بُعد %", 5.0, 50.0, 25.0, 1.0,
-                help="أبعد منطقة معروضة. 25% يلتقط المناطق التاريخية")
+            _conf_max_dist = st.slider("أقصى بُعد %", 5.0, 100.0, 100.0, 1.0,
+                help="100 = بدون فلترة (Pine الافتراضي)")
         _conf_tfs = st.multiselect(
             "الفريمات",
             options=['D', '240', '60', '15', '5'],
