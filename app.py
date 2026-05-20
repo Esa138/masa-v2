@@ -8457,45 +8457,66 @@ elif page == "⭐ التلاقي الذهبي":
         # Purple-zone filter option
         _only_purple = st.checkbox("🟣 اعرض فقط الأسهم القريبة/الواصلة لمنطقة قوي خالص (بنفسجية)", value=False, key="conf_only_purple")
 
-        # All 5 TFs to match Pine v7.2 exactly (D·240·60·15·5)
-        _scan_tfs = ['D', '240', '60', '15', '5']
+        # Scan uses D + 4H + 1H (covers all purple-tier detection).
+        # 15m/5m skipped for speed; they don't change Pure/Mixed Strong
+        # classifications (those depend on D/240). Single-stock view keeps all 5.
+        _scan_tfs = ['D', '240', '60']
         _tickers = list(_stocks_dict.keys())
         _scan_rows = []
-        _progress = st.progress(0.0, text="بدء المسح المتوازي...")
         _engine_scan = ConfluenceEngine(cluster_pct=_conf_cluster_pct, max_dist_pct=_conf_max_dist)
 
-        from core.confluence import StrengthTier as _ST, fetch_multi_tf_data_cached
+        from core.confluence import StrengthTier as _ST, fetch_daily_batch, fetch_single_tf
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        def _analyze_one(_tk):
-            """Fetch + analyze one ticker. Returns row dict or None."""
+        # PHASE 1: Bulk fetch all daily data in one yfinance call
+        _progress = st.progress(0.0, text=f"📥 جلب البيانات اليومية لـ {len(_tickers)} سهم...")
+        _daily_data = fetch_daily_batch(_tickers, period='5y')
+        _progress.progress(0.2, text=f"✅ جُلبت {len(_daily_data)} يومي · جاري جلب 4H + 1H...")
+
+        # PHASE 2: Parallel-fetch 240 and 60 for tickers that have daily data
+        def _fetch_intraday(_tk):
             try:
-                _tfd = fetch_multi_tf_data_cached(_tk, timeframes=_scan_tfs)
+                return (_tk, fetch_single_tf(_tk, '240'), fetch_single_tf(_tk, '60'))
+            except Exception:
+                return (_tk, None, None)
+
+        _intraday: dict = {}
+        _intraday_done = 0
+        with ThreadPoolExecutor(max_workers=20) as _ex:
+            _futures = {_ex.submit(_fetch_intraday, _tk): _tk for _tk in _daily_data.keys()}
+            for _fut in as_completed(_futures):
+                _intraday_done += 1
+                _tk, _df240, _df60 = _fut.result()
+                _intraday[_tk] = {'240': _df240, '60': _df60}
+                if _intraday_done % 10 == 0 or _intraday_done == len(_daily_data):
+                    _frac = 0.2 + 0.6 * (_intraday_done / max(1, len(_daily_data)))
+                    _progress.progress(min(0.8, _frac),
+                        text=f"📥 4H + 1H ({_intraday_done}/{len(_daily_data)})")
+
+        # PHASE 3: Analyze all tickers with their fetched data
+        _progress.progress(0.85, text="🧠 جاري التحليل...")
+        _results_list = []
+        for _tk in _tickers:
+            try:
+                _tfd = {}
+                if _tk in _daily_data:
+                    _tfd['D'] = _daily_data[_tk]
+                _intra = _intraday.get(_tk, {})
+                if _intra.get('240') is not None and not _intra['240'].empty:
+                    _tfd['240'] = _intra['240']
+                if _intra.get('60') is not None and not _intra['60'].empty:
+                    _tfd['60'] = _intra['60']
                 if not _tfd:
-                    return None
-                _ref = next((t for t in ['5','15','60','240','D'] if t in _tfd), None)
+                    continue
+                _ref = next((t for t in ['60','240','D'] if t in _tfd), None)
                 if _ref is None:
-                    return None
+                    continue
                 _cp = float(_tfd[_ref]['close'].iloc[-1])
                 _res = _engine_scan.analyze(_tfd, _cp)
                 _flt = apply_all_filters(_res, _tfd[_ref])
-                return (_tk, _cp, _res, _flt)
+                _results_list.append((_tk, _cp, _res, _flt))
             except Exception:
-                return None
-
-        _done = 0
-        _results_list = []
-        # 10 workers — yfinance is I/O bound, this is safe
-        with ThreadPoolExecutor(max_workers=10) as _ex:
-            _futures = {_ex.submit(_analyze_one, _tk): _tk for _tk in _tickers}
-            for _fut in as_completed(_futures):
-                _done += 1
-                _tk = _futures[_fut]
-                _progress.progress(_done / len(_tickers), text=f"تحليل ({_done}/{len(_tickers)})")
-                _outcome = _fut.result()
-                if _outcome is None:
-                    continue
-                _results_list.append(_outcome)
+                continue
 
         # Process the analyzed results into table rows
         for _tk, _cp, _res, _flt in _results_list:

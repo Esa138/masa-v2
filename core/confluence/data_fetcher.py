@@ -135,6 +135,54 @@ def fetch_multi_tf_data(
     return out
 
 
+def fetch_daily_batch(tickers: list, period: str = '5y') -> Dict[str, pd.DataFrame]:
+    """
+    Bulk download daily OHLCV for many tickers in ONE yfinance call.
+
+    Much faster than per-ticker calls when scanning a market:
+    250 tickers × individual = ~250 requests
+    250 tickers batched     = ~1 request
+    """
+    if not tickers:
+        return {}
+
+    out: Dict[str, pd.DataFrame] = {}
+    try:
+        df_all = yf.download(
+            tickers=' '.join(tickers),
+            period=period,
+            interval='1d',
+            group_by='ticker',
+            progress=False,
+            auto_adjust=False,
+            threads=True,
+        )
+    except Exception:
+        return out
+
+    if df_all is None or df_all.empty:
+        return out
+
+    # When >1 ticker, columns are MultiIndex (ticker, field)
+    if isinstance(df_all.columns, pd.MultiIndex):
+        for tk in tickers:
+            try:
+                if tk in df_all.columns.get_level_values(0):
+                    sub = df_all[tk]
+                    sub = _normalize_df(sub)
+                    if not sub.empty:
+                        out[tk] = sub
+            except Exception:
+                continue
+    else:
+        # Single ticker case
+        sub = _normalize_df(df_all)
+        if not sub.empty and tickers:
+            out[tickers[0]] = sub
+
+    return out
+
+
 # ── In-process cache wrapper (5-min TTL) ─────────────────────
 _CACHE: Dict[tuple, tuple] = {}  # (ticker, tf_tuple) -> (timestamp, data_dict)
 _CACHE_TTL_SEC = 300
