@@ -88,8 +88,10 @@ class ConfluenceEngine:
         # 3. Cluster
         clusters = cluster_levels(raw_levels, cluster_pct=self.cluster_pct)
 
-        # 4. Build zones
-        zones = self._build_zones(clusters, current_price)
+        # 4. Build zones — use lowest active TF for interaction tracking
+        _ref_tf = next((t for t in ['5', '15', '60', '240', 'D'] if t in tf_data), None)
+        _ref_df = tf_data.get(_ref_tf) if _ref_tf else None
+        zones = self._build_zones(clusters, current_price, ref_df=_ref_df)
 
         # 5. Filter by max distance
         zones = [z for z in zones if z.distance_from_price_pct <= self.max_dist_pct]
@@ -126,13 +128,69 @@ class ConfluenceEngine:
                 })
         return levels
 
-    def _build_zones(self, clusters: List[Cluster], current_price: float) -> List[ConfluenceZone]:
+    def _compute_interaction(self, zone_price, current_price, ref_df, touch_threshold, lookback_bars: int = 20):
+        """
+        Determine how price has been interacting with the zone over recent bars:
+        - ✅ داخل المنطقة (still in zone)
+        - 🔄 ارتد من الدعم  (touched and bounced up — support held)
+        - 🔄 ارتد من المقاومة (touched and bounced down — resistance held)
+        - 💥 اخترق صعوداً (broke up through zone)
+        - 💥 كسر هبوطاً (broke down through zone)
+        - 🎯 يقترب (close but no recent touch)
+        - ⏸️ بعيد (far)
+        """
+        if abs(current_price - zone_price) <= touch_threshold:
+            return "✅ داخل المنطقة"
+
+        if ref_df is None or len(ref_df) < 3:
+            # fallback to static
+            dist_pct = abs(current_price - zone_price) / current_price * 100
+            if dist_pct <= max(self.touch_pct * 6, 3.0):
+                return "🎯 يقترب"
+            return "⏸️ بعيد"
+
+        # Look back N bars for a touch event
+        N = min(lookback_bars, len(ref_df))
+        recent = ref_df.tail(N)
+
+        touched_idx = None
+        for i in range(N - 1, -1, -1):  # newest to oldest
+            bar = recent.iloc[i]
+            if (bar['low'] - touch_threshold) <= zone_price <= (bar['high'] + touch_threshold):
+                touched_idx = i
+                break
+
+        is_above = current_price > zone_price
+
+        if touched_idx is None:
+            dist_pct = abs(current_price - zone_price) / current_price * 100
+            if dist_pct <= max(self.touch_pct * 6, 3.0):
+                return "🎯 يقترب من " + ("الأعلى" if is_above else "الأسفل")
+            return "⏸️ بعيد"
+
+        # Determine which side price came from before the touch
+        if touched_idx > 0:
+            before = recent.iloc[:touched_idx]
+            avg_close = float(before['close'].mean())
+            was_above = avg_close > zone_price
+        else:
+            was_above = is_above
+
+        if was_above and is_above:
+            return "🔄 ارتد من الدعم"
+        if (not was_above) and (not is_above):
+            return "🔄 ارتد من المقاومة"
+        if was_above and (not is_above):
+            return "💥 كسر هبوطاً"
+        if (not was_above) and is_above:
+            return "💥 اخترق صعوداً"
+
+        return "⏸️ بعيد"
+
+    def _build_zones(self, clusters: List[Cluster], current_price: float, ref_df=None) -> List[ConfluenceZone]:
         """Convert clusters to ConfluenceZones with strength tiers."""
         zones = []
         for cluster in clusters:
-            # Pine: showCluster requires tf_count >= min_box_tfs (default 2),
-            # else fall through to showAllLevelsV2 (still display as a single line).
-            # We keep single-TF clusters from D/240 (strong source); skip the rest.
             if cluster.tf_count < self.min_box_tfs and not self._is_strong_single(cluster):
                 continue
 
@@ -142,17 +200,11 @@ class ConfluenceEngine:
             touch_threshold = current_price * self.touch_pct / 100 if current_price else 0
             is_touched = abs(current_price - cluster.price) <= touch_threshold
 
-            # Status: broken / touched / approaching / far
-            if is_touched:
-                status = "✅ ملموس"
-            elif cluster.is_resistance and current_price > cluster.price + touch_threshold:
-                status = "⚡ مكسور (اختراق)"
-            elif (not cluster.is_resistance) and current_price < cluster.price - touch_threshold:
-                status = "⚡ مكسور (هبوط)"
-            elif dist_pct <= max(self.touch_pct * 6, 3.0):  # within ~3%
-                status = "🎯 قريب"
-            else:
-                status = "⏸️ بعيد"
+            # Dynamic interaction status — uses recent bars to detect bounce/break
+            status = self._compute_interaction(
+                cluster.price, current_price, ref_df, touch_threshold,
+                lookback_bars=20,
+            )
 
             zones.append(ConfluenceZone(
                 price=cluster.price,

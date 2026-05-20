@@ -8490,7 +8490,7 @@ elif page == "⭐ التلاقي الذهبي":
                     if z.strength.tier in (_ST.PURE_STRONG, _ST.MIXED_STRONG)
                     and z.tf_count >= 2
                     and (z.mask & 1)  # Daily must be part of the confluence
-                    and z.status in ('✅ ملموس', '🎯 قريب')
+                    and (z.status.startswith('✅') or z.status.startswith('🎯') or z.status.startswith('🔄') or z.status.startswith('💥'))
                 ]
                 _purple_status = ""
                 _purple_price = None
@@ -8649,7 +8649,7 @@ elif page == "⭐ التلاقي الذهبي":
             if z.strength.tier in (_ST_single.PURE_STRONG, _ST_single.MIXED_STRONG)
             and z.tf_count >= 2
             and (z.mask & 1)
-            and z.status in ('✅ ملموس', '🎯 قريب')
+            and (z.status.startswith('✅') or z.status.startswith('🎯') or z.status.startswith('🔄') or z.status.startswith('💥'))
         ]
         if _purple_hits:
             _pz = min(_purple_hits, key=lambda z: z.distance_from_price_pct)
@@ -8696,7 +8696,7 @@ elif page == "⭐ التلاقي الذهبي":
             else:
                 st.info("ما فيه مقاومة قريبة")
 
-        st.caption("✅ ملموس = داخل نطاق اللمس · 🎯 قريب = ≤ 3× نطاق اللمس · ⚡ مكسور = السعر تجاوز المنطقة · ⏸️ بعيد")
+        st.caption("✅ داخل المنطقة · 🔄 ارتد (الدعم/المقاومة صمدت) · 💥 كسر/اخترق · 🎯 يقترب · ⏸️ بعيد")
 
         # ── Full zones table
         st.markdown("### 🗺️ كل مناطق التلاقي")
