@@ -5,6 +5,9 @@ Uses yfinance with caching and column normalization.
 import pandas as pd
 import yfinance as yf
 from typing import Dict, Optional
+from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
+import time
 
 
 # TF name -> (yfinance interval, period)
@@ -99,14 +102,58 @@ def fetch_single_tf(ticker: str, tf: str) -> pd.DataFrame:
 def fetch_multi_tf_data(
     ticker: str,
     timeframes: Optional[list] = None,
+    parallel: bool = True,
 ) -> Dict[str, pd.DataFrame]:
-    """Fetch OHLCV for multiple timeframes. Returns dict {tf_name: df}."""
+    """
+    Fetch OHLCV for multiple timeframes. Returns dict {tf_name: df}.
+
+    With parallel=True (default), fetches all TFs concurrently using a
+    thread pool — typically 3-5× faster for multi-TF requests.
+    """
     if timeframes is None:
         timeframes = ['D', '240', '60', '15', '5']
 
     out: Dict[str, pd.DataFrame] = {}
-    for tf in timeframes:
-        df = fetch_single_tf(ticker, tf)
-        if df is not None and not df.empty:
-            out[tf] = df
+
+    if parallel and len(timeframes) > 1:
+        with ThreadPoolExecutor(max_workers=min(5, len(timeframes))) as ex:
+            futures = {ex.submit(fetch_single_tf, ticker, tf): tf for tf in timeframes}
+            for fut in futures:
+                tf = futures[fut]
+                try:
+                    df = fut.result(timeout=30)
+                    if df is not None and not df.empty:
+                        out[tf] = df
+                except Exception:
+                    pass
+    else:
+        for tf in timeframes:
+            df = fetch_single_tf(ticker, tf)
+            if df is not None and not df.empty:
+                out[tf] = df
+
     return out
+
+
+# ── In-process cache wrapper (5-min TTL) ─────────────────────
+_CACHE: Dict[tuple, tuple] = {}  # (ticker, tf_tuple) -> (timestamp, data_dict)
+_CACHE_TTL_SEC = 300
+
+
+def fetch_multi_tf_data_cached(
+    ticker: str,
+    timeframes: Optional[list] = None,
+) -> Dict[str, pd.DataFrame]:
+    """Same as fetch_multi_tf_data but caches results in-process for 5 minutes."""
+    if timeframes is None:
+        timeframes = ['D', '240', '60', '15', '5']
+    key = (ticker, tuple(sorted(timeframes)))
+    now = time.time()
+
+    cached = _CACHE.get(key)
+    if cached and (now - cached[0]) < _CACHE_TTL_SEC:
+        return cached[1]
+
+    data = fetch_multi_tf_data(ticker, timeframes=timeframes, parallel=True)
+    _CACHE[key] = (now, data)
+    return data

@@ -88,8 +88,10 @@ class ConfluenceEngine:
         # 3. Cluster
         clusters = cluster_levels(raw_levels, cluster_pct=self.cluster_pct)
 
-        # 4. Build zones — use lowest active TF for interaction tracking
-        _ref_tf = next((t for t in ['5', '15', '60', '240', 'D'] if t in tf_data), None)
+        # 4. Build zones — use 60m for interaction tracking (covers ~5-10 days
+        # of price action with the 50-bar lookback, capturing bounces/breaks
+        # that intraday 5m would miss).
+        _ref_tf = next((t for t in ['60', '15', '240', 'D', '5'] if t in tf_data), None)
         _ref_df = tf_data.get(_ref_tf) if _ref_tf else None
         zones = self._build_zones(clusters, current_price, ref_df=_ref_df)
 
@@ -200,10 +202,11 @@ class ConfluenceEngine:
             touch_threshold = current_price * self.touch_pct / 100 if current_price else 0
             is_touched = abs(current_price - cluster.price) <= touch_threshold
 
-            # Dynamic interaction status — uses recent bars to detect bounce/break
+            # Dynamic interaction status. Lookback=50 bars on 60m TF =
+            # ~5-10 trading days, enough to capture multi-day bounces.
             status = self._compute_interaction(
                 cluster.price, current_price, ref_df, touch_threshold,
-                lookback_bars=20,
+                lookback_bars=50,
             )
 
             zones.append(ConfluenceZone(

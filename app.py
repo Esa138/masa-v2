@@ -8461,24 +8461,45 @@ elif page == "⭐ التلاقي الذهبي":
         _scan_tfs = ['D', '240', '60', '15', '5']
         _tickers = list(_stocks_dict.keys())
         _scan_rows = []
-        _progress = st.progress(0.0, text="بدء المسح...")
+        _progress = st.progress(0.0, text="بدء المسح المتوازي...")
         _engine_scan = ConfluenceEngine(cluster_pct=_conf_cluster_pct, max_dist_pct=_conf_max_dist)
 
-        # Lazy import for tier check
-        from core.confluence import StrengthTier as _ST
+        from core.confluence import StrengthTier as _ST, fetch_multi_tf_data_cached
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        for _i, _tk in enumerate(_tickers):
-            _progress.progress((_i + 1) / len(_tickers), text=f"تحليل {_tk} ({_i+1}/{len(_tickers)})...")
+        def _analyze_one(_tk):
+            """Fetch + analyze one ticker. Returns row dict or None."""
             try:
-                _tfd = fetch_multi_tf_data(_tk, timeframes=_scan_tfs)
+                _tfd = fetch_multi_tf_data_cached(_tk, timeframes=_scan_tfs)
                 if not _tfd:
-                    continue
-                _ref = next((t for t in ['240', 'D'] if t in _tfd), None)
+                    return None
+                _ref = next((t for t in ['5','15','60','240','D'] if t in _tfd), None)
                 if _ref is None:
-                    continue
+                    return None
                 _cp = float(_tfd[_ref]['close'].iloc[-1])
                 _res = _engine_scan.analyze(_tfd, _cp)
                 _flt = apply_all_filters(_res, _tfd[_ref])
+                return (_tk, _cp, _res, _flt)
+            except Exception:
+                return None
+
+        _done = 0
+        _results_list = []
+        # 10 workers — yfinance is I/O bound, this is safe
+        with ThreadPoolExecutor(max_workers=10) as _ex:
+            _futures = {_ex.submit(_analyze_one, _tk): _tk for _tk in _tickers}
+            for _fut in as_completed(_futures):
+                _done += 1
+                _tk = _futures[_fut]
+                _progress.progress(_done / len(_tickers), text=f"تحليل ({_done}/{len(_tickers)})")
+                _outcome = _fut.result()
+                if _outcome is None:
+                    continue
+                _results_list.append(_outcome)
+
+        # Process the analyzed results into table rows
+        for _tk, _cp, _res, _flt in _results_list:
+            try:
 
                 # Purple alert: Pure Strong + Mixed Strong tiers are both purple.
                 # CRITICAL: require the cluster to include Daily (mask bit 1)
