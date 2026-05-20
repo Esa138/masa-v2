@@ -8368,27 +8368,53 @@ elif page == "⭐ التلاقي الذهبي":
         st.error(f"تعذّر تحميل وحدة التلاقي: {_e}")
         st.stop()
 
-    _c_col1, _c_col2, _c_col3 = st.columns([2, 1, 1])
-    with _c_col1:
-        _conf_ticker = st.text_input(
-            "الرمز (Yahoo Finance)",
-            value="2222.SR",
-            help="مثل: 2222.SR للسعودي، AAPL للأمريكي، BTC-USD للعملات",
-            key="conf_ticker_input",
+    # Import market lists for dropdown
+    try:
+        from data.markets import SAUDI_STOCKS, US_STOCKS, CRYPTO_STOCKS
+    except Exception:
+        SAUDI_STOCKS, US_STOCKS, CRYPTO_STOCKS = {}, {}, {}
+
+    _market_options = {
+        "🇸🇦 السوق السعودي": SAUDI_STOCKS,
+        "🇺🇸 السوق الأمريكي": US_STOCKS,
+        "₿ العملات الرقمية": CRYPTO_STOCKS,
+    }
+
+    _mc1, _mc2 = st.columns([1, 3])
+    with _mc1:
+        _conf_market = st.selectbox("السوق", list(_market_options.keys()), key="conf_market_sel")
+    with _mc2:
+        _stocks_dict = _market_options[_conf_market]
+        if _stocks_dict:
+            # Show "name (ticker)" but return ticker
+            _conf_ticker = st.selectbox(
+                "السهم",
+                options=list(_stocks_dict.keys()),
+                format_func=lambda t: f"{_stocks_dict.get(t, t)} ({t})",
+                key="conf_ticker_sel",
+            )
+        else:
+            _conf_ticker = st.text_input("الرمز", value="2222.SR", key="conf_ticker_input")
+
+    # Sensible defaults — advanced settings hidden
+    _conf_cluster_pct = 0.5
+    _conf_max_dist = 10.0
+    _conf_tfs = ['D', '240', '60', '15']
+
+    with st.expander("⚙️ إعدادات متقدمة (اختياري)"):
+        _ac1, _ac2 = st.columns(2)
+        with _ac1:
+            _conf_cluster_pct = st.slider("عرض التجميع %", 0.1, 2.0, 0.5, 0.1)
+        with _ac2:
+            _conf_max_dist = st.slider("أقصى بُعد %", 2.0, 30.0, 10.0, 1.0)
+        _conf_tfs = st.multiselect(
+            "الفريمات",
+            options=['D', '240', '60', '15', '5'],
+            default=['D', '240', '60', '15'],
+            format_func=lambda x: {'D':'يومي','240':'4 ساعات','60':'ساعة','15':'15د','5':'5د'}.get(x, x),
         )
-    with _c_col2:
-        _conf_cluster_pct = st.slider("عرض التجميع %", 0.1, 2.0, 0.5, 0.1)
-    with _c_col3:
-        _conf_max_dist = st.slider("أقصى بُعد %", 2.0, 30.0, 10.0, 1.0)
 
-    _conf_tfs = st.multiselect(
-        "الفريمات",
-        options=['D', '240', '60', '15', '5'],
-        default=['D', '240', '60', '15'],
-        format_func=lambda x: {'D':'يومي','240':'4 ساعات','60':'ساعة','15':'15د','5':'5د'}.get(x, x),
-    )
-
-    if st.button("🔍 تحليل التلاقي", type="primary", use_container_width=True):
+    if st.button(f"🔍 حلّل {_conf_ticker}", type="primary", use_container_width=True):
         with st.spinner(f"جاري تحميل بيانات {_conf_ticker} لـ {len(_conf_tfs)} فريم..."):
             _tf_data = fetch_multi_tf_data(_conf_ticker, timeframes=_conf_tfs)
 
