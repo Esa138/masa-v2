@@ -8480,15 +8480,16 @@ elif page == "⭐ التلاقي الذهبي":
                 _res = _engine_scan.analyze(_tfd, _cp)
                 _flt = apply_all_filters(_res, _tfd[_ref])
 
-                # Purple alert: Pure Strong (#ba68c8) + Mixed Strong (#7e57c2)
-                # tiers are both PURPLE in Pine. Include support AND resistance
-                # because data differences between yfinance and TADAWUL can flip
-                # the classification — a pivot low slightly above current price
-                # is technically resistance but still marks the strong zone.
+                # Purple alert: Pure Strong + Mixed Strong tiers are both purple.
+                # CRITICAL: require the cluster to include Daily (mask bit 1)
+                # to filter out intraday-only confluences that yfinance
+                # creates as resampling artifacts near current price.
+                # A genuine purple confluence anchors to the daily timeframe.
                 _purple_zones = [
                     z for z in _res['zones']
                     if z.strength.tier in (_ST.PURE_STRONG, _ST.MIXED_STRONG)
                     and z.tf_count >= 2
+                    and (z.mask & 1)  # Daily must be part of the confluence
                     and z.status in ('✅ ملموس', '🎯 قريب')
                 ]
                 _purple_status = ""
@@ -8641,11 +8642,13 @@ elif page == "⭐ التلاقي الذهبي":
 
         # ── Purple zone alert banner
         from core.confluence import StrengthTier as _ST_single
-        # Banner: any multi-TF Pure Strong OR Mixed Strong zone (both purple in Pine)
+        # Banner: purple zones must include Daily TF (mask bit 1)
+        # to avoid intraday-only false positives from yfinance resampling.
         _purple_hits = [
             z for z in _result['zones']
             if z.strength.tier in (_ST_single.PURE_STRONG, _ST_single.MIXED_STRONG)
             and z.tf_count >= 2
+            and (z.mask & 1)
             and z.status in ('✅ ملموس', '🎯 قريب')
         ]
         if _purple_hits:
