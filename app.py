@@ -8490,6 +8490,34 @@ elif page == "⭐ التلاقي الذهبي":
                 and z.tf_count >= 2 and (z.mask & 1)
                 and (z.status.startswith('✅') or z.status.startswith('🎯') or z.status.startswith('🔄') or z.status.startswith('💥'))
             ]
+            # Freshness tracking for the TASI signal (session-state)
+            from datetime import datetime as _dt
+            _tasi_hist = st.session_state.setdefault('conf_tasi_history', {})
+            _now_ts = _dt.now()
+            _tasi_status_now = _tasi_purple[0].status if _tasi_purple else None
+            _tasi_key = f"{_tasi_purple[0].price:.2f}|{_tasi_status_now}" if _tasi_purple else None
+
+            if _tasi_key:
+                _prev = _tasi_hist.get('current')
+                if _prev is None or _prev.get('key') != _tasi_key:
+                    _tasi_hist['current'] = {'key': _tasi_key, 'first_seen': _now_ts}
+                _entry = _tasi_hist['current']
+                _age_min = int((_now_ts - _entry['first_seen']).total_seconds() / 60)
+                _first_seen_str = _entry['first_seen'].strftime('%H:%M')
+                if _age_min < 15:
+                    _light, _light_label = '🟢', 'طازجة'
+                elif _age_min < 60:
+                    _light, _light_label = '🟡', 'متوسطة'
+                elif _age_min < 180:
+                    _light, _light_label = '🟠', 'قديمة'
+                else:
+                    _light, _light_label = '🔴', 'منتهية'
+            else:
+                _tasi_hist.pop('current', None)
+                _age_min = 0
+                _first_seen_str = '—'
+                _light, _light_label = '—', ''
+
             if _tasi_purple:
                 _pz = min(_tasi_purple, key=lambda z: z.distance_from_price_pct)
                 _typ = "مقاومة" if _pz.is_resistance else "دعم"
@@ -8500,7 +8528,10 @@ elif page == "⭐ التلاقي الذهبي":
                     f"<div style='margin-top:4px'>النوع: <b>{_typ}</b> · "
                     f"المنطقة: <b>{_pz.price:,.2f}</b> · "
                     f"البُعد: <b>{_pz.signed_distance_pct:+.2f}%</b> · "
-                    f"الفريمات: <b>{_pz.tf_names}</b> · {_pz.strength.stars}</div></div>",
+                    f"الفريمات: <b>{_pz.tf_names}</b> · {_pz.strength.stars}</div>"
+                    f"<div style='margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.25);font-size:0.95em'>"
+                    f"{_light} <b>{_light_label}</b> · ⏱️ أول ظهور: <b>{_first_seen_str}</b> · 🕐 العمر: <b>{_age_min}د</b>"
+                    f"</div></div>",
                     unsafe_allow_html=True,
                 )
 
@@ -8519,17 +8550,29 @@ elif page == "⭐ التلاقي الذهبي":
                 })
             st.dataframe(pd.DataFrame(_tasi_tf_rows), use_container_width=True, hide_index=True)
 
-            # Zones table
+            # Zones table with per-zone freshness tracking
             st.markdown("### 🗺️ مناطق التلاقي")
+            _zones_hist = st.session_state.setdefault('conf_tasi_zones_history', {})
             _tasi_zones_data = []
-            for z in _tasi_res['zones'][:15]:  # top 15 zones
+            for z in _tasi_res['zones'][:15]:
+                _zkey = f"{round(z.price, 2)}"
+                _zentry = _zones_hist.get(_zkey)
+                if _zentry is None or _zentry.get('status') != z.status:
+                    _zones_hist[_zkey] = {'status': z.status, 'first_seen': _now_ts}
+                    _zentry = _zones_hist[_zkey]
+                _z_age = int((_now_ts - _zentry['first_seen']).total_seconds() / 60)
+                _z_first = _zentry['first_seen'].strftime('%H:%M')
+                _z_light = '🟢' if _z_age < 15 else '🟡' if _z_age < 60 else '🟠' if _z_age < 180 else '🔴'
                 _tasi_zones_data.append({
+                    '🚦': _z_light,
                     'الحالة': z.status,
                     'النوع': 'مقاومة' if z.is_resistance else 'دعم',
                     'السعر': f"{z.price:,.2f}",
                     'البُعد': f"{z.signed_distance_pct:+.2f}%",
                     'الفريمات': z.tf_names,
                     'القوة': f"{z.strength.label} {z.strength.stars}".strip(),
+                    '⏱️ أول ظهور': _z_first,
+                    '🕐 العمر': f"{_z_age}د",
                 })
             if _tasi_zones_data:
                 st.dataframe(pd.DataFrame(_tasi_zones_data), use_container_width=True, hide_index=True, height=400)
