@@ -8441,11 +8441,109 @@ elif page == "⭐ التلاقي الذهبي":
             format_func=lambda x: {'D':'يومي','240':'4 ساعات','60':'ساعة','15':'15د','5':'5د'}.get(x, x),
         )
 
-    _btn_c1, _btn_c2 = st.columns(2)
+    _btn_c1, _btn_c2, _btn_c3 = st.columns([2, 2, 1])
     with _btn_c1:
         _do_single = st.button(f"🔍 حلّل {_conf_ticker}", type="primary", use_container_width=True, key="conf_single_btn")
     with _btn_c2:
         _do_scan = st.button(f"📊 امسح كل السوق ({len(_stocks_dict)} سهم)", use_container_width=True, key="conf_scan_btn")
+    with _btn_c3:
+        _do_tasi = st.button("📈 مؤشر تاسي", use_container_width=True, key="conf_tasi_btn")
+
+    # ─────────────────────────────────────────────
+    # TASI INDEX MODE — standalone analyzer for ^TASI.SR
+    # ─────────────────────────────────────────────
+    if _do_tasi:
+        st.markdown("---")
+        st.markdown(
+            "<div style='background:linear-gradient(90deg,#0f4c81,#1a73e8);"
+            "padding:14px 20px;border-radius:8px;color:#fff;margin:10px 0'>"
+            "<div style='font-size:1.4em;font-weight:800'>📈 تحليل مؤشر تاسي (TASI)</div>"
+            "<div style='opacity:0.9;font-size:0.9em;margin-top:3px'>Tadawul All Shares · ^TASI.SR</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        with st.spinner("جاري جلب بيانات المؤشر..."):
+            _tasi_data = fetch_multi_tf_data('^TASI.SR', timeframes=['D', '240', '60', '15', '5'])
+
+        if not _tasi_data:
+            st.error("تعذّر جلب بيانات المؤشر من yfinance")
+        else:
+            _tasi_ref = next((t for t in ['5','15','60','240','D'] if t in _tasi_data), None)
+            _tasi_cp = float(_tasi_data[_tasi_ref]['close'].iloc[-1])
+            _tasi_engine = ConfluenceEngine(cluster_pct=_conf_cluster_pct, max_dist_pct=_conf_max_dist)
+            _tasi_res = _tasi_engine.analyze(_tasi_data, _tasi_cp)
+            _tasi_flt = apply_all_filters(_tasi_res, _tasi_data[_tasi_ref])
+
+            # Header metrics
+            _th1, _th2, _th3, _th4 = st.columns(4)
+            _th1.metric("📊 قيمة المؤشر", f"{_tasi_cp:,.2f}")
+            _th2.metric("فريمات نشطة", _tasi_res['active_tfs'])
+            _th3.metric("فوق Gamma", f"{_tasi_res['gamma_above_count']}/{_tasi_res['active_tfs']}")
+            _th4.metric("الإشارة", "🟢 شراء ⭐" if _tasi_flt.final_buy_signal else "⏸️ انتظار")
+
+            # Purple banner if applicable
+            from core.confluence import StrengthTier as _ST_t
+            _tasi_purple = [
+                z for z in _tasi_res['zones']
+                if z.strength.tier in (_ST_t.PURE_STRONG, _ST_t.MIXED_STRONG)
+                and z.tf_count >= 2 and (z.mask & 1)
+                and (z.status.startswith('✅') or z.status.startswith('🎯') or z.status.startswith('🔄') or z.status.startswith('💥'))
+            ]
+            if _tasi_purple:
+                _pz = min(_tasi_purple, key=lambda z: z.distance_from_price_pct)
+                _typ = "مقاومة" if _pz.is_resistance else "دعم"
+                st.markdown(
+                    f"<div style='background:linear-gradient(90deg,#7b1fa2,#ba68c8);"
+                    f"padding:14px 20px;border-radius:8px;margin:8px 0;color:#fff'>"
+                    f"<div style='font-size:1.3em;font-weight:800'>🟣 المؤشر {_pz.status} منطقة قوي خالص</div>"
+                    f"<div style='margin-top:4px'>النوع: <b>{_typ}</b> · "
+                    f"المنطقة: <b>{_pz.price:,.2f}</b> · "
+                    f"البُعد: <b>{_pz.signed_distance_pct:+.2f}%</b> · "
+                    f"الفريمات: <b>{_pz.tf_names}</b> · {_pz.strength.stars}</div></div>",
+                    unsafe_allow_html=True,
+                )
+
+            # Per-TF gamma table (like Pine dashboard)
+            st.markdown("### 📊 جدول الفريمات")
+            _tasi_tf_rows = []
+            for _tf, _d in _tasi_res['per_tf'].items():
+                _g = _d.get('gamma_current')
+                _above = _d.get('price_above_gamma')
+                _slope = _d.get('gamma_slope')
+                _tasi_tf_rows.append({
+                    'الفريم': {'D':'يومي','240':'4 ساعات','60':'ساعة','15':'15د','5':'5د'}.get(_tf, _tf),
+                    'قاما 600': f"{_g:,.2f}" if _g else '—',
+                    'الميل': _slope or '—',
+                    'الموقع': '▲ فوق' if _above else '▼ تحت' if _above is False else '—',
+                })
+            st.dataframe(pd.DataFrame(_tasi_tf_rows), use_container_width=True, hide_index=True)
+
+            # Zones table
+            st.markdown("### 🗺️ مناطق التلاقي")
+            _tasi_zones_data = []
+            for z in _tasi_res['zones'][:15]:  # top 15 zones
+                _tasi_zones_data.append({
+                    'الحالة': z.status,
+                    'النوع': 'مقاومة' if z.is_resistance else 'دعم',
+                    'السعر': f"{z.price:,.2f}",
+                    'البُعد': f"{z.signed_distance_pct:+.2f}%",
+                    'الفريمات': z.tf_names,
+                    'القوة': f"{z.strength.label} {z.strength.stars}".strip(),
+                })
+            if _tasi_zones_data:
+                st.dataframe(pd.DataFrame(_tasi_zones_data), use_container_width=True, hide_index=True, height=400)
+            else:
+                st.info("لا توجد مناطق ضمن النطاق المحدد")
+
+            # Quality filter summary
+            st.markdown("### 🛡️ بوابة الجودة")
+            _tsum = _tasi_flt.summary()
+            _tfc = st.columns(6)
+            for _i, _k in enumerate([k for k in _tsum.keys() if k not in ('الإشارة','نسبة_التحقق')]):
+                with _tfc[_i]:
+                    st.markdown(f"<div style='text-align:center'><div style='font-size:0.82em;color:#9ca3af'>{_k}</div><div style='font-size:1.5em'>{_tsum[_k]}</div></div>", unsafe_allow_html=True)
+            st.caption(f"نسبة التحقق: **{_tsum['نسبة_التحقق']}**  ·  المسافة من قاما: **{_tasi_flt.current_distance_pct:+.2f}%**")
 
     # ─────────────────────────────────────────────
     # MARKET SCAN MODE
