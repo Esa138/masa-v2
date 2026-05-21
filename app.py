@@ -8472,6 +8472,7 @@ elif page == "⭐ التلاقي الذهبي":
 
         from core.confluence import StrengthTier as _ST, fetch_daily_batch, fetch_single_tf
         from concurrent.futures import ThreadPoolExecutor, as_completed
+        from datetime import datetime
 
         # PHASE 1: Bulk fetch all daily data in one yfinance call
         _progress = st.progress(0.0, text=f"📥 جلب البيانات اليومية لـ {len(_tickers)} سهم...")
@@ -8554,11 +8555,47 @@ elif page == "⭐ التلاقي الذهبي":
                     _p_tier = f"{_pz.strength.label} {_pz.strength.stars}".strip()
                     _p_dist = f"{_pz.signed_distance_pct:+.2f}%"
 
+                # ── Time stamp / age tracking ─────────────
+                # session_state['conf_signal_history'][ticker] = {status, first_seen}
+                _hist = st.session_state.setdefault('conf_signal_history', {})
+                _now_ts = datetime.now()
+                _prev = _hist.get(_tk)
+                if _purple_zones:
+                    # signal exists — if status changed (or first time), reset
+                    if _prev is None or _prev.get('status') != _p_status:
+                        _hist[_tk] = {'status': _p_status, 'first_seen': _now_ts}
+                else:
+                    # no signal — clear history so next time it's fresh
+                    if _prev is not None:
+                        _hist.pop(_tk, None)
+
+                _entry = _hist.get(_tk)
+                if _entry:
+                    _age_min = int((_now_ts - _entry['first_seen']).total_seconds() / 60)
+                    _first_seen_str = _entry['first_seen'].strftime('%H:%M')
+                    # Traffic light by age
+                    if _age_min < 15:
+                        _freshness = '🟢'
+                    elif _age_min < 60:
+                        _freshness = '🟡'
+                    elif _age_min < 180:
+                        _freshness = '🟠'
+                    else:
+                        _freshness = '🔴'
+                    _age_str = f"{_age_min}د"
+                else:
+                    _first_seen_str = '—'
+                    _age_str = '—'
+                    _freshness = '—'
+
                 _row = {
                     'السهم': _stocks_dict.get(_tk, _tk),
                     'الرمز': _tk,
                     'السعر': round(_cp, 2),
                     '🟣 الحالة': _p_status,
+                    '🚦': _freshness,
+                    '⏱️ أول ظهور': _first_seen_str,
+                    '🕐 العمر': _age_str,
                     'النوع': _p_kind,
                     'سعر المنطقة': _p_price,
                     'البُعد': _p_dist,
@@ -8570,6 +8607,7 @@ elif page == "⭐ التلاقي الذهبي":
                     '_passed': _flt.passed_count(),
                     '_has_purple': bool(_purple_zones),
                     '_purple_dist': min((z.distance_from_price_pct for z in _purple_zones), default=999),
+                    '_age_min': int((_now_ts - _entry['first_seen']).total_seconds() / 60) if _entry else 99999,
                 }
                 if _only_purple and not _purple_zones:
                     continue
@@ -8589,10 +8627,10 @@ elif page == "⭐ التلاقي الذهبي":
                 lambda s: _status_rank.get(str(s)[:1] if str(s) else '⏸️', 9)
             )
             _df_scan = _df_scan.sort_values(
-                ['_has_purple', '_status_rank', '_purple_dist', '_final', '_passed'],
-                ascending=[False, True, True, False, False],
+                ['_has_purple', '_status_rank', '_age_min', '_purple_dist', '_final', '_passed'],
+                ascending=[False, True, True, True, False, False],
             )
-            _df_scan = _df_scan.drop(columns=['_final', '_passed', '_has_purple', '_purple_dist', '_status_rank'])
+            _df_scan = _df_scan.drop(columns=['_final', '_passed', '_has_purple', '_purple_dist', '_status_rank', '_age_min'])
 
             _golden_cnt = sum(1 for r in _scan_rows if r['_final'])
             _strong_cnt = sum(1 for r in _scan_rows if r['_passed'] >= 4)
@@ -8602,6 +8640,7 @@ elif page == "⭐ التلاقي الذهبي":
             _purple_picks = [r for r in _scan_rows if r['_has_purple']]
             _purple_picks.sort(key=lambda r: (
                 _status_rank.get(str(r['🟣 الحالة'])[:1] if str(r['🟣 الحالة']) else '⏸️', 9),
+                r.get('_age_min', 99999),
                 r['_purple_dist'],
             ))
 
@@ -8614,23 +8653,36 @@ elif page == "⭐ التلاقي الذهبي":
                     '🎯': '#37474f',  # approaching — gray
                 }.get(first, '#263238')
 
+            # Freshness counts among purple picks
+            _fresh_cnt = sum(1 for r in _scan_rows if r['_has_purple'] and r['_age_min'] < 15)
+            _medium_cnt = sum(1 for r in _scan_rows if r['_has_purple'] and 15 <= r['_age_min'] < 60)
+            _stale_cnt = sum(1 for r in _scan_rows if r['_has_purple'] and 60 <= r['_age_min'] < 180)
+            _dead_cnt = sum(1 for r in _scan_rows if r['_has_purple'] and r['_age_min'] >= 180)
+
             def _render_summary(_loc: str):
                 _m1, _m2, _m3, _m4 = st.columns(4)
                 _m1.metric("إجمالي مفحوص", len(_scan_rows))
                 _m2.metric("🟢 إشارات ذهبية", _golden_cnt)
                 _m3.metric("⭐ قوية (4+ فلاتر)", _strong_cnt)
                 _m4.metric("🟣 في منطقة بنفسجية", _purple_cnt)
+                # Freshness breakdown
+                _f1, _f2, _f3, _f4 = st.columns(4)
+                _f1.metric("🟢 طازجة (<15د)", _fresh_cnt)
+                _f2.metric("🟡 متوسطة (15-60د)", _medium_cnt)
+                _f3.metric("🟠 قديمة (60-180د)", _stale_cnt)
+                _f4.metric("🔴 منتهية (>180د)", _dead_cnt)
 
                 if _purple_picks:
                     _chips_html = "".join([
                         f"<span style='display:inline-block;margin:3px;padding:7px 13px;"
                         f"background:{_chip_bg(p['🟣 الحالة'])};"
                         f"border-radius:14px;font-size:0.88em;color:#fff'>"
-                        f"{p['🟣 الحالة']} <b>{p['السهم']}</b> "
+                        f"{p['🚦']} {p['🟣 الحالة']} <b>{p['السهم']}</b> "
                         f"<span style='color:#cfd8dc;font-size:0.85em'>({p['الرمز']})</span> "
                         f"<span style='color:#fff;font-weight:600'>{p['السعر']}</span> "
                         f"<span style='color:#b39ddb'>← {p['سعر المنطقة']}</span> "
-                        f"<span style='color:#9fa8da'>{p['البُعد']}</span></span>"
+                        f"<span style='color:#9fa8da'>{p['البُعد']}</span> "
+                        f"<span style='color:#ce93d8;font-size:0.8em'>· {p['🕐 العمر']}</span></span>"
                         for p in _purple_picks
                     ])
                     st.markdown(
