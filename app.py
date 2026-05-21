@@ -3311,9 +3311,23 @@ if page == "🔬 Order Flow":
         progress.empty()
 
         # حساب صحة السوق من نتائج المسح (بدون استعلامات إضافية)
+        def _ma50_last(r):
+            _m = r.get("chart_ma50")
+            if not _m:
+                return None
+            try:
+                _v = _m[-1]
+                return _v if _v is not None else None
+            except (TypeError, IndexError):
+                return None
+
         if results:
-            above_ma50 = sum(1 for r in results if r.get("chart_ma50") and r["price"] > r["chart_ma50"][-1])
-            total_valid = sum(1 for r in results if r.get("chart_ma50") and r["chart_ma50"][-1] is not None)
+            _valid = [
+                r for r in results
+                if _ma50_last(r) is not None and r.get("price") is not None
+            ]
+            above_ma50 = sum(1 for r in _valid if r["price"] > _ma50_last(r))
+            total_valid = len(_valid)
             health = round(above_ma50 / total_valid * 100, 1) if total_valid > 0 else 50.0
         else:
             health = 50.0
