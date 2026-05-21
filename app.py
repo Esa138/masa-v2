@@ -8441,30 +8441,55 @@ elif page == "⭐ التلاقي الذهبي":
             format_func=lambda x: {'D':'يومي','240':'4 ساعات','60':'ساعة','15':'15د','5':'5د'}.get(x, x),
         )
 
-    _btn_c1, _btn_c2, _btn_c3 = st.columns([2, 2, 1])
+    # Market-specific index buttons
+    _index_configs = {
+        "🇸🇦 السوق السعودي": [("📈 مؤشر تاسي", "^TASI.SR", "Tadawul All Shares")],
+        "🇺🇸 السوق الأمريكي": [
+            ("📈 S&P 500", "^GSPC", "S&P 500 Index"),
+            ("📈 ناسداك", "^IXIC", "NASDAQ Composite"),
+            ("📈 داو جونز", "^DJI", "Dow Jones Industrial"),
+        ],
+        "₿ العملات الرقمية": [
+            ("📈 بيتكوين", "BTC-USD", "Bitcoin"),
+            ("📈 إيثيريوم", "ETH-USD", "Ethereum"),
+        ],
+    }
+    _idx_list = _index_configs.get(_conf_market, [])
+
+    _btn_c1, _btn_c2 = st.columns([1, 1])
     with _btn_c1:
         _do_single = st.button(f"🔍 حلّل {_conf_ticker}", type="primary", use_container_width=True, key="conf_single_btn")
     with _btn_c2:
         _do_scan = st.button(f"📊 امسح كل السوق ({len(_stocks_dict)} سهم)", use_container_width=True, key="conf_scan_btn")
-    with _btn_c3:
-        _do_tasi = st.button("📈 مؤشر تاسي", use_container_width=True, key="conf_tasi_btn")
+
+    # Index buttons row
+    _idx_clicked = None
+    if _idx_list:
+        _idx_cols = st.columns(len(_idx_list))
+        for _i, (_label, _sym, _full) in enumerate(_idx_list):
+            with _idx_cols[_i]:
+                if st.button(_label, use_container_width=True, key=f"conf_idx_btn_{_sym}"):
+                    _idx_clicked = (_label, _sym, _full)
+
+    _do_tasi = _idx_clicked is not None
 
     # ─────────────────────────────────────────────
-    # TASI INDEX MODE — standalone analyzer for ^TASI.SR
+    # INDEX MODE — analyzer for major market indices
     # ─────────────────────────────────────────────
-    if _do_tasi:
+    if _do_tasi and _idx_clicked:
+        _idx_label, _idx_sym, _idx_full = _idx_clicked
         st.markdown("---")
         st.markdown(
-            "<div style='background:linear-gradient(90deg,#0f4c81,#1a73e8);"
-            "padding:14px 20px;border-radius:8px;color:#fff;margin:10px 0'>"
-            "<div style='font-size:1.4em;font-weight:800'>📈 تحليل مؤشر تاسي (TASI)</div>"
-            "<div style='opacity:0.9;font-size:0.9em;margin-top:3px'>Tadawul All Shares · ^TASI.SR</div>"
-            "</div>",
+            f"<div style='background:linear-gradient(90deg,#0f4c81,#1a73e8);"
+            f"padding:14px 20px;border-radius:8px;color:#fff;margin:10px 0'>"
+            f"<div style='font-size:1.4em;font-weight:800'>{_idx_label}</div>"
+            f"<div style='opacity:0.9;font-size:0.9em;margin-top:3px'>{_idx_full} · {_idx_sym}</div>"
+            f"</div>",
             unsafe_allow_html=True,
         )
 
-        with st.spinner("جاري جلب بيانات المؤشر..."):
-            _tasi_data = fetch_multi_tf_data('^TASI.SR', timeframes=['D', '240', '60', '15', '5'])
+        with st.spinner(f"جاري جلب بيانات {_idx_label}..."):
+            _tasi_data = fetch_multi_tf_data(_idx_sym, timeframes=['D', '240', '60', '15', '5'])
 
         if not _tasi_data:
             st.error("تعذّر جلب بيانات المؤشر من yfinance")
@@ -8490,9 +8515,9 @@ elif page == "⭐ التلاقي الذهبي":
                 and z.tf_count >= 2 and (z.mask & 1)
                 and (z.status.startswith('✅') or z.status.startswith('🎯') or z.status.startswith('🔄') or z.status.startswith('💥'))
             ]
-            # Freshness tracking for the TASI signal (session-state)
+            # Freshness tracking — keyed per-index so multiple indices don't collide
             from datetime import datetime as _dt
-            _tasi_hist = st.session_state.setdefault('conf_tasi_history', {})
+            _tasi_hist = st.session_state.setdefault(f'conf_idx_history_{_idx_sym}', {})
             _now_ts = _dt.now()
             _tasi_status_now = _tasi_purple[0].status if _tasi_purple else None
             _tasi_key = f"{_tasi_purple[0].price:.2f}|{_tasi_status_now}" if _tasi_purple else None
@@ -8552,7 +8577,7 @@ elif page == "⭐ التلاقي الذهبي":
 
             # Zones table with per-zone freshness tracking
             st.markdown("### 🗺️ مناطق التلاقي")
-            _zones_hist = st.session_state.setdefault('conf_tasi_zones_history', {})
+            _zones_hist = st.session_state.setdefault(f'conf_idx_zones_history_{_idx_sym}', {})
             _tasi_zones_data = []
             for z in _tasi_res['zones'][:15]:
                 _zkey = f"{round(z.price, 2)}"
