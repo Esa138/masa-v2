@@ -8616,6 +8616,30 @@ elif page == "⭐ التلاقي الذهبي":
     # ─────────────────────────────────────────────
     # MARKET SCAN MODE
     # ─────────────────────────────────────────────
+    # ── Auto-refresh toggle (persistent across reruns)
+    _auto_refresh = st.session_state.get('conf_auto_refresh', False)
+    _refresh_col1, _refresh_col2 = st.columns([3, 1])
+    with _refresh_col2:
+        _auto_refresh = st.checkbox(
+            "🔄 تحديث تلقائي (5د)",
+            value=_auto_refresh,
+            key="conf_auto_refresh_chk",
+            help="يعيد المسح تلقائياً كل 5 دقائق",
+        )
+        st.session_state['conf_auto_refresh'] = _auto_refresh
+
+    if _auto_refresh:
+        # Trigger rerun every 5 min — only if a scan has run
+        try:
+            import streamlit_autorefresh  # optional dep
+            streamlit_autorefresh.st_autorefresh(interval=5 * 60 * 1000, key="conf_autorf")
+        except Exception:
+            # fallback: javascript-based refresh
+            st.markdown(
+                "<script>setTimeout(function(){window.location.reload()}, 300000);</script>",
+                unsafe_allow_html=True,
+            )
+
     if _do_scan and _stocks_dict:
         st.markdown("---")
         st.markdown(f"### 📊 مسح {_conf_market}")
@@ -8883,13 +8907,58 @@ elif page == "⭐ التلاقي الذهبي":
 
             _purple_rows_full = [r for r in _scan_rows if r['_has_purple']]
             if _purple_rows_full:
+                # ──── TOP OPPORTUNITIES (ranked picks) ────
+                st.markdown("---")
+                st.markdown("### 🏆 خلاصة أفضل الفرص (الأعلى موثوقية)")
+
+                def _opp_score(r):
+                    """Score = status priority + freshness + filter count + close to zone."""
+                    _st = str(r['🟣 الحالة'])[:1]
+                    _status_score = {'✅': 40, '🔄': 35, '💥': 10, '🎯': 20}.get(_st, 0)
+                    _fresh_score = max(0, 30 - r['_age_min'] / 6)  # 30 at 0min → 0 at 180min
+                    _filter_score = r['_passed'] * 5  # 0-30
+                    _dist_score = max(0, 10 - r['_purple_dist'])  # 0-10
+                    _tier_bonus = 10 if 'قوي خالص' in str(r['التصنيف']) else 5 if 'مختلط قوي' in str(r['التصنيف']) else 0
+                    return _status_score + _fresh_score + _filter_score + _dist_score + _tier_bonus
+
+                _ranked = sorted(_purple_rows_full, key=_opp_score, reverse=True)
+                _top5 = _ranked[:5]
+
+                _opp_cols = st.columns(min(5, len(_top5)))
+                for _i, r in enumerate(_top5):
+                    with _opp_cols[_i]:
+                        _score = int(_opp_score(r))
+                        _tv_url = f"https://www.tradingview.com/chart/?symbol={r['الرمز'].replace('.SR', '').replace('-', '')}"
+                        st.markdown(
+                            f"<div style='background:linear-gradient(135deg,#4a148c,#7b1fa2);"
+                            f"padding:12px;border-radius:10px;color:#fff;height:200px;"
+                            f"border:2px solid {'#ffd700' if _i == 0 else '#9c27b0'}'>"
+                            f"<div style='font-size:0.75em;opacity:0.8'>#{_i+1} · موثوقية {_score}</div>"
+                            f"<div style='font-size:1.15em;font-weight:800;margin:4px 0'>{r['السهم']}</div>"
+                            f"<div style='font-size:0.85em;opacity:0.9'>{r['الرمز']}</div>"
+                            f"<div style='font-size:1.4em;font-weight:700;margin-top:6px'>{r['السعر']}</div>"
+                            f"<div style='font-size:0.8em;color:#e1bee7;margin-top:4px'>{r['🚦']} {r['🟣 الحالة']}</div>"
+                            f"<div style='font-size:0.78em;color:#fff;margin-top:3px'>{r['النوع']} · {r['البُعد']}</div>"
+                            f"<div style='font-size:0.72em;color:#ce93d8;margin-top:2px'>{r['🕐 العمر']}</div>"
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
+
                 st.markdown("---")
                 st.markdown("### 📋 جدول الأسهم البنفسجية + القطاع + الإحصائيات")
 
-                # Detailed per-stock stats table
+                # Detailed per-stock stats table with TradingView link
                 _detail_data = []
                 for r in _purple_rows_full:
                     _sector = _sector_map.get(r['الرمز'], '—')
+                    # Build TradingView URL
+                    _tv_sym = r['الرمز']
+                    if _tv_sym.endswith('.SR'):
+                        _tv_url = f"https://tradingview.com/chart/?symbol=TADAWUL:{_tv_sym.replace('.SR','')}"
+                    elif _tv_sym.endswith('-USD'):
+                        _tv_url = f"https://tradingview.com/chart/?symbol={_tv_sym.replace('-USD','USD')}"
+                    else:
+                        _tv_url = f"https://tradingview.com/chart/?symbol={_tv_sym}"
                     _detail_data.append({
                         '🚦': r.get('🚦', '—'),
                         'السهم': r['السهم'],
@@ -8905,8 +8974,30 @@ elif page == "⭐ التلاقي الذهبي":
                         'فلاتر': f"{r['فلاتر']}/6",
                         '⏱️ أول ظهور': r.get('⏱️ أول ظهور', '—'),
                         '🕐 العمر': r.get('🕐 العمر', '—'),
+                        '📺 TV': _tv_url,
                     })
-                st.dataframe(pd.DataFrame(_detail_data), use_container_width=True, hide_index=True, height=400)
+                _detail_df = pd.DataFrame(_detail_data)
+                st.dataframe(
+                    _detail_df,
+                    use_container_width=True, hide_index=True, height=400,
+                    column_config={
+                        '📺 TV': st.column_config.LinkColumn(
+                            '📺 TV', display_text='افتح',
+                            help='فتح السهم في TradingView',
+                        ),
+                    },
+                )
+
+                # CSV download
+                _csv_bytes = _detail_df.to_csv(index=False).encode('utf-8-sig')
+                _ts_str = datetime.now().strftime('%Y%m%d_%H%M')
+                st.download_button(
+                    "📥 تنزيل النتائج CSV",
+                    data=_csv_bytes,
+                    file_name=f"masa_purple_{_conf_market.split(' ')[-1]}_{_ts_str}.csv",
+                    mime="text/csv",
+                    use_container_width=False,
+                )
 
                 # Sector breakdown stats
                 st.markdown("### 🏭 إحصائيات القطاعات")
