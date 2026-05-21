@@ -8867,6 +8867,91 @@ elif page == "⭐ التلاقي الذهبي":
             st.markdown("---")
             _render_summary("bottom")
 
+            # ────────────────────────────────────────────
+            # FINAL STATS TABLE — purple stocks grouped by sector
+            # ────────────────────────────────────────────
+            try:
+                from data.markets import SAUDI_SECTORS, US_SECTORS, CRYPTO_SECTORS
+            except Exception:
+                SAUDI_SECTORS, US_SECTORS, CRYPTO_SECTORS = {}, {}, {}
+
+            _sector_map = {
+                "🇸🇦 السوق السعودي": SAUDI_SECTORS,
+                "🇺🇸 السوق الأمريكي": US_SECTORS,
+                "₿ العملات الرقمية": CRYPTO_SECTORS,
+            }.get(_conf_market, {})
+
+            _purple_rows_full = [r for r in _scan_rows if r['_has_purple']]
+            if _purple_rows_full:
+                st.markdown("---")
+                st.markdown("### 📋 جدول الأسهم البنفسجية + القطاع + الإحصائيات")
+
+                # Detailed per-stock stats table
+                _detail_data = []
+                for r in _purple_rows_full:
+                    _sector = _sector_map.get(r['الرمز'], '—')
+                    _detail_data.append({
+                        '🚦': r.get('🚦', '—'),
+                        'السهم': r['السهم'],
+                        'الرمز': r['الرمز'],
+                        'القطاع': _sector,
+                        'الحالة': r['🟣 الحالة'],
+                        'النوع': r['النوع'],
+                        'السعر': r['السعر'],
+                        'سعر المنطقة': r['سعر المنطقة'],
+                        'البُعد': r['البُعد'],
+                        'الفريمات': r['الفريمات'],
+                        'التصنيف': r['التصنيف'],
+                        'فلاتر': f"{r['فلاتر']}/6",
+                        '⏱️ أول ظهور': r.get('⏱️ أول ظهور', '—'),
+                        '🕐 العمر': r.get('🕐 العمر', '—'),
+                    })
+                st.dataframe(pd.DataFrame(_detail_data), use_container_width=True, hide_index=True, height=400)
+
+                # Sector breakdown stats
+                st.markdown("### 🏭 إحصائيات القطاعات")
+                _by_sector: dict = {}
+                for r in _purple_rows_full:
+                    _sec = _sector_map.get(r['الرمز'], 'غير محدد')
+                    _by_sector.setdefault(_sec, {'count': 0, 'support': 0, 'resistance': 0,
+                                                 'in_zone': 0, 'bounced': 0, 'broken': 0,
+                                                 'approaching': 0, 'fresh': 0, 'stocks': []})
+                    _s = _by_sector[_sec]
+                    _s['count'] += 1
+                    if r['النوع'] == '🟢 دعم':
+                        _s['support'] += 1
+                    elif r['النوع'] == '🔴 مقاومة':
+                        _s['resistance'] += 1
+                    _st_emoji = str(r['🟣 الحالة'])[:1]
+                    if _st_emoji == '✅':
+                        _s['in_zone'] += 1
+                    elif _st_emoji == '🔄':
+                        _s['bounced'] += 1
+                    elif _st_emoji == '💥':
+                        _s['broken'] += 1
+                    elif _st_emoji == '🎯':
+                        _s['approaching'] += 1
+                    if r['_age_min'] < 15:
+                        _s['fresh'] += 1
+                    _s['stocks'].append(r['السهم'])
+
+                _sector_rows = []
+                for _sec, _s in sorted(_by_sector.items(), key=lambda x: -x[1]['count']):
+                    _sector_rows.append({
+                        'القطاع': _sec,
+                        'العدد': _s['count'],
+                        '🟢 دعم': _s['support'],
+                        '🔴 مقاومة': _s['resistance'],
+                        '✅ داخل': _s['in_zone'],
+                        '🔄 ارتد': _s['bounced'],
+                        '💥 كسر': _s['broken'],
+                        '🎯 يقترب': _s['approaching'],
+                        '🟢 طازجة': _s['fresh'],
+                        'الأسهم': ' · '.join(_s['stocks'][:5]) + ('...' if len(_s['stocks']) > 5 else ''),
+                    })
+                st.dataframe(pd.DataFrame(_sector_rows), use_container_width=True, hide_index=True)
+                st.caption(f"إجمالي القطاعات النشطة: **{len(_by_sector)}** · إجمالي الأسهم البنفسجية: **{len(_purple_rows_full)}**")
+
     # ─────────────────────────────────────────────
     # SINGLE STOCK MODE
     # ─────────────────────────────────────────────
