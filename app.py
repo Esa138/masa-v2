@@ -8413,10 +8413,15 @@ elif page == "⭐ التلاقي الذهبي":
         from data.markets import SAUDI_STOCKS, US_STOCKS, CRYPTO_STOCKS
     except Exception:
         SAUDI_STOCKS, US_STOCKS, CRYPTO_STOCKS = {}, {}, {}
+    try:
+        from data.sp500 import SP500_STOCKS
+    except Exception:
+        SP500_STOCKS = {}
 
     _market_options = {
         "🇸🇦 السوق السعودي": SAUDI_STOCKS,
         "🇺🇸 السوق الأمريكي": US_STOCKS,
+        "🏛️ S&P 500": SP500_STOCKS,
         "₿ العملات الرقمية": CRYPTO_STOCKS,
     }
 
@@ -8462,6 +8467,11 @@ elif page == "⭐ التلاقي الذهبي":
             ("📈 S&P 500", "^GSPC", "S&P 500 Index"),
             ("📈 ناسداك", "^IXIC", "NASDAQ Composite"),
             ("📈 داو جونز", "^DJI", "Dow Jones Industrial"),
+        ],
+        "🏛️ S&P 500": [
+            ("📈 S&P 500", "^GSPC", "S&P 500 Index"),
+            ("📈 ناسداك", "^IXIC", "NASDAQ Composite"),
+            ("📈 SPY ETF", "SPY", "SPDR S&P 500 ETF"),
         ],
         "₿ العملات الرقمية": [
             ("📈 بيتكوين", "BTC-USD", "Bitcoin"),
@@ -8923,6 +8933,7 @@ elif page == "⭐ التلاقي الذهبي":
             _sector_map = {
                 "🇸🇦 السوق السعودي": SAUDI_SECTORS,
                 "🇺🇸 السوق الأمريكي": US_SECTORS,
+                "🏛️ S&P 500": US_SECTORS,  # share sector data with US market
                 "₿ العملات الرقمية": CRYPTO_SECTORS,
             }.get(_conf_market, {})
 
