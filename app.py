@@ -8946,17 +8946,42 @@ elif page == "⭐ التلاقي الذهبي":
                     if (st.session_state.get('scan_results') and any(
                         x.get('ticker') == r['الرمز'] for x in st.session_state['scan_results']))
                 )
-                if _of_count == 0:
-                    st.info(
-                        "💡 شغّل المسح من صفحة **Order Flow** أولاً عشان تشوف "
-                        "**المرحلة (تجميع/تصريف)** و **المهاجم (مشترين/بائعين)** و **القرار (ادخل/راقب)** "
-                        "لكل سهم بنفسجي في الجدول التفصيلي أدناه."
+                # Banner + inline Order Flow button
+                _of_banner_col1, _of_banner_col2 = st.columns([3, 1])
+                with _of_banner_col1:
+                    if _of_count == 0:
+                        st.info(
+                            "💡 أعمدة **المرحلة / المهاجم / القرار** فارغة الآن — "
+                            "اضغط الزر ⏪ لتشغيل Order Flow على الأسهم البنفسجية فقط (~30 ثانية)."
+                        )
+                    else:
+                        st.success(
+                            f"✅ بيانات Order Flow: {_purple_with_of} من {len(_purple_rows_full)} "
+                            f"سهم بنفسجي معه تحليل كامل."
+                        )
+                with _of_banner_col2:
+                    _run_of_purple = st.button(
+                        "⏪ شغّل Order Flow للبنفسجي",
+                        type="primary" if _of_count == 0 else "secondary",
+                        use_container_width=True,
+                        key="conf_run_of_purple",
                     )
-                else:
-                    st.success(
-                        f"✅ بيانات Order Flow متاحة: {_purple_with_of} من {len(_purple_rows_full)} "
-                        f"سهم بنفسجي معه تحليل المرحلة + المهاجم + القرار."
-                    )
+
+                if _run_of_purple:
+                    _purple_tks = [r['الرمز'] for r in _purple_rows_full]
+                    with st.spinner(f"تشغيل Order Flow على {len(_purple_tks)} سهم بنفسجي..."):
+                        try:
+                            _of_new = scan_market(_purple_tks, period="2y", max_workers=10)
+                            # Merge with existing scan_results so previous data isn't lost
+                            _existing = st.session_state.get('scan_results') or []
+                            _existing_by_tk = {r.get('ticker'): r for r in _existing}
+                            for _r in _of_new:
+                                _existing_by_tk[_r['ticker']] = _r
+                            st.session_state['scan_results'] = list(_existing_by_tk.values())
+                            st.success(f"✅ تم تحليل {len(_of_new)} سهم. اعمل refresh للجدول.")
+                            st.rerun()
+                        except Exception as _e:
+                            st.error(f"خطأ في Order Flow: {_e}")
 
                 with st.expander("🎓 شرح عمود **التوصية** — اضغط للتوسيع"):
                     st.markdown("""
