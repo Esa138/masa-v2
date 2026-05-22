@@ -1852,16 +1852,28 @@ COMMODITIES_SECTORS = {
 # MARKET CONFIGS
 # ══════════════════════════════════════════════════════════════
 
+# Import SP500 list (kept in separate file for clarity)
+try:
+    from data.sp500 import SP500_STOCKS
+except Exception:
+    SP500_STOCKS = {}
+
+
 MARKETS = {
     "🇸🇦 السوق السعودي (TASI)": {
         "key": "saudi",
         "stocks": SAUDI_STOCKS,
         "label": "السوق السعودي",
     },
-    "🇺🇸 السوق الأمريكي (S&P 500)": {
+    "🇺🇸 السوق الأمريكي": {
         "key": "us",
         "stocks": US_STOCKS,
         "label": "السوق الأمريكي",
+    },
+    "🏛️ S&P 500": {
+        "key": "sp500",
+        "stocks": SP500_STOCKS,
+        "label": "S&P 500",
     },
     "💱 الفوركس (Forex)": {
         "key": "forex",
@@ -1885,6 +1897,8 @@ def get_all_tickers(market: str = "saudi") -> list:
     """Get all tickers for a market."""
     if market == "us":
         return list(US_STOCKS.keys())
+    if market == "sp500":
+        return list(SP500_STOCKS.keys())
     if market == "forex":
         return list(FOREX_STOCKS.keys())
     if market == "crypto":
@@ -1896,7 +1910,7 @@ def get_all_tickers(market: str = "saudi") -> list:
 
 def get_stock_name(ticker: str) -> str:
     """Get company name for a ticker."""
-    for d in (SAUDI_STOCKS, US_STOCKS, FOREX_STOCKS, CRYPTO_STOCKS, COMMODITIES_STOCKS):
+    for d in (SAUDI_STOCKS, US_STOCKS, SP500_STOCKS, FOREX_STOCKS, CRYPTO_STOCKS, COMMODITIES_STOCKS):
         if ticker in d:
             return d[ticker]
     return ticker.replace(".SR", "").replace("=X", "").replace("=F", "").replace("-USD", "")
