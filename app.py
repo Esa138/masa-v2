@@ -8664,7 +8664,16 @@ elif page == "⭐ التلاقي الذهبي":
                 unsafe_allow_html=True,
             )
 
-    if _do_scan and _stocks_dict:
+    # Re-render the scan view when either:
+    #   1. user clicked the scan button (_do_scan = True), OR
+    #   2. cached scan results exist for the currently-selected market
+    # The cache holds the heavy zone-analysis output; OF lookup is re-done fresh
+    # on every render so Order Flow updates reflect immediately.
+    _cached_scan = st.session_state.get(f'conf_cached_scan_{_conf_market}')
+    _has_cached = _cached_scan is not None
+    _show_scan = _do_scan or _has_cached
+
+    if _show_scan and _stocks_dict:
         st.markdown("---")
         st.markdown(f"### 📊 مسح {_conf_market}")
 
@@ -8681,13 +8690,24 @@ elif page == "⭐ التلاقي الذهبي":
         # classifications (those depend on D/240). Single-stock view keeps all 5.
         _scan_tfs = ['D', '240', '60']
         _tickers = list(_stocks_dict.keys())
-        _scan_rows = []
         _engine_scan = ConfluenceEngine(cluster_pct=_conf_cluster_pct, max_dist_pct=_conf_max_dist)
 
         from core.confluence import StrengthTier as _ST, fetch_daily_batch, fetch_single_tf
         from concurrent.futures import ThreadPoolExecutor, as_completed
         from datetime import datetime
 
+        if not _do_scan and _has_cached:
+            # Re-render path: use cached zone results, skip fetch+analyze
+            _results_list = _cached_scan.get('results_list', [])
+            _daily_data = {}
+            _intraday = {}
+        else:
+            # Fresh scan: PHASE 1-3 below will populate _results_list
+            _results_list = None
+
+    if _show_scan and _stocks_dict and _do_scan:
+        # Fresh scan clicked → clear stale cache (regenerated below)
+        st.session_state.pop(f'conf_cached_scan_{_conf_market}', None)
         # PHASE 1: Bulk fetch all daily data in one yfinance call
         _progress = st.progress(0.0, text=f"📥 جلب البيانات اليومية لـ {len(_tickers)} سهم...")
         _daily_data = fetch_daily_batch(_tickers, period='5y')
@@ -8745,8 +8765,18 @@ elif page == "⭐ التلاقي الذهبي":
         del _daily_data, _intraday
         gc.collect()
 
+        # Cache analyzed results so post-scan re-renders (e.g. after Order Flow
+        # inline button updates session_state) can rebuild the table with
+        # fresh OF lookups, without re-fetching market data.
+        st.session_state[f'conf_cached_scan_{_conf_market}'] = {
+            'results_list': _results_list,
+        }
+
+    # ── Row-building + rendering — runs on every render (fresh or cached) ──
+    if _show_scan and _stocks_dict:
+        _scan_rows = []
         # Process the analyzed results into table rows
-        for _tk, _cp, _res, _flt in _results_list:
+        for _tk, _cp, _res, _flt in (_results_list or []):
             try:
 
                 # Purple alert: Pure Strong + Mixed Strong tiers are both purple.
@@ -8836,7 +8866,10 @@ elif page == "⭐ التلاقي الذهبي":
             except Exception:
                 continue
 
-        _progress.empty()
+        try:
+            _progress.empty()
+        except Exception:
+            pass
 
         if not _scan_rows:
             st.warning("ما طلعت نتائج. جرّب سوقاً آخر.")
