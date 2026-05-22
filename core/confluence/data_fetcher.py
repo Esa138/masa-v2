@@ -11,15 +11,19 @@ import time
 
 
 # TF name -> (yfinance interval, period)
-# Periods extended so ZR1 (400-bar) window captures historical highs/lows
-# matching the Pine indicator on TradingView.
+# Periods trimmed to stay under Streamlit Cloud's 1GB memory limit
+# while still covering the ZR1 400-bar window.
 TF_CONFIG = {
-    'D':   {'interval': '1d',  'period': '5y'},    # ~1250 bars
-    '240': {'interval': '1h',  'period': '730d'},  # ~4380 1h → ~1095 4h bars
-    '60':  {'interval': '1h',  'period': '730d'},  # ~4380 bars
-    '15':  {'interval': '15m', 'period': '60d'},   # yfinance limit
-    '5':   {'interval': '5m',  'period': '60d'},   # yfinance limit
+    'D':   {'interval': '1d',  'period': '3y'},    # ~750 bars (was 5y/1250)
+    '240': {'interval': '1h',  'period': '365d'},  # ~2200 1h → ~550 4h bars
+    '60':  {'interval': '1h',  'period': '365d'},  # ~2200 bars (was 4380)
+    '15':  {'interval': '15m', 'period': '30d'},   # ~600 bars (was 60d)
+    '5':   {'interval': '5m',  'period': '15d'},   # ~900 bars (was 60d)
 }
+
+# Hard cap on rows kept in memory per dataframe — anything beyond this
+# gets trimmed (more than enough for ZR1 400-bar + ZR2 300-bar windows).
+_MAX_BARS = 800
 
 
 def _normalize_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -95,6 +99,10 @@ def fetch_single_tf(ticker: str, tf: str) -> pd.DataFrame:
 
     if tf == '240' and not df.empty:
         df = _resample_to_4h(df, ticker=ticker)
+
+    # Trim to last _MAX_BARS to control memory
+    if not df.empty and len(df) > _MAX_BARS:
+        df = df.tail(_MAX_BARS).copy()
 
     return df
 
@@ -183,20 +191,33 @@ def fetch_daily_batch(tickers: list, period: str = '5y') -> Dict[str, pd.DataFra
     return out
 
 
-# ── In-process cache wrapper (5-min TTL) ─────────────────────
-_CACHE: Dict[tuple, tuple] = {}  # (ticker, tf_tuple) -> (timestamp, data_dict)
+# ── Memory-aware cache (size-bounded, 5-min TTL) ──────────
+# Previous unbounded cache held DataFrames for hundreds of tickers
+# → OOM on Streamlit Cloud's 1GB limit. New version caps entries.
+_CACHE: Dict[tuple, tuple] = {}
 _CACHE_TTL_SEC = 300
+_CACHE_MAX_ENTRIES = 50  # hold at most 50 tickers' worth of data
 
 
 def fetch_multi_tf_data_cached(
     ticker: str,
     timeframes: Optional[list] = None,
 ) -> Dict[str, pd.DataFrame]:
-    """Same as fetch_multi_tf_data but caches results in-process for 5 minutes."""
+    """Cached multi-TF fetch — bounded LRU-style, 5-min TTL."""
     if timeframes is None:
         timeframes = ['D', '240', '60', '15', '5']
     key = (ticker, tuple(sorted(timeframes)))
     now = time.time()
+
+    # Evict expired entries
+    expired = [k for k, v in _CACHE.items() if (now - v[0]) >= _CACHE_TTL_SEC]
+    for k in expired:
+        _CACHE.pop(k, None)
+
+    # Size cap — drop oldest if at capacity
+    while len(_CACHE) >= _CACHE_MAX_ENTRIES:
+        oldest = min(_CACHE.items(), key=lambda kv: kv[1][0])[0]
+        _CACHE.pop(oldest, None)
 
     cached = _CACHE.get(key)
     if cached and (now - cached[0]) < _CACHE_TTL_SEC:
@@ -205,3 +226,8 @@ def fetch_multi_tf_data_cached(
     data = fetch_multi_tf_data(ticker, timeframes=timeframes, parallel=True)
     _CACHE[key] = (now, data)
     return data
+
+
+def clear_cache():
+    """Free all cached data."""
+    _CACHE.clear()

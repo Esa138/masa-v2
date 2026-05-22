@@ -8728,6 +8728,13 @@ elif page == "⭐ التلاقي الذهبي":
             except Exception:
                 continue
 
+        # Free the huge dataframes before processing rows (frees ~hundreds of MB)
+        import gc
+        _daily_data.clear()
+        _intraday.clear()
+        del _daily_data, _intraday
+        gc.collect()
+
         # Process the analyzed results into table rows
         for _tk, _cp, _res, _flt in _results_list:
             try:
