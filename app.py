@@ -8939,6 +8939,25 @@ elif page == "⭐ التلاقي الذهبي":
 
             _purple_rows_full = [r for r in _scan_rows if r['_has_purple']]
             if _purple_rows_full:
+                # ──── Order Flow integration hint ────
+                _of_count = len(st.session_state.get('scan_results') or [])
+                _purple_with_of = sum(
+                    1 for r in _purple_rows_full
+                    if (st.session_state.get('scan_results') and any(
+                        x.get('ticker') == r['الرمز'] for x in st.session_state['scan_results']))
+                )
+                if _of_count == 0:
+                    st.info(
+                        "💡 شغّل المسح من صفحة **Order Flow** أولاً عشان تشوف "
+                        "**المرحلة (تجميع/تصريف)** و **المهاجم (مشترين/بائعين)** و **القرار (ادخل/راقب)** "
+                        "لكل سهم بنفسجي في الجدول التفصيلي أدناه."
+                    )
+                else:
+                    st.success(
+                        f"✅ بيانات Order Flow متاحة: {_purple_with_of} من {len(_purple_rows_full)} "
+                        f"سهم بنفسجي معه تحليل المرحلة + المهاجم + القرار."
+                    )
+
                 # ──── TOP OPPORTUNITIES (ranked picks) ────
                 st.markdown("---")
                 st.markdown("### 🏆 خلاصة أفضل الفرص (الأعلى موثوقية)")
@@ -8979,10 +8998,40 @@ elif page == "⭐ التلاقي الذهبي":
                 st.markdown("---")
                 st.markdown("### 📋 جدول الأسهم البنفسجية + القطاع + الإحصائيات")
 
-                # Detailed per-stock stats table with TradingView link
+                # Build Order Flow lookup from existing scan_results (if any)
+                _of_results = st.session_state.get('scan_results') or []
+                _of_lookup = {r.get('ticker'): r for r in _of_results if r.get('ticker')}
+
+                _phase_arabic = {
+                    'accumulation': '🟢 تجميع',
+                    'spring': '🚀 نابض',
+                    'markup': '📈 ارتفاع',
+                    'distribution': '🔴 تصريف',
+                    'upthrust': '⚠️ اختراق كاذب',
+                    'markdown': '📉 هبوط',
+                    'neutral': '⚪ محايد',
+                }
+                _aggressor_arabic = {
+                    'buyers': '🟢 مشترين',
+                    'sellers': '🔴 بائعين',
+                    'neutral': '⚪ متوازن',
+                }
+                _decision_arabic = {
+                    'enter': '✅ ادخل',
+                    'watch': '👁️ راقب',
+                    'avoid': '🛑 تجنب',
+                    'exit': '🚪 اخرج',
+                    'hold': '✋ احتفظ',
+                }
+
+                # Detailed per-stock stats table with TradingView link + Order Flow
                 _detail_data = []
                 for r in _purple_rows_full:
                     _sector = _sector_map.get(r['الرمز'], '—')
+                    _of = _of_lookup.get(r['الرمز'], {})
+                    _phase = _phase_arabic.get(str(_of.get('phase', '')).lower(), '—')
+                    _aggr = _aggressor_arabic.get(str(_of.get('aggressor', '')).lower(), '—')
+                    _decn = _decision_arabic.get(str(_of.get('decision', '')).lower(), '—')
                     # Build TradingView URL
                     _tv_sym = r['الرمز']
                     if _tv_sym.endswith('.SR'):
@@ -8991,11 +9040,46 @@ elif page == "⭐ التلاقي الذهبي":
                         _tv_url = f"https://tradingview.com/chart/?symbol={_tv_sym.replace('-USD','USD')}"
                     else:
                         _tv_url = f"https://tradingview.com/chart/?symbol={_tv_sym}"
+                    # Combined recommendation: zone status × Order Flow
+                    _zone_st = str(r['🟣 الحالة'])[:1]
+                    _is_support = r['النوع'] == '🟢 دعم'
+                    _phase_raw = str(_of.get('phase', '')).lower()
+                    _aggr_raw = str(_of.get('aggressor', '')).lower()
+                    _combo = "—"
+                    if _is_support and _zone_st in ('✅', '🔄'):
+                        if _phase_raw in ('accumulation', 'spring') and _aggr_raw == 'buyers':
+                            _combo = "🟢🟢 شراء قوي"
+                        elif _phase_raw in ('accumulation', 'spring'):
+                            _combo = "🟢 شراء — تجميع"
+                        elif _aggr_raw == 'buyers':
+                            _combo = "🟡 شراء — مشترين"
+                        elif _phase_raw in ('distribution', 'upthrust'):
+                            _combo = "🔴 حذر — تصريف عند دعم"
+                        else:
+                            _combo = "🟡 محتمل — تأكد"
+                    elif (not _is_support) and _zone_st in ('✅', '🔄'):
+                        if _phase_raw in ('distribution', 'upthrust') and _aggr_raw == 'sellers':
+                            _combo = "🔴🔴 بيع قوي"
+                        elif _phase_raw in ('distribution', 'upthrust'):
+                            _combo = "🔴 بيع — تصريف"
+                        elif _phase_raw in ('accumulation', 'spring'):
+                            _combo = "🟡 احتمال اختراق صاعد"
+                        else:
+                            _combo = "⚠️ مقاومة — راقب"
+                    elif _zone_st == '💥':
+                        _combo = "⚠️ كسر/اختراق — تأكد"
+                    elif _zone_st == '🎯':
+                        _combo = "👁️ يقترب — راقب"
+
                     _detail_data.append({
                         '🚦': r.get('🚦', '—'),
                         'السهم': r['السهم'],
                         'الرمز': r['الرمز'],
                         'القطاع': _sector,
+                        '🎯 التوصية': _combo,
+                        '📊 المرحلة': _phase,
+                        '⚔️ المهاجم': _aggr,
+                        '🎯 القرار': _decn,
                         'الحالة': r['🟣 الحالة'],
                         'النوع': r['النوع'],
                         'السعر': r['السعر'],
