@@ -2,7 +2,7 @@
 Main engine: orchestrates ZR, gamma, clustering, and strength tiers.
 """
 import pandas as pd
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List
 
 from .zero_reversal import compute_zr1_zr2
@@ -24,6 +24,7 @@ class ConfluenceZone:
     is_touched: bool
     status: str = "⏸️ بعيد"      # ✅ ملموس / 🎯 قريب / ⚡ مكسور / ⏸️ بعيد
     signed_distance_pct: float = 0.0  # +ve = price above zone, -ve = below
+    triggered_tfs: dict = field(default_factory=dict)  # {tf_name: bars_ago}
 
     def to_dict(self) -> dict:
         return {
@@ -93,7 +94,7 @@ class ConfluenceEngine:
         # that intraday 5m would miss).
         _ref_tf = next((t for t in ['60', '15', '240', 'D', '5'] if t in tf_data), None)
         _ref_df = tf_data.get(_ref_tf) if _ref_tf else None
-        zones = self._build_zones(clusters, current_price, ref_df=_ref_df)
+        zones = self._build_zones(clusters, current_price, ref_df=_ref_df, tf_data=tf_data)
 
         # 5. Filter by max distance
         zones = [z for z in zones if z.distance_from_price_pct <= self.max_dist_pct]
@@ -110,6 +111,33 @@ class ConfluenceEngine:
             'gamma_above_count': sum(1 for t in per_tf_data.values() if t.get('price_above_gamma')),
             'active_tfs': len(per_tf_data),
         }
+
+    def _detect_trigger_tfs(self, zone_price: float, tf_data: dict, touch_threshold: float,
+                             tf_lookback: dict = None) -> dict:
+        """
+        For a given zone price, check WHICH TFs actually had bars touch
+        (or break through) the zone recently. Returns a dict:
+          {tf_name: bars_since_touch}  for TFs that touched.
+
+        A TF "triggered" if any bar in its recent lookback window had
+        [low, high] range containing zone_price ± touch_threshold.
+        """
+        if tf_lookback is None:
+            # tuned for each TF — covers ~5 trading days each
+            tf_lookback = {'D': 5, '240': 30, '60': 50, '15': 100, '5': 200}
+
+        triggers = {}
+        for tf_name, df in (tf_data or {}).items():
+            if df is None or df.empty:
+                continue
+            N = min(tf_lookback.get(tf_name, 20), len(df))
+            recent = df.tail(N)
+            for i in range(N - 1, -1, -1):
+                bar = recent.iloc[i]
+                if (bar['low'] - touch_threshold) <= zone_price <= (bar['high'] + touch_threshold):
+                    triggers[tf_name] = N - 1 - i  # bars ago
+                    break
+        return triggers
 
     def _collect_raw_levels(self, per_tf_data: dict, current_price: float) -> List[dict]:
         """Gather z1h/z1l/z2h/z2l from each TF — matches Pine f_addCluster calls."""
@@ -189,7 +217,7 @@ class ConfluenceEngine:
 
         return "⏸️ بعيد"
 
-    def _build_zones(self, clusters: List[Cluster], current_price: float, ref_df=None) -> List[ConfluenceZone]:
+    def _build_zones(self, clusters: List[Cluster], current_price: float, ref_df=None, tf_data=None) -> List[ConfluenceZone]:
         """Convert clusters to ConfluenceZones with strength tiers."""
         zones = []
         for cluster in clusters:
@@ -209,6 +237,11 @@ class ConfluenceEngine:
                 lookback_bars=50,
             )
 
+            # Which TFs actually had bars touching this zone recently?
+            triggered = self._detect_trigger_tfs(
+                cluster.price, tf_data, touch_threshold,
+            ) if tf_data else {}
+
             zones.append(ConfluenceZone(
                 price=cluster.price,
                 is_resistance=cluster.is_resistance,
@@ -220,6 +253,7 @@ class ConfluenceEngine:
                 is_touched=is_touched,
                 status=status,
                 signed_distance_pct=signed_dist,
+                triggered_tfs=triggered,
             ))
         return zones
 

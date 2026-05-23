@@ -8672,7 +8672,7 @@ elif page == "⭐ التلاقي الذهبي":
 
     # CRITICAL: invalidate cache when engine version changes (e.g. Gamma type
     # switch from HMA to SMA). Bump _ENGINE_VERSION to force re-scan.
-    _ENGINE_VERSION = "sma600-v2"
+    _ENGINE_VERSION = "sma600-trig-v3"  # bumped: zones now include triggered_tfs
     _cached_scan = st.session_state.get(f'conf_cached_scan_{_conf_market}')
     if _cached_scan and _cached_scan.get('version') != _ENGINE_VERSION:
         # Old cache from previous engine version → drop it
@@ -8818,6 +8818,7 @@ elif page == "⭐ التلاقي الذهبي":
                 _p_tier = '—'
                 _p_dist = '—'
                 _p_above_gamma = '—'
+                _p_triggered = '—'
                 # Prefer Esa zones (above gamma) when selecting which to display
                 _display_zones = _esa_zones if _esa_zones else _purple_zones
                 if _display_zones:
@@ -8831,6 +8832,13 @@ elif page == "⭐ التلاقي الذهبي":
                     if _daily_gamma and _daily_gamma > 0:
                         _gap = (_pz.price - _daily_gamma) / _daily_gamma * 100
                         _p_above_gamma = f"{_gap:+.2f}%"
+                    # Which TF(s) actually touched the zone, with bars-ago info
+                    if _pz.triggered_tfs:
+                        _tf_label = {'D':'يومي','240':'4H','60':'1H','15':'15م','5':'5م'}
+                        _trigs = sorted(_pz.triggered_tfs.items(), key=lambda x: x[1])
+                        _p_triggered = ' · '.join([
+                            f"{_tf_label.get(t,t)}({n}ش)" for t, n in _trigs
+                        ])
 
                 # ── Time stamp / age tracking ─────────────
                 # session_state['conf_signal_history'][ticker] = {status, first_seen}
@@ -8879,6 +8887,7 @@ elif page == "⭐ التلاقي الذهبي":
                     'فوق Gamma': _p_above_gamma,
                     'البُعد': _p_dist,
                     'الفريمات': _p_tfs,
+                    '✅ تحقق على': _p_triggered,
                     'التصنيف': _p_tier,
                     'فلاتر': _flt.passed_count(),
                     'الإشارة': '🟢 شراء ⭐' if _flt.final_buy_signal else '⏸️',
@@ -9236,6 +9245,7 @@ elif page == "⭐ التلاقي الذهبي":
                         'السعر': r['السعر'],
                         'سعر المنطقة': r['سعر المنطقة'],
                         'فوق Gamma': r.get('فوق Gamma', '—'),
+                        '✅ تحقق على': r.get('✅ تحقق على', '—'),
                         'البُعد': r['البُعد'],
                         'الفريمات': r['الفريمات'],
                         'التصنيف': r['التصنيف'],
