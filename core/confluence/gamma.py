@@ -36,8 +36,13 @@ def compute_gamma(
     close = df['close']
     n = len(close)
 
-    # Adapt length if not enough data
-    actual_length = min(length, max(20, n - 1))
+    # HMA needs `period + sqrt(period)` valid bars to produce a non-NaN
+    # last value (two stacked rolling WMAs). Reserve that overhead.
+    if ma_type == "HMA":
+        overhead = int(np.sqrt(length)) + 5
+        actual_length = min(length, max(20, n - overhead))
+    else:
+        actual_length = min(length, max(20, n - 1))
 
     if ma_type == "EMA":
         return close.ewm(span=actual_length, adjust=False).mean()

@@ -13,15 +13,15 @@ import time
 # TF name -> (yfinance interval, period)
 # Aggressively trimmed for Streamlit Cloud (1GB memory ceiling).
 TF_CONFIG = {
-    'D':   {'interval': '1d',  'period': '2y'},    # ~500 bars
-    '240': {'interval': '1h',  'period': '180d'},  # ~1080 1h → ~270 4h
-    '60':  {'interval': '1h',  'period': '180d'},  # ~1080 bars
-    '15':  {'interval': '15m', 'period': '15d'},   # ~300 bars
-    '5':   {'interval': '5m',  'period': '7d'},    # ~400 bars
+    'D':   {'interval': '1d',  'period': '5y'},    # ~1250 bars — matches TV history depth
+    '240': {'interval': '1h',  'period': '365d'},  # ~2200 1h → ~550 4h
+    '60':  {'interval': '1h',  'period': '365d'},  # ~2200 bars
+    '15':  {'interval': '15m', 'period': '30d'},   # ~600 bars
+    '5':   {'interval': '5m',  'period': '15d'},   # ~900 bars
 }
 
-# Hard cap per DataFrame — ZR1 needs only 400 bars max.
-_MAX_BARS = 500
+# Hard cap per DataFrame — give Gamma enough history to match TV's HMA600.
+_MAX_BARS = 1300
 
 
 def _normalize_df(df: pd.DataFrame) -> pd.DataFrame:

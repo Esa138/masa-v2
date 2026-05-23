@@ -68,7 +68,7 @@ class ConfluenceEngine:
             # ZR1 = highest pivot high & lowest pivot low in last 400 bars (confirm=25).
             # ZR2 = same with bars=300, confirm=30.
             zr = compute_zr1_zr2(df)
-            gamma = compute_gamma(df, length=600, ma_type='HMA')
+            gamma = compute_gamma(df, length=600, ma_type='SMA')
 
             gamma_val = float(gamma.iloc[-1]) if len(gamma) > 0 and pd.notna(gamma.iloc[-1]) else None
 
