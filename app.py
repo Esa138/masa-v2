@@ -8687,7 +8687,7 @@ elif page == "⭐ التلاقي الذهبي":
 
         # Purple-zone filter — checked by default since the user's main use case
         # is finding stocks at/near major purple confluence zones
-        _filt_c1, _filt_c2 = st.columns([2, 1])
+        _filt_c1, _filt_c2 = st.columns([3, 2])
         with _filt_c1:
             _only_purple = st.checkbox(
                 "🟣 اعرض فقط الأسهم في منطقة بنفسجية (قوي خالص + مختلط قوي)",
@@ -8696,9 +8696,24 @@ elif page == "⭐ التلاقي الذهبي":
             )
         with _filt_c2:
             _esa_max_dist = st.slider(
-                "🌟 أقصى بُعد منطقة عيسى %", 1.0, 30.0, 5.0, 0.5,
+                "🌟 أقصى بُعد منطقة عيسى عن السعر %", 1.0, 30.0, 5.0, 0.5,
                 key="conf_esa_max_dist",
-                help="منطقة عيسى تتجاهل المناطق الأبعد من هذه النسبة عن السعر الحالي. الافتراضي 5% = فرص دخول قريبة.",
+                help="منطقة عيسى تتجاهل المناطق الأبعد من هذه النسبة عن السعر الحالي.",
+            )
+
+        # Esa band: zone must be N%-M% ABOVE daily Gamma (tight pullback zone)
+        _esa_b1, _esa_b2 = st.columns(2)
+        with _esa_b1:
+            _esa_min_gamma_pct = st.number_input(
+                "🌟 أدنى ارتفاع عن Gamma %", min_value=0.0, max_value=20.0,
+                value=1.0, step=0.5, key="conf_esa_min_g",
+                help="المنطقة لازم تكون فوق Gamma اليومية بهذه النسبة على الأقل",
+            )
+        with _esa_b2:
+            _esa_max_gamma_pct = st.number_input(
+                "🌟 أقصى ارتفاع عن Gamma %", min_value=0.5, max_value=50.0,
+                value=3.0, step=0.5, key="conf_esa_max_g",
+                help="المنطقة لازم لا تتجاوز Gamma اليومية بأكثر من هذه النسبة (تبقى قريبة من Gamma)",
             )
 
         # Scan uses D + 4H + 1H (covers all purple-tier detection).
@@ -8810,15 +8825,15 @@ elif page == "⭐ التلاقي الذهبي":
                 ]
 
                 # 🌟 منطقة عيسى — purple zone that's:
-                #   1) at least 1% ABOVE daily gamma (uptrend confirmation)
+                #   1) BETWEEN 1% and 3% above daily gamma (just above Gamma,
+                #      not stretched far above — pullback-to-Gamma buy setup)
                 #   2) within `_esa_max_dist`% of current price (actionable)
-                # Both conditions = strongest tradeable buy setup.
                 _daily_gamma = _res.get('per_tf', {}).get('D', {}).get('gamma_current')
                 _esa_zones = []
                 if _daily_gamma and _daily_gamma > 0:
                     _esa_zones = [
                         z for z in _purple_zones
-                        if z.price > _daily_gamma * 1.01
+                        if (_daily_gamma * (1 + _esa_min_gamma_pct / 100)) <= z.price <= (_daily_gamma * (1 + _esa_max_gamma_pct / 100))
                         and z.distance_from_price_pct <= _esa_max_dist
                     ]
                 _is_esa = bool(_esa_zones)
