@@ -8695,6 +8695,39 @@ elif page == "⭐ التلاقي الذهبي":
 
         # ── Esa zone settings: 4 controls split across 2 scenarios ──
         st.markdown("**🌟 إعدادات منطقة عيسى:**")
+
+        # Quick preset buttons — calibrated per market type
+        _preset_c1, _preset_c2, _preset_c3, _preset_c4 = st.columns(4)
+        _ESA_PRESETS = {
+            'saudi': {'min': 1.0, 'max': 15.0, 'approach': 8.0, 'bounce': 4.0},
+            'us':    {'min': 1.0, 'max': 80.0, 'approach': 12.0, 'bounce': 5.0},
+            'crypto':{'min': 1.0, 'max': 200.0, 'approach': 20.0, 'bounce': 8.0},
+            'tight': {'min': 1.0, 'max': 5.0,  'approach': 5.0, 'bounce': 3.0},
+        }
+        def _apply_esa_preset(name: str):
+            p = _ESA_PRESETS[name]
+            st.session_state['conf_esa_min_g'] = p['min']
+            st.session_state['conf_esa_max_g'] = p['max']
+            st.session_state['conf_esa_approach'] = p['approach']
+            st.session_state['conf_esa_bounce'] = p['bounce']
+            st.rerun()
+
+        with _preset_c1:
+            if st.button("🇸🇦 سعودي", use_container_width=True, key="esa_preset_saudi",
+                         help="1-15% فوق Gamma · اقتراب 8% · ارتداد 4% · مناسب لتداول"):
+                _apply_esa_preset('saudi')
+        with _preset_c2:
+            if st.button("🇺🇸 أمريكي", use_container_width=True, key="esa_preset_us",
+                         help="1-80% فوق Gamma · اقتراب 12% · ارتداد 5% · يلاءم الاتجاهات الصاعدة"):
+                _apply_esa_preset('us')
+        with _preset_c3:
+            if st.button("₿ كريبتو", use_container_width=True, key="esa_preset_crypto",
+                         help="1-200% فوق Gamma · اقتراب 20% · ارتداد 8% · لتقلبات العملات"):
+                _apply_esa_preset('crypto')
+        with _preset_c4:
+            if st.button("🎯 صارم", use_container_width=True, key="esa_preset_tight",
+                         help="1-5% فوق Gamma · بُعد 3-5% · يصفّي لأفضل setups فقط"):
+                _apply_esa_preset('tight')
         _esa_g1, _esa_g2 = st.columns(2)
         with _esa_g1:
             _esa_min_gamma_pct = st.number_input(
@@ -8704,9 +8737,9 @@ elif page == "⭐ التلاقي الذهبي":
             )
         with _esa_g2:
             _esa_max_gamma_pct = st.number_input(
-                "أقصى ارتفاع المنطقة عن Gamma %", min_value=0.5, max_value=100.0,
-                value=5.0, step=0.5, key="conf_esa_max_g",
-                help="المنطقة لا تتجاوز Gamma اليومية بأكثر من هذه النسبة",
+                "أقصى ارتفاع المنطقة عن Gamma %", min_value=0.5, max_value=300.0,
+                value=15.0, step=1.0, key="conf_esa_max_g",
+                help="المنطقة لا تتجاوز Gamma اليومية بأكثر من هذه النسبة. (يختلف بين الأسواق — استخدم الأزرار أعلاه)",
             )
 
         _esa_d1, _esa_d2 = st.columns(2)
