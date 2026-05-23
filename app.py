@@ -8669,7 +8669,15 @@ elif page == "⭐ التلاقي الذهبي":
     #   2. cached scan results exist for the currently-selected market
     # The cache holds the heavy zone-analysis output; OF lookup is re-done fresh
     # on every render so Order Flow updates reflect immediately.
+
+    # CRITICAL: invalidate cache when engine version changes (e.g. Gamma type
+    # switch from HMA to SMA). Bump _ENGINE_VERSION to force re-scan.
+    _ENGINE_VERSION = "sma600-v2"
     _cached_scan = st.session_state.get(f'conf_cached_scan_{_conf_market}')
+    if _cached_scan and _cached_scan.get('version') != _ENGINE_VERSION:
+        # Old cache from previous engine version → drop it
+        st.session_state.pop(f'conf_cached_scan_{_conf_market}', None)
+        _cached_scan = None
     _has_cached = _cached_scan is not None
     _show_scan = _do_scan or _has_cached
 
@@ -8770,6 +8778,7 @@ elif page == "⭐ التلاقي الذهبي":
         # fresh OF lookups, without re-fetching market data.
         st.session_state[f'conf_cached_scan_{_conf_market}'] = {
             'results_list': _results_list,
+            'version': _ENGINE_VERSION,
         }
 
     # ── Row-building + rendering — runs on every render (fresh or cached) ──
