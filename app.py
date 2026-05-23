@@ -8791,20 +8791,37 @@ elif page == "⭐ التلاقي الذهبي":
                     and (z.mask & 1)
                     and (z.status.startswith('✅') or z.status.startswith('🎯') or z.status.startswith('🔄') or z.status.startswith('💥'))
                 ]
+
+                # 🌟 منطقة عيسى — purple zone that's at least 1% ABOVE daily gamma
+                # (confirms uptrend context — strongest buy-setup variant)
+                _daily_gamma = _res.get('per_tf', {}).get('D', {}).get('gamma_current')
+                _esa_zones = []
+                if _daily_gamma and _daily_gamma > 0:
+                    _esa_zones = [
+                        z for z in _purple_zones
+                        if z.price > _daily_gamma * 1.01
+                    ]
+                _is_esa = bool(_esa_zones)
                 _p_status = '—'
                 _p_kind = '—'
                 _p_price = '—'
                 _p_tfs = '—'
                 _p_tier = '—'
                 _p_dist = '—'
-                if _purple_zones:
-                    _pz = min(_purple_zones, key=lambda z: z.distance_from_price_pct)
+                _p_above_gamma = '—'
+                # Prefer Esa zones (above gamma) when selecting which to display
+                _display_zones = _esa_zones if _esa_zones else _purple_zones
+                if _display_zones:
+                    _pz = min(_display_zones, key=lambda z: z.distance_from_price_pct)
                     _p_status = _pz.status
                     _p_kind = "🟢 دعم" if not _pz.is_resistance else "🔴 مقاومة"
                     _p_price = round(_pz.price, 2)
                     _p_tfs = _pz.tf_names
                     _p_tier = f"{_pz.strength.label} {_pz.strength.stars}".strip()
                     _p_dist = f"{_pz.signed_distance_pct:+.2f}%"
+                    if _daily_gamma and _daily_gamma > 0:
+                        _gap = (_pz.price - _daily_gamma) / _daily_gamma * 100
+                        _p_above_gamma = f"{_gap:+.2f}%"
 
                 # ── Time stamp / age tracking ─────────────
                 # session_state['conf_signal_history'][ticker] = {status, first_seen}
@@ -8843,12 +8860,14 @@ elif page == "⭐ التلاقي الذهبي":
                     'السهم': _stocks_dict.get(_tk, _tk),
                     'الرمز': _tk,
                     'السعر': round(_cp, 2),
+                    '🌟 عيسى': '🌟' if _is_esa else '—',
                     '🟣 الحالة': _p_status,
                     '🚦': _freshness,
                     '⏱️ أول ظهور': _first_seen_str,
                     '🕐 العمر': _age_str,
                     'النوع': _p_kind,
                     'سعر المنطقة': _p_price,
+                    'فوق Gamma': _p_above_gamma,
                     'البُعد': _p_dist,
                     'الفريمات': _p_tfs,
                     'التصنيف': _p_tier,
@@ -8857,6 +8876,7 @@ elif page == "⭐ التلاقي الذهبي":
                     '_final': _flt.final_buy_signal,
                     '_passed': _flt.passed_count(),
                     '_has_purple': bool(_purple_zones),
+                    '_is_esa': _is_esa,
                     '_purple_dist': min((z.distance_from_price_pct for z in _purple_zones), default=999),
                     '_age_min': int((_now_ts - _entry['first_seen']).total_seconds() / 60) if _entry else 99999,
                 }
@@ -8881,20 +8901,26 @@ elif page == "⭐ التلاقي الذهبي":
                 lambda s: _status_rank.get(str(s)[:1] if str(s) else '⏸️', 9)
             )
             _df_scan = _df_scan.sort_values(
-                ['_has_purple', '_status_rank', '_age_min', '_purple_dist', '_final', '_passed'],
-                ascending=[False, True, True, True, False, False],
+                ['_is_esa', '_has_purple', '_status_rank', '_age_min', '_purple_dist', '_final', '_passed'],
+                ascending=[False, False, True, True, True, False, False],
             )
-            _df_scan = _df_scan.drop(columns=['_final', '_passed', '_has_purple', '_purple_dist', '_status_rank', '_age_min'])
+            _df_scan = _df_scan.drop(columns=['_final', '_passed', '_has_purple', '_is_esa', '_purple_dist', '_status_rank', '_age_min'])
 
             _golden_cnt = sum(1 for r in _scan_rows if r['_final'])
             _strong_cnt = sum(1 for r in _scan_rows if r['_passed'] >= 4)
             _purple_cnt = sum(1 for r in _scan_rows if r['_has_purple'])
+            _esa_cnt = sum(1 for r in _scan_rows if r.get('_is_esa'))
 
             # Purple picks — sorted by status priority (in-zone first, then bounce)
             _purple_picks = [r for r in _scan_rows if r['_has_purple']]
             _purple_picks.sort(key=lambda r: (
                 _status_rank.get(str(r['🟣 الحالة'])[:1] if str(r['🟣 الحالة']) else '⏸️', 9),
                 r.get('_age_min', 99999),
+                r['_purple_dist'],
+            ))
+            _esa_picks = [r for r in _scan_rows if r.get('_is_esa')]
+            _esa_picks.sort(key=lambda r: (
+                _status_rank.get(str(r['🟣 الحالة'])[:1] if str(r['🟣 الحالة']) else '⏸️', 9),
                 r['_purple_dist'],
             ))
 
@@ -8914,17 +8940,39 @@ elif page == "⭐ التلاقي الذهبي":
             _dead_cnt = sum(1 for r in _scan_rows if r['_has_purple'] and r['_age_min'] >= 180)
 
             def _render_summary(_loc: str):
-                _m1, _m2, _m3, _m4 = st.columns(4)
+                _m1, _m2, _m3, _m4, _m5 = st.columns(5)
                 _m1.metric("إجمالي مفحوص", len(_scan_rows))
                 _m2.metric("🟢 إشارات ذهبية", _golden_cnt)
                 _m3.metric("⭐ قوية (4+ فلاتر)", _strong_cnt)
                 _m4.metric("🟣 في منطقة بنفسجية", _purple_cnt)
+                _m5.metric("🌟 منطقة عيسى", _esa_cnt,
+                           help="منطقة بنفسجية فوق Gamma اليومية بـ ≥1% — أقوى Setup شراء")
                 # Freshness breakdown
                 _f1, _f2, _f3, _f4 = st.columns(4)
                 _f1.metric("🟢 طازجة (<15د)", _fresh_cnt)
                 _f2.metric("🟡 متوسطة (15-60د)", _medium_cnt)
                 _f3.metric("🟠 قديمة (60-180د)", _stale_cnt)
                 _f4.metric("🔴 منتهية (>180د)", _dead_cnt)
+
+                # 🌟 منطقة عيسى chips first — premium signal
+                if _esa_picks:
+                    _esa_html = "".join([
+                        f"<span style='display:inline-block;margin:3px;padding:8px 14px;"
+                        f"background:linear-gradient(135deg,#ff6f00,#ffd700);"
+                        f"border:2px solid #fff59d;border-radius:14px;font-size:0.9em;color:#1a1a1a;font-weight:600'>"
+                        f"🌟 <b>{p['السهم']}</b> "
+                        f"<span style='color:#37474f;font-size:0.85em'>({p['الرمز']})</span> "
+                        f"<span>{p['السعر']}</span> "
+                        f"<span style='color:#4a148c'>← {p['سعر المنطقة']}</span> "
+                        f"<span style='color:#1b5e20'>فوق Gamma {p.get('فوق Gamma', '')}</span>"
+                        f"</span>"
+                        for p in _esa_picks
+                    ])
+                    st.markdown(
+                        f"<div style='padding:8px 0'><div style='color:#ffd700;font-size:0.95em;margin-bottom:6px;font-weight:700'>"
+                        f"🌟 منطقة عيسى ({len(_esa_picks)}) — منطقة بنفسجية فوق Gamma:</div>{_esa_html}</div>",
+                        unsafe_allow_html=True,
+                    )
 
                 if _purple_picks:
                     _chips_html = "".join([
@@ -9165,6 +9213,7 @@ elif page == "⭐ التلاقي الذهبي":
 
                     _detail_data.append({
                         '🚦': r.get('🚦', '—'),
+                        '🌟 عيسى': r.get('🌟 عيسى', '—'),
                         'السهم': r['السهم'],
                         'الرمز': r['الرمز'],
                         'القطاع': _sector,
@@ -9177,6 +9226,7 @@ elif page == "⭐ التلاقي الذهبي":
                         'النوع': r['النوع'],
                         'السعر': r['السعر'],
                         'سعر المنطقة': r['سعر المنطقة'],
+                        'فوق Gamma': r.get('فوق Gamma', '—'),
                         'البُعد': r['البُعد'],
                         'الفريمات': r['الفريمات'],
                         'التصنيف': r['التصنيف'],
