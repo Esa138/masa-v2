@@ -8687,34 +8687,43 @@ elif page == "⭐ التلاقي الذهبي":
 
         # Purple-zone filter — checked by default since the user's main use case
         # is finding stocks at/near major purple confluence zones
-        _filt_c1, _filt_c2 = st.columns([3, 2])
-        with _filt_c1:
-            _only_purple = st.checkbox(
-                "🟣 اعرض فقط الأسهم في منطقة بنفسجية (قوي خالص + مختلط قوي)",
-                value=True, key="conf_only_purple",
-                help="إلغاء التحديد لرؤية كل الأسهم",
+        _only_purple = st.checkbox(
+            "🟣 اعرض فقط الأسهم في منطقة بنفسجية (قوي خالص + مختلط قوي)",
+            value=True, key="conf_only_purple",
+            help="إلغاء التحديد لرؤية كل الأسهم",
+        )
+
+        # ── Esa zone settings: 4 controls split across 2 scenarios ──
+        st.markdown("**🌟 إعدادات منطقة عيسى:**")
+        _esa_g1, _esa_g2 = st.columns(2)
+        with _esa_g1:
+            _esa_min_gamma_pct = st.number_input(
+                "أدنى ارتفاع المنطقة عن Gamma %", min_value=0.0, max_value=20.0,
+                value=1.0, step=0.5, key="conf_esa_min_g",
+                help="المنطقة فوق Gamma اليومية بهذه النسبة على الأقل",
             )
-        with _filt_c2:
-            _esa_max_dist = st.slider(
-                "🌟 أقصى بُعد منطقة عيسى عن السعر %", 1.0, 30.0, 5.0, 0.5,
-                key="conf_esa_max_dist",
-                help="منطقة عيسى تتجاهل المناطق الأبعد من هذه النسبة عن السعر الحالي.",
+        with _esa_g2:
+            _esa_max_gamma_pct = st.number_input(
+                "أقصى ارتفاع المنطقة عن Gamma %", min_value=0.5, max_value=100.0,
+                value=55.0, step=1.0, key="conf_esa_max_g",
+                help="المنطقة لا تتجاوز Gamma اليومية بأكثر من هذه النسبة",
             )
 
-        # Esa band: zone must be N%-M% ABOVE daily Gamma (tight pullback zone)
-        _esa_b1, _esa_b2 = st.columns(2)
-        with _esa_b1:
-            _esa_min_gamma_pct = st.number_input(
-                "🌟 أدنى ارتفاع عن Gamma %", min_value=0.0, max_value=20.0,
-                value=5.0, step=0.5, key="conf_esa_min_g",
-                help="المنطقة لازم تكون فوق Gamma اليومية بهذه النسبة على الأقل",
+        _esa_d1, _esa_d2 = st.columns(2)
+        with _esa_d1:
+            _esa_approach_max = st.number_input(
+                "📉 بُعد الاقتراب من المنطقة % (للهبوط)", min_value=1.0, max_value=30.0,
+                value=10.0, step=0.5, key="conf_esa_approach",
+                help="السعر فوق المنطقة، نازل تجاهها، البُعد بين 1% وهذه القيمة",
             )
-        with _esa_b2:
-            _esa_max_gamma_pct = st.number_input(
-                "🌟 أقصى ارتفاع عن Gamma %", min_value=0.5, max_value=50.0,
-                value=5.0, step=0.5, key="conf_esa_max_g",
-                help="المنطقة لازم لا تتجاوز Gamma اليومية بأكثر من هذه النسبة (تبقى قريبة من Gamma)",
+        with _esa_d2:
+            _esa_bounce_max = st.number_input(
+                "🔄 بُعد الارتداد من المنطقة %", min_value=0.5, max_value=15.0,
+                value=5.0, step=0.5, key="conf_esa_bounce",
+                help="السعر ارتد من المنطقة، البُعد الحالي ≤ هذه القيمة",
             )
+        # Backward-compat reference (some code below uses _esa_max_dist)
+        _esa_max_dist = max(_esa_approach_max, _esa_bounce_max)
 
         # Scan uses D + 4H + 1H (covers all purple-tier detection).
         # 15m/5m skipped for speed; they don't change Pure/Mixed Strong
@@ -8824,18 +8833,40 @@ elif page == "⭐ التلاقي الذهبي":
                     and (z.status.startswith('✅') or z.status.startswith('🎯') or z.status.startswith('🔄') or z.status.startswith('💥'))
                 ]
 
-                # 🌟 منطقة عيسى — purple zone that's:
-                #   1) BETWEEN 1% and 3% above daily gamma (just above Gamma,
-                #      not stretched far above — pullback-to-Gamma buy setup)
-                #   2) within `_esa_max_dist`% of current price (actionable)
+                # 🌟 منطقة عيسى — TWO valid scenarios:
+                #   A) APPROACH: price ABOVE zone, falling toward it,
+                #      distance between 1% and _esa_approach_max%
+                #      (statuses: 🎯 يقترب من الأسفل، ⏸️ بعيد قريباً)
+                #   B) BOUNCE: price already bounced FROM the zone,
+                #      currently within _esa_bounce_max% of it
+                #      (statuses: 🔄 ارتد، ✅ داخل المنطقة)
+                # In BOTH cases the zone must be _esa_min_gamma_pct% to
+                # _esa_max_gamma_pct% above daily Gamma.
                 _daily_gamma = _res.get('per_tf', {}).get('D', {}).get('gamma_current')
                 _esa_zones = []
                 if _daily_gamma and _daily_gamma > 0:
-                    _esa_zones = [
-                        z for z in _purple_zones
-                        if (_daily_gamma * (1 + _esa_min_gamma_pct / 100)) <= z.price <= (_daily_gamma * (1 + _esa_max_gamma_pct / 100))
-                        and z.distance_from_price_pct <= _esa_max_dist
-                    ]
+                    _g_min = _daily_gamma * (1 + _esa_min_gamma_pct / 100)
+                    _g_max = _daily_gamma * (1 + _esa_max_gamma_pct / 100)
+                    for z in _purple_zones:
+                        if not (_g_min <= z.price <= _g_max):
+                            continue
+                        _price_above_zone = z.signed_distance_pct > 0
+                        _dist = z.distance_from_price_pct
+                        _status_char = z.status[:1] if z.status else ''
+
+                        # A) approach: price above the zone, gap in [1%, approach_max%]
+                        _is_approach = (
+                            _price_above_zone
+                            and 1.0 <= _dist <= _esa_approach_max
+                            and _status_char in ('🎯', '⏸️')
+                        )
+                        # B) bounce: bounced or in zone, gap ≤ bounce_max%
+                        _is_bounce = (
+                            _status_char in ('🔄', '✅')
+                            and _dist <= _esa_bounce_max
+                        )
+                        if _is_approach or _is_bounce:
+                            _esa_zones.append(z)
                 _is_esa = bool(_esa_zones)
                 _p_status = '—'
                 _p_kind = '—'
