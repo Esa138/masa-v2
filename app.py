@@ -8672,7 +8672,7 @@ elif page == "⭐ التلاقي الذهبي":
 
     # CRITICAL: invalidate cache when engine version changes (e.g. Gamma type
     # switch from HMA to SMA). Bump _ENGINE_VERSION to force re-scan.
-    _ENGINE_VERSION = "sma600-trig-v3"  # bumped: zones now include triggered_tfs
+    _ENGINE_VERSION = "sma600-trig-v3"  # bumped when engine output structure changes
     _cached_scan = st.session_state.get(f'conf_cached_scan_{_conf_market}')
     if _cached_scan and _cached_scan.get('version') != _ENGINE_VERSION:
         # Old cache from previous engine version → drop it
@@ -8687,11 +8687,19 @@ elif page == "⭐ التلاقي الذهبي":
 
         # Purple-zone filter — checked by default since the user's main use case
         # is finding stocks at/near major purple confluence zones
-        _only_purple = st.checkbox(
-            "🟣 اعرض فقط الأسهم في منطقة بنفسجية (قوي خالص + مختلط قوي)",
-            value=True, key="conf_only_purple",
-            help="إلغاء التحديد لرؤية كل الأسهم",
-        )
+        _filt_c1, _filt_c2 = st.columns([2, 1])
+        with _filt_c1:
+            _only_purple = st.checkbox(
+                "🟣 اعرض فقط الأسهم في منطقة بنفسجية (قوي خالص + مختلط قوي)",
+                value=True, key="conf_only_purple",
+                help="إلغاء التحديد لرؤية كل الأسهم",
+            )
+        with _filt_c2:
+            _esa_max_dist = st.slider(
+                "🌟 أقصى بُعد منطقة عيسى %", 1.0, 30.0, 5.0, 0.5,
+                key="conf_esa_max_dist",
+                help="منطقة عيسى تتجاهل المناطق الأبعد من هذه النسبة عن السعر الحالي. الافتراضي 5% = فرص دخول قريبة.",
+            )
 
         # Scan uses D + 4H + 1H (covers all purple-tier detection).
         # 15m/5m skipped for speed; they don't change Pure/Mixed Strong
@@ -8801,14 +8809,17 @@ elif page == "⭐ التلاقي الذهبي":
                     and (z.status.startswith('✅') or z.status.startswith('🎯') or z.status.startswith('🔄') or z.status.startswith('💥'))
                 ]
 
-                # 🌟 منطقة عيسى — purple zone that's at least 1% ABOVE daily gamma
-                # (confirms uptrend context — strongest buy-setup variant)
+                # 🌟 منطقة عيسى — purple zone that's:
+                #   1) at least 1% ABOVE daily gamma (uptrend confirmation)
+                #   2) within `_esa_max_dist`% of current price (actionable)
+                # Both conditions = strongest tradeable buy setup.
                 _daily_gamma = _res.get('per_tf', {}).get('D', {}).get('gamma_current')
                 _esa_zones = []
                 if _daily_gamma and _daily_gamma > 0:
                     _esa_zones = [
                         z for z in _purple_zones
                         if z.price > _daily_gamma * 1.01
+                        and z.distance_from_price_pct <= _esa_max_dist
                     ]
                 _is_esa = bool(_esa_zones)
                 _p_status = '—'
