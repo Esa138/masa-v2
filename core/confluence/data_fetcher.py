@@ -11,19 +11,17 @@ import time
 
 
 # TF name -> (yfinance interval, period)
-# Periods trimmed to stay under Streamlit Cloud's 1GB memory limit
-# while still covering the ZR1 400-bar window.
+# Aggressively trimmed for Streamlit Cloud (1GB memory ceiling).
 TF_CONFIG = {
-    'D':   {'interval': '1d',  'period': '3y'},    # ~750 bars (was 5y/1250)
-    '240': {'interval': '1h',  'period': '365d'},  # ~2200 1h → ~550 4h bars
-    '60':  {'interval': '1h',  'period': '365d'},  # ~2200 bars (was 4380)
-    '15':  {'interval': '15m', 'period': '30d'},   # ~600 bars (was 60d)
-    '5':   {'interval': '5m',  'period': '15d'},   # ~900 bars (was 60d)
+    'D':   {'interval': '1d',  'period': '2y'},    # ~500 bars
+    '240': {'interval': '1h',  'period': '180d'},  # ~1080 1h → ~270 4h
+    '60':  {'interval': '1h',  'period': '180d'},  # ~1080 bars
+    '15':  {'interval': '15m', 'period': '15d'},   # ~300 bars
+    '5':   {'interval': '5m',  'period': '7d'},    # ~400 bars
 }
 
-# Hard cap on rows kept in memory per dataframe — anything beyond this
-# gets trimmed (more than enough for ZR1 400-bar + ZR2 300-bar windows).
-_MAX_BARS = 800
+# Hard cap per DataFrame — ZR1 needs only 400 bars max.
+_MAX_BARS = 500
 
 
 def _normalize_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -196,7 +194,7 @@ def fetch_daily_batch(tickers: list, period: str = '5y') -> Dict[str, pd.DataFra
 # → OOM on Streamlit Cloud's 1GB limit. New version caps entries.
 _CACHE: Dict[tuple, tuple] = {}
 _CACHE_TTL_SEC = 300
-_CACHE_MAX_ENTRIES = 50  # hold at most 50 tickers' worth of data
+_CACHE_MAX_ENTRIES = 20  # tighter cap for low-memory environments
 
 
 def fetch_multi_tf_data_cached(
