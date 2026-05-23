@@ -8712,7 +8712,7 @@ elif page == "⭐ التلاقي الذهبي":
         with _esa_b2:
             _esa_max_gamma_pct = st.number_input(
                 "🌟 أقصى ارتفاع عن Gamma %", min_value=0.5, max_value=50.0,
-                value=3.0, step=0.5, key="conf_esa_max_g",
+                value=5.0, step=0.5, key="conf_esa_max_g",
                 help="المنطقة لازم لا تتجاوز Gamma اليومية بأكثر من هذه النسبة (تبقى قريبة من Gamma)",
             )
 
