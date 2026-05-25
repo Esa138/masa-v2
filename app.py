@@ -8954,6 +8954,7 @@ elif page == "⭐ التلاقي الذهبي":
                 _p_dist = '—'
                 _p_above_gamma = '—'
                 _p_triggered = '—'
+                _p_latest_tf = '—'
                 # Prefer Esa zones (above gamma) when selecting which to display
                 _display_zones = _esa_zones if _esa_zones else _purple_zones
                 if _display_zones:
@@ -8974,6 +8975,10 @@ elif page == "⭐ التلاقي الذهبي":
                         _p_triggered = ' · '.join([
                             f"{_tf_label.get(t,t)}({n}ش)" for t, n in _trigs
                         ])
+                        # Most-recent (smallest bars-ago) trigger TF — the
+                        # actual signal-firing timeframe
+                        _latest = _trigs[0]
+                        _p_latest_tf = f"{_tf_label.get(_latest[0], _latest[0])} (قبل {_latest[1]}ش)"
 
                 # ── Time stamp / age tracking ─────────────
                 # session_state['conf_signal_history'][ticker] = {status, first_seen}
@@ -9024,6 +9029,7 @@ elif page == "⭐ التلاقي الذهبي":
                     'البُعد': _p_dist,
                     'الفريمات': _p_tfs,
                     '✅ تحقق على': _p_triggered,
+                    '⚡ أحدث فريم': _p_latest_tf,
                     'التصنيف': _p_tier,
                     'فلاتر': _flt.passed_count(),
                     'الإشارة': '🟢 شراء ⭐' if _flt.final_buy_signal else '⏸️',
@@ -9131,6 +9137,10 @@ elif page == "⭐ التلاقي الذهبي":
                         f"<span style='color:#fff'>{p['السعر']}</span> "
                         f"<span style='color:#fff3e0'>← {p['سعر المنطقة']}</span> "
                         f"<span style='color:#c8e6c9'>فوق Gamma {p.get('فوق Gamma', '')}</span>"
+                        f"<div style='margin-top:4px;padding-top:4px;border-top:1px solid rgba(255,255,255,0.25);font-size:0.78em;color:#fffde7'>"
+                        f"⚡ أحدث: <b style='color:#fff'>{p.get('⚡ أحدث فريم', '—')}</b><br>"
+                        f"🎯 كل الفريمات: {p.get('✅ تحقق على', '—')}"
+                        f"</div>"
                         f"</span>"
                         for p in _esa_picks
                     ])
@@ -9395,6 +9405,7 @@ elif page == "⭐ التلاقي الذهبي":
                         'السعر': r['السعر'],
                         'سعر المنطقة': r['سعر المنطقة'],
                         'فوق Gamma': r.get('فوق Gamma', '—'),
+                        '⚡ أحدث فريم': r.get('⚡ أحدث فريم', '—'),
                         '✅ تحقق على': r.get('✅ تحقق على', '—'),
                         'البُعد': r['البُعد'],
                         'الفريمات': r['الفريمات'],
