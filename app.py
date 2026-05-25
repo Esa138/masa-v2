@@ -8757,11 +8757,18 @@ elif page == "⭐ التلاقي الذهبي":
             )
         _esa_max_dist = max(_esa_approach_max, _esa_bounce_max)
 
+        # US markets auto-enable sell scenarios + use CALL/PUT terminology
+        # (options trading is the dominant use case there).
+        _is_us_market = any(s in _conf_market for s in ('أمريكي', 'S&P 500', 'US'))
         _esa_include_sell = st.checkbox(
             "🔻 اشمل فرص البيع والهبوط (مقاومة بنفسجية + كسر هابط)",
             value=True, key="conf_esa_include_sell",
             help="يضيف للقائمة: السعر يلامس/ارتد من مقاومة بنفسجية، أو كسر دعم بنفسجي هابطاً. مفيد للبيع على المكشوف أو إغلاق المراكز.",
         )
+        # Force-enable for US markets regardless of checkbox state
+        if _is_us_market:
+            _esa_include_sell = True
+            st.caption("🇺🇸 للسوق الأمريكي: فرص CALL و PUT تظهر تلقائياً")
 
         # Scan uses D + 4H + 1H (covers all purple-tier detection).
         # 15m/5m skipped for speed; they don't change Pure/Mixed Strong
@@ -8920,16 +8927,25 @@ elif page == "⭐ التلاقي الذهبي":
                             _esa_zones.append(z)
                             _esa_zone_kind[id(z)] = _kind
                 _is_esa = bool(_esa_zones)
-                # Mark the row's Esa side (buy/sell/mixed) based on first matched zone
+                # Mark the row's Esa side based on the matched zone kinds.
+                # US markets get CALL/PUT (options-trading lingo), others get شراء/بيع.
                 _esa_side = ''
                 if _esa_zones:
                     _kinds_set = set(_esa_zone_kind.values())
-                    if _kinds_set == {'buy'}:
-                        _esa_side = '🟢 شراء'
-                    elif _kinds_set == {'sell'}:
-                        _esa_side = '🔴 بيع'
+                    if _is_us_market:
+                        if _kinds_set == {'buy'}:
+                            _esa_side = '🟢 CALL'
+                        elif _kinds_set == {'sell'}:
+                            _esa_side = '🔴 PUT'
+                        else:
+                            _esa_side = '⚖️ CALL+PUT'
                     else:
-                        _esa_side = '⚖️ مختلط'
+                        if _kinds_set == {'buy'}:
+                            _esa_side = '🟢 شراء'
+                        elif _kinds_set == {'sell'}:
+                            _esa_side = '🔴 بيع'
+                        else:
+                            _esa_side = '⚖️ مختلط'
                 _p_status = '—'
                 _p_kind = '—'
                 _p_price = '—'
@@ -9083,8 +9099,9 @@ elif page == "⭐ التلاقي الذهبي":
                 _m2.metric("🟢 إشارات ذهبية", _golden_cnt)
                 _m3.metric("⭐ قوية (4+ فلاتر)", _strong_cnt)
                 _m4.metric("🟣 في منطقة بنفسجية", _purple_cnt)
-                _m5.metric("🌟 منطقة عيسى", _esa_cnt,
-                           help="منطقة بنفسجية فوق Gamma اليومية بـ ≥1% — أقوى Setup شراء")
+                _esa_metric_label = "🌟 CALL + PUT" if _is_us_market else "🌟 منطقة عيسى"
+                _m5.metric(_esa_metric_label, _esa_cnt,
+                           help="منطقة بنفسجية + سياق Gamma + اتجاه. للأسواق الأمريكية: تشمل فرص CALL وPUT تلقائياً.")
                 # Freshness breakdown
                 _f1, _f2, _f3, _f4 = st.columns(4)
                 _f1.metric("🟢 طازجة (<15د)", _fresh_cnt)
@@ -9093,22 +9110,34 @@ elif page == "⭐ التلاقي الذهبي":
                 _f4.metric("🔴 منتهية (>180د)", _dead_cnt)
 
                 # 🌟 منطقة عيسى chips first — premium signal
+                # Color-coded by side: green CALL/شراء, red PUT/بيع, gray mixed
                 if _esa_picks:
+                    def _side_chip_bg(side: str) -> str:
+                        if 'CALL' in side or 'شراء' in side:
+                            return 'linear-gradient(135deg,#1b5e20,#66bb6a)'
+                        if 'PUT' in side or 'بيع' in side:
+                            return 'linear-gradient(135deg,#b71c1c,#ef5350)'
+                        if 'مختلط' in side or 'CALL+PUT' in side:
+                            return 'linear-gradient(135deg,#5d4037,#a1887f)'
+                        return 'linear-gradient(135deg,#ff6f00,#ffd700)'
+
                     _esa_html = "".join([
                         f"<span style='display:inline-block;margin:3px;padding:8px 14px;"
-                        f"background:linear-gradient(135deg,#ff6f00,#ffd700);"
-                        f"border:2px solid #fff59d;border-radius:14px;font-size:0.9em;color:#1a1a1a;font-weight:600'>"
-                        f"🌟 <b>{p['السهم']}</b> "
-                        f"<span style='color:#37474f;font-size:0.85em'>({p['الرمز']})</span> "
-                        f"<span>{p['السعر']}</span> "
-                        f"<span style='color:#4a148c'>← {p['سعر المنطقة']}</span> "
-                        f"<span style='color:#1b5e20'>فوق Gamma {p.get('فوق Gamma', '')}</span>"
+                        f"background:{_side_chip_bg(p.get('اتجاه عيسى', ''))};"
+                        f"border:2px solid #fff59d;border-radius:14px;font-size:0.9em;color:#fff;font-weight:600'>"
+                        f"<span style='background:rgba(0,0,0,0.35);padding:2px 8px;border-radius:8px;font-weight:800;margin-left:4px'>{p.get('اتجاه عيسى', '🌟')}</span> "
+                        f"<b>{p['السهم']}</b> "
+                        f"<span style='color:#f5f5f5;font-size:0.85em'>({p['الرمز']})</span> "
+                        f"<span style='color:#fff'>{p['السعر']}</span> "
+                        f"<span style='color:#fff3e0'>← {p['سعر المنطقة']}</span> "
+                        f"<span style='color:#c8e6c9'>فوق Gamma {p.get('فوق Gamma', '')}</span>"
                         f"</span>"
                         for p in _esa_picks
                     ])
+                    _esa_title = "🌟 فرص CALL و PUT" if _is_us_market else "🌟 منطقة عيسى"
                     st.markdown(
                         f"<div style='padding:8px 0'><div style='color:#ffd700;font-size:0.95em;margin-bottom:6px;font-weight:700'>"
-                        f"🌟 منطقة عيسى ({len(_esa_picks)}) — منطقة بنفسجية فوق Gamma:</div>{_esa_html}</div>",
+                        f"{_esa_title} ({len(_esa_picks)}) — منطقة بنفسجية + اتجاه:</div>{_esa_html}</div>",
                         unsafe_allow_html=True,
                     )
 
@@ -9352,6 +9381,7 @@ elif page == "⭐ التلاقي الذهبي":
                     _detail_data.append({
                         '🚦': r.get('🚦', '—'),
                         '🌟 عيسى': r.get('🌟 عيسى', '—'),
+                        'اتجاه': r.get('اتجاه عيسى', '—'),
                         'السهم': r['السهم'],
                         'الرمز': r['الرمز'],
                         'القطاع': _sector,
