@@ -8755,8 +8755,13 @@ elif page == "⭐ التلاقي الذهبي":
                 value=5.0, step=0.5, key="conf_esa_bounce",
                 help="السعر ارتد من المنطقة، البُعد الحالي ≤ هذه القيمة",
             )
-        # Backward-compat reference (some code below uses _esa_max_dist)
         _esa_max_dist = max(_esa_approach_max, _esa_bounce_max)
+
+        _esa_include_sell = st.checkbox(
+            "🔻 اشمل فرص البيع والهبوط (مقاومة بنفسجية + كسر هابط)",
+            value=True, key="conf_esa_include_sell",
+            help="يضيف للقائمة: السعر يلامس/ارتد من مقاومة بنفسجية، أو كسر دعم بنفسجي هابطاً. مفيد للبيع على المكشوف أو إغلاق المراكز.",
+        )
 
         # Scan uses D + 4H + 1H (covers all purple-tier detection).
         # 15m/5m skipped for speed; they don't change Pure/Mixed Strong
@@ -8866,17 +8871,16 @@ elif page == "⭐ التلاقي الذهبي":
                     and (z.status.startswith('✅') or z.status.startswith('🎯') or z.status.startswith('🔄') or z.status.startswith('💥'))
                 ]
 
-                # 🌟 منطقة عيسى — TWO valid scenarios:
-                #   A) APPROACH: price ABOVE zone, falling toward it,
-                #      distance between 1% and _esa_approach_max%
-                #      (statuses: 🎯 يقترب من الأسفل، ⏸️ بعيد قريباً)
-                #   B) BOUNCE: price already bounced FROM the zone,
-                #      currently within _esa_bounce_max% of it
-                #      (statuses: 🔄 ارتد، ✅ داخل المنطقة)
-                # In BOTH cases the zone must be _esa_min_gamma_pct% to
-                # _esa_max_gamma_pct% above daily Gamma.
+                # 🌟 منطقة عيسى — BUY scenarios (A, B) + SELL scenarios (C, D, E):
+                #   A) Buy APPROACH:   price ABOVE zone, falling toward it (1-approach%)
+                #   B) Buy BOUNCE:     bounced from support, within bounce%
+                #   C) Sell APPROACH:  price BELOW resistance, rising toward it
+                #   D) Sell REJECT:    bounced down from resistance, within bounce%
+                #   E) Breakdown:      💥 كسر هبوطاً (support failed)
+                # Zone must be _esa_min_gamma_pct% to _esa_max_gamma_pct% above Gamma.
                 _daily_gamma = _res.get('per_tf', {}).get('D', {}).get('gamma_current')
                 _esa_zones = []
+                _esa_zone_kind: dict = {}  # zone id → 'buy'/'sell'
                 if _daily_gamma and _daily_gamma > 0:
                     _g_min = _daily_gamma * (1 + _esa_min_gamma_pct / 100)
                     _g_max = _daily_gamma * (1 + _esa_max_gamma_pct / 100)
@@ -8886,21 +8890,46 @@ elif page == "⭐ التلاقي الذهبي":
                         _price_above_zone = z.signed_distance_pct > 0
                         _dist = z.distance_from_price_pct
                         _status_char = z.status[:1] if z.status else ''
+                        _kind = None
 
-                        # A) approach: price above the zone, gap in [1%, approach_max%]
-                        _is_approach = (
-                            _price_above_zone
-                            and 1.0 <= _dist <= _esa_approach_max
-                            and _status_char in ('🎯', '⏸️')
-                        )
-                        # B) bounce: bounced or in zone, gap ≤ bounce_max%
-                        _is_bounce = (
-                            _status_char in ('🔄', '✅')
-                            and _dist <= _esa_bounce_max
-                        )
-                        if _is_approach or _is_bounce:
+                        # ── BUY scenarios ──
+                        # A) approach down to support
+                        if (_price_above_zone and 1.0 <= _dist <= _esa_approach_max
+                                and _status_char in ('🎯', '⏸️') and not z.is_resistance):
+                            _kind = 'buy'
+                        # B) bounce from support / in support zone
+                        elif (_status_char in ('🔄', '✅') and _dist <= _esa_bounce_max
+                              and not z.is_resistance):
+                            _kind = 'buy'
+
+                        # ── SELL scenarios (optional) ──
+                        if _esa_include_sell and _kind is None:
+                            # C) approach up to resistance: price below, rising
+                            if (not _price_above_zone and 1.0 <= _dist <= _esa_approach_max
+                                    and _status_char in ('🎯', '⏸️') and z.is_resistance):
+                                _kind = 'sell'
+                            # D) rejected from resistance / in resistance zone
+                            elif (_status_char in ('🔄', '✅') and _dist <= _esa_bounce_max
+                                  and z.is_resistance):
+                                _kind = 'sell'
+                            # E) breakdown — support broke (any zone now turning to resistance)
+                            elif _status_char == '💥' and _dist <= _esa_bounce_max:
+                                _kind = 'sell'
+
+                        if _kind:
                             _esa_zones.append(z)
+                            _esa_zone_kind[id(z)] = _kind
                 _is_esa = bool(_esa_zones)
+                # Mark the row's Esa side (buy/sell/mixed) based on first matched zone
+                _esa_side = ''
+                if _esa_zones:
+                    _kinds_set = set(_esa_zone_kind.values())
+                    if _kinds_set == {'buy'}:
+                        _esa_side = '🟢 شراء'
+                    elif _kinds_set == {'sell'}:
+                        _esa_side = '🔴 بيع'
+                    else:
+                        _esa_side = '⚖️ مختلط'
                 _p_status = '—'
                 _p_kind = '—'
                 _p_price = '—'
@@ -8968,6 +8997,7 @@ elif page == "⭐ التلاقي الذهبي":
                     'الرمز': _tk,
                     'السعر': round(_cp, 2),
                     '🌟 عيسى': '🌟' if _is_esa else '—',
+                    'اتجاه عيسى': _esa_side if _esa_side else '—',
                     '🟣 الحالة': _p_status,
                     '🚦': _freshness,
                     '⏱️ أول ظهور': _first_seen_str,
