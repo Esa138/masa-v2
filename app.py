@@ -8424,6 +8424,12 @@ elif page == "⭐ التلاقي الذهبي":
         "🏛️ S&P 500": SP500_STOCKS,
         "₿ العملات الرقمية": CRYPTO_STOCKS,
     }
+    _MARKET_SLUGS = {
+        "🇸🇦 السوق السعودي": "tasi",
+        "🇺🇸 السوق الأمريكي": "us",
+        "🏛️ S&P 500": "sp500",
+        "₿ العملات الرقمية": "crypto",
+    }
 
     _mc1, _mc2 = st.columns([1, 3])
     with _mc1:
@@ -8456,7 +8462,7 @@ elif page == "⭐ التلاقي الذهبي":
         _conf_tfs = st.multiselect(
             "الفريمات",
             options=['D', '240', '60', '15', '5'],
-            default=['D', '240', '60', '15'],
+            default=['D', '240', '60', '15', '5'],
             format_func=lambda x: {'D':'يومي','240':'4 ساعات','60':'ساعة','15':'15د','5':'5د'}.get(x, x),
         )
 
@@ -8482,7 +8488,8 @@ elif page == "⭐ التلاقي الذهبي":
 
     _btn_c1, _btn_c2 = st.columns([1, 1])
     with _btn_c1:
-        _do_single = st.button(f"🔍 حلّل {_conf_ticker}", type="primary", use_container_width=True, key="conf_single_btn")
+        _conf_ticker_name = _stocks_dict.get(_conf_ticker, _conf_ticker) if _stocks_dict else _conf_ticker
+        _do_single = st.button(f"🔍 حلّل {_conf_ticker_name}", type="primary", use_container_width=True, key="conf_single_btn")
     with _btn_c2:
         _do_scan = st.button(f"📊 امسح كل السوق ({len(_stocks_dict)} سهم)", use_container_width=True, key="conf_scan_btn")
 
@@ -8539,20 +8546,21 @@ elif page == "⭐ التلاقي الذهبي":
                 and z.tf_count >= 2 and (z.mask & 1)
                 and (z.status.startswith('✅') or z.status.startswith('🎯') or z.status.startswith('🔄') or z.status.startswith('💥'))
             ]
-            # Freshness tracking — keyed per-index so multiple indices don't collide
+            # Freshness tracking — persisted in SQLite per index symbol
             from datetime import datetime as _dt
-            _tasi_hist = st.session_state.setdefault(f'conf_idx_history_{_idx_sym}', {})
+            from core.database import get_conf_first_seen as _get_fs
             _now_ts = _dt.now()
             _tasi_status_now = _tasi_purple[0].status if _tasi_purple else None
-            _tasi_key = f"{_tasi_purple[0].price:.2f}|{_tasi_status_now}" if _tasi_purple else None
+            _tasi_key = f"{_idx_sym}|{_tasi_purple[0].price:.2f}" if _tasi_purple else None
 
             if _tasi_key:
-                _prev = _tasi_hist.get('current')
-                if _prev is None or _prev.get('key') != _tasi_key:
-                    _tasi_hist['current'] = {'key': _tasi_key, 'first_seen': _now_ts}
-                _entry = _tasi_hist['current']
-                _age_min = int((_now_ts - _entry['first_seen']).total_seconds() / 60)
-                _first_seen_str = _entry['first_seen'].strftime('%H:%M')
+                _fs_iso = _get_fs(_tasi_key, _tasi_status_now or '', _now_ts.isoformat())
+                try:
+                    _fs_dt = _dt.fromisoformat(_fs_iso)
+                except Exception:
+                    _fs_dt = _now_ts
+                _age_min = int((_now_ts - _fs_dt).total_seconds() / 60)
+                _first_seen_str = _fs_dt.strftime('%H:%M')
                 if _age_min < 15:
                     _light, _light_label = '🟢', 'طازجة'
                 elif _age_min < 60:
@@ -8562,7 +8570,6 @@ elif page == "⭐ التلاقي الذهبي":
                 else:
                     _light, _light_label = '🔴', 'منتهية'
             else:
-                _tasi_hist.pop('current', None)
                 _age_min = 0
                 _first_seen_str = '—'
                 _light, _light_label = '—', ''
@@ -8599,18 +8606,17 @@ elif page == "⭐ التلاقي الذهبي":
                 })
             st.dataframe(pd.DataFrame(_tasi_tf_rows), use_container_width=True, hide_index=True)
 
-            # Zones table with per-zone freshness tracking
+            # Zones table with per-zone freshness tracking (SQLite-persisted)
             st.markdown("### 🗺️ مناطق التلاقي")
-            _zones_hist = st.session_state.setdefault(f'conf_idx_zones_history_{_idx_sym}', {})
             _tasi_zones_data = []
             for z in _tasi_res['zones'][:15]:
-                _zkey = f"{round(z.price, 2)}"
-                _zentry = _zones_hist.get(_zkey)
-                if _zentry is None or _zentry.get('status') != z.status:
-                    _zones_hist[_zkey] = {'status': z.status, 'first_seen': _now_ts}
-                    _zentry = _zones_hist[_zkey]
-                _z_age = int((_now_ts - _zentry['first_seen']).total_seconds() / 60)
-                _z_first = _zentry['first_seen'].strftime('%H:%M')
+                _zfs_iso = _get_fs(f"{_idx_sym}|z{round(z.price, 2)}", z.status, _now_ts.isoformat())
+                try:
+                    _zfs_dt = _dt.fromisoformat(_zfs_iso)
+                except Exception:
+                    _zfs_dt = _now_ts
+                _z_age = int((_now_ts - _zfs_dt).total_seconds() / 60)
+                _z_first = _zfs_dt.strftime('%H:%M')
                 _z_light = '🟢' if _z_age < 15 else '🟡' if _z_age < 60 else '🟠' if _z_age < 180 else '🔴'
                 _tasi_zones_data.append({
                     '🚦': _z_light,
@@ -8653,16 +8659,16 @@ elif page == "⭐ التلاقي الذهبي":
         st.session_state['conf_auto_refresh'] = _auto_refresh
 
     if _auto_refresh:
-        # Trigger rerun every 5 min — only if a scan has run
+        # Trigger a Streamlit rerun every 5 minutes so freshness timers
+        # advance and cached tables rebuild with fresh OF lookups.
         try:
-            import streamlit_autorefresh  # optional dep
-            streamlit_autorefresh.st_autorefresh(interval=5 * 60 * 1000, key="conf_autorf")
+            from streamlit_autorefresh import st_autorefresh
+            st_autorefresh(interval=5 * 60 * 1000, key="conf_autorf")
         except Exception:
-            # fallback: javascript-based refresh
-            st.markdown(
-                "<script>setTimeout(function(){window.location.reload()}, 300000);</script>",
-                unsafe_allow_html=True,
-            )
+            # Dependency missing (pre-deploy) — tell the user instead of
+            # silently doing nothing. <script> tags don't execute in
+            # st.markdown, so there is no JS fallback.
+            st.warning("⚠️ التحديث التلقائي يتطلب مكتبة streamlit-autorefresh — أعد نشر التطبيق لتثبيتها.")
 
     # Re-render the scan view when either:
     #   1. user clicked the scan button (_do_scan = True), OR
@@ -8755,7 +8761,6 @@ elif page == "⭐ التلاقي الذهبي":
                 value=5.0, step=0.5, key="conf_esa_bounce",
                 help="السعر ارتد من المنطقة، البُعد الحالي ≤ هذه القيمة",
             )
-        _esa_max_dist = max(_esa_approach_max, _esa_bounce_max)
 
         # US markets auto-enable sell scenarios + use CALL/PUT terminology
         # (options trading is the dominant use case there).
@@ -8798,10 +8803,14 @@ elif page == "⭐ التلاقي الذهبي":
         _daily_data = fetch_daily_batch(_tickers, period='5y')
         _progress.progress(0.2, text=f"✅ جُلبت {len(_daily_data)} يومي · جاري جلب 4H + 1H...")
 
-        # PHASE 2: Parallel-fetch 240 and 60 for tickers that have daily data
+        # PHASE 2: One 1h download per ticker — 4h derived locally
+        # (halves the request count vs separate '240' + '60' fetches)
+        from core.confluence import fetch_60_and_240 as _fetch_pair
+
         def _fetch_intraday(_tk):
             try:
-                return (_tk, fetch_single_tf(_tk, '240'), fetch_single_tf(_tk, '60'))
+                _df240, _df60 = _fetch_pair(_tk)
+                return (_tk, _df240, _df60)
             except Exception:
                 return (_tk, None, None)
 
@@ -8853,6 +8862,11 @@ elif page == "⭐ التلاقي الذهبي":
         # Cache analyzed results so post-scan re-renders (e.g. after Order Flow
         # inline button updates session_state) can rebuild the table with
         # fresh OF lookups, without re-fetching market data.
+        # Keep ONLY the current market's cache — scanning multiple markets
+        # in one session previously accumulated caches and risked OOM on
+        # Streamlit Cloud's 1GB limit.
+        for _k in [k for k in st.session_state.keys() if k.startswith('conf_cached_scan_')]:
+            st.session_state.pop(_k, None)
         st.session_state[f'conf_cached_scan_{_conf_market}'] = {
             'results_list': _results_list,
             'version': _ENGINE_VERSION,
@@ -8996,20 +9010,20 @@ elif page == "⭐ التلاقي الذهبي":
                         _p_latest_tf = f"{_tf_label.get(_latest[0], _latest[0])} (قبل {_latest[1]}ش)"
 
                 # ── Time stamp / age tracking ─────────────
-                # session_state['conf_signal_history'][ticker] = {status, first_seen}
-                _hist = st.session_state.setdefault('conf_signal_history', {})
+                # Persisted in SQLite (survives browser refresh + app restarts).
+                # Key = ticker|zone_price; a status change resets the timer.
+                from core.database import get_conf_first_seen
                 _now_ts = datetime.now()
-                _prev = _hist.get(_tk)
-                if _purple_zones:
-                    # signal exists — if status changed (or first time), reset
-                    if _prev is None or _prev.get('status') != _p_status:
-                        _hist[_tk] = {'status': _p_status, 'first_seen': _now_ts}
-                else:
-                    # no signal — clear history so next time it's fresh
-                    if _prev is not None:
-                        _hist.pop(_tk, None)
+                _entry = None
+                if _purple_zones and _p_price != '—':
+                    _sig_key = f"{_tk}|{_p_price}"
+                    _fs_iso = get_conf_first_seen(_sig_key, _p_status, _now_ts.isoformat())
+                    try:
+                        _fs_dt = datetime.fromisoformat(_fs_iso)
+                    except Exception:
+                        _fs_dt = _now_ts
+                    _entry = {'status': _p_status, 'first_seen': _fs_dt}
 
-                _entry = _hist.get(_tk)
                 if _entry:
                     _age_min = int((_now_ts - _entry['first_seen']).total_seconds() / 60)
                     _first_seen_str = _entry['first_seen'].strftime('%H:%M')
@@ -9448,7 +9462,7 @@ elif page == "⭐ التلاقي الذهبي":
                 st.download_button(
                     "📥 تنزيل النتائج CSV",
                     data=_csv_bytes,
-                    file_name=f"masa_purple_{_conf_market.split(' ')[-1]}_{_ts_str}.csv",
+                    file_name=f"masa_purple_{_MARKET_SLUGS.get(_conf_market, 'market')}_{_ts_str}.csv",
                     mime="text/csv",
                     use_container_width=False,
                 )

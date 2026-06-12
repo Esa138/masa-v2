@@ -14,7 +14,7 @@ Modules:
 from .confluence_engine import ConfluenceEngine, ConfluenceZone
 from .signal_filter import apply_all_filters, QualityFilters
 from .strength_tier import classify_strength, StrengthTier, TIER_INFO
-from .data_fetcher import fetch_multi_tf_data, fetch_multi_tf_data_cached, fetch_daily_batch, fetch_single_tf
+from .data_fetcher import fetch_multi_tf_data, fetch_multi_tf_data_cached, fetch_daily_batch, fetch_single_tf, fetch_60_and_240
 
 __all__ = [
     "ConfluenceEngine",

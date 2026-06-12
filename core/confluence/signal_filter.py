@@ -197,7 +197,17 @@ def apply_all_filters(
         tol_pct=config.get('gamma_conf_tol', 1.0),
     )
 
-    current_gamma = per_tf.get('D', {}).get('gamma_current')
+    # Pine measures currDistPct against the CURRENT chart-TF gamma
+    # (gammaCurrent), not the daily one. Compute SMA600 on the supplied
+    # chart df; fall back to daily gamma when the df is too short.
+    current_gamma = None
+    if current_tf_df is not None and not current_tf_df.empty and 'close' in current_tf_df.columns:
+        from .gamma import compute_gamma
+        _g_series = compute_gamma(current_tf_df, length=600, ma_type='SMA')
+        if len(_g_series) and pd.notna(_g_series.iloc[-1]):
+            current_gamma = float(_g_series.iloc[-1])
+    if current_gamma is None:
+        current_gamma = per_tf.get('D', {}).get('gamma_current')
     dist_ok, dist_pct = check_distance_filter(
         current_price,
         current_gamma,
@@ -218,9 +228,11 @@ def apply_all_filters(
     sup_touched = sum(1 for z in engine_result['support_zones'] if z.is_touched)
     gamma_above = engine_result['gamma_above_count']
 
+    # Pine defaults: minConfluence=3, minGammaTFs=3 — the golden signal
+    # requires zero-floor touches on 3+ TFs AND price above gamma on 3+ TFs.
     base_buy = (
-        sup_touched >= config.get('min_confluence', 1)
-        and gamma_above >= config.get('min_gamma_tfs', 1)
+        sup_touched >= config.get('min_confluence', 3)
+        and gamma_above >= config.get('min_gamma_tfs', 3)
     )
 
     final_buy = (

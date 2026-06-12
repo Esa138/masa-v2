@@ -379,3 +379,53 @@ def get_total_performance() -> dict:
             }
     except Exception:
         return {"total": 0, "enter_count": 0, "win_rate": 0, "avg_return": 0}
+
+
+# ─────────────────────────────────────────────────────────────
+# Confluence signal first-seen tracking (survives app restarts)
+# ─────────────────────────────────────────────────────────────
+
+def _ensure_conf_history_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS conf_signal_history (
+            sig_key    TEXT PRIMARY KEY,   -- ticker|zone_price
+            status     TEXT,               -- last status (reset trigger)
+            first_seen TEXT                -- ISO timestamp
+        )
+    """)
+
+
+def get_conf_first_seen(sig_key: str, status: str, now_iso: str) -> str:
+    """
+    Return the first-seen ISO timestamp for a confluence signal.
+    Inserts (or resets, when status changed) the row as a side effect.
+    """
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            _ensure_conf_history_table(conn)
+            row = conn.execute(
+                "SELECT status, first_seen FROM conf_signal_history WHERE sig_key = ?",
+                (sig_key,),
+            ).fetchone()
+            if row is None or row[0] != status:
+                conn.execute(
+                    "INSERT OR REPLACE INTO conf_signal_history (sig_key, status, first_seen) VALUES (?, ?, ?)",
+                    (sig_key, status, now_iso),
+                )
+                return now_iso
+            return row[1]
+    except Exception:
+        return now_iso
+
+
+def prune_conf_history(days: int = 14):
+    """Delete tracking rows older than N days (housekeeping)."""
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            _ensure_conf_history_table(conn)
+            conn.execute(
+                "DELETE FROM conf_signal_history WHERE first_seen < datetime('now', ?)",
+                (f'-{days} days',),
+            )
+    except Exception:
+        pass
