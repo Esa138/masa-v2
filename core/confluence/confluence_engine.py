@@ -102,6 +102,20 @@ class ConfluenceEngine:
         # 6. Sort: strength tier (ascending = strongest first) then distance
         zones.sort(key=lambda z: (z.strength.tier.value, z.distance_from_price_pct))
 
+        # 7. Recent price direction on the reference TF — used by Esa
+        # approach scenarios ('price falling toward support' needs the
+        # price to actually be falling, not just near).
+        recent_trend = 'flat'
+        if _ref_df is not None and len(_ref_df) >= 8:
+            _now = float(_ref_df['close'].iloc[-1])
+            _then = float(_ref_df['close'].iloc[-7])  # ~6 bars back
+            if _then > 0:
+                _chg = (_now - _then) / _then * 100
+                if _chg < -0.3:
+                    recent_trend = 'down'
+                elif _chg > 0.3:
+                    recent_trend = 'up'
+
         return {
             'current_price': current_price,
             'per_tf': per_tf_data,
@@ -110,6 +124,8 @@ class ConfluenceEngine:
             'resistance_zones': [z for z in zones if z.is_resistance],
             'gamma_above_count': sum(1 for t in per_tf_data.values() if t.get('price_above_gamma')),
             'active_tfs': len(per_tf_data),
+            'recent_trend': recent_trend,
+            'recent_trend_tf': _ref_tf,
         }
 
     def _detect_trigger_tfs(self, zone_price: float, tf_data: dict, touch_threshold: float,

@@ -8672,7 +8672,7 @@ elif page == "⭐ التلاقي الذهبي":
 
     # CRITICAL: invalidate cache when engine version changes (e.g. Gamma type
     # switch from HMA to SMA). Bump _ENGINE_VERSION to force re-scan.
-    _ENGINE_VERSION = "sma600-trig-v3"  # bumped when engine output structure changes
+    _ENGINE_VERSION = "sma600-trend-v4"  # bumped when engine output structure changes
     _cached_scan = st.session_state.get(f'conf_cached_scan_{_conf_market}')
     if _cached_scan and _cached_scan.get('version') != _ENGINE_VERSION:
         # Old cache from previous engine version → drop it
@@ -8886,6 +8886,7 @@ elif page == "⭐ التلاقي الذهبي":
                 #   E) Breakdown:      💥 كسر هبوطاً (support failed)
                 # Zone must be _esa_min_gamma_pct% to _esa_max_gamma_pct% above Gamma.
                 _daily_gamma = _res.get('per_tf', {}).get('D', {}).get('gamma_current')
+                _recent_trend = _res.get('recent_trend', 'flat')  # down/up/flat on ref TF
                 _esa_zones = []
                 _esa_zone_kind: dict = {}  # zone id → 'buy'/'sell'
                 if _daily_gamma and _daily_gamma > 0:
@@ -8896,31 +8897,45 @@ elif page == "⭐ التلاقي الذهبي":
                             continue
                         _price_above_zone = z.signed_distance_pct > 0
                         _dist = z.distance_from_price_pct
-                        _status_char = z.status[:1] if z.status else ''
+                        _zstatus = z.status or ''
                         _kind = None
 
                         # ── BUY scenarios ──
-                        # A) approach down to support
-                        if (_price_above_zone and 1.0 <= _dist <= _esa_approach_max
-                                and _status_char in ('🎯', '⏸️') and not z.is_resistance):
+                        # A) approach DOWN to support: price above the zone,
+                        #    actually FALLING toward it (trend check), gap 1-approach%
+                        if (_price_above_zone
+                                and 1.0 <= _dist <= _esa_approach_max
+                                and not z.is_resistance
+                                and _zstatus.startswith(('🎯', '⏸️'))
+                                and _recent_trend == 'down'):
                             _kind = 'buy'
-                        # B) bounce from support / in support zone
-                        elif (_status_char in ('🔄', '✅') and _dist <= _esa_bounce_max
-                              and not z.is_resistance):
+                        # B) bounce UP from support (exact status text) or sitting in it
+                        elif ((_zstatus.startswith('🔄') and 'الدعم' in _zstatus)
+                              or _zstatus.startswith('✅')) \
+                                and _dist <= _esa_bounce_max and not z.is_resistance:
+                            _kind = 'buy'
+                        # F) breakout UP through resistance — bullish continuation
+                        elif (_zstatus.startswith('💥') and 'صعود' in _zstatus
+                              and _dist <= _esa_bounce_max):
                             _kind = 'buy'
 
                         # ── SELL scenarios (optional) ──
                         if _esa_include_sell and _kind is None:
-                            # C) approach up to resistance: price below, rising
-                            if (not _price_above_zone and 1.0 <= _dist <= _esa_approach_max
-                                    and _status_char in ('🎯', '⏸️') and z.is_resistance):
+                            # C) approach UP to resistance: price below, actually RISING
+                            if (not _price_above_zone
+                                    and 1.0 <= _dist <= _esa_approach_max
+                                    and z.is_resistance
+                                    and _zstatus.startswith(('🎯', '⏸️'))
+                                    and _recent_trend == 'up'):
                                 _kind = 'sell'
-                            # D) rejected from resistance / in resistance zone
-                            elif (_status_char in ('🔄', '✅') and _dist <= _esa_bounce_max
-                                  and z.is_resistance):
+                            # D) rejected DOWN from resistance (exact status) or sitting in it
+                            elif ((_zstatus.startswith('🔄') and 'المقاومة' in _zstatus)
+                                  or _zstatus.startswith('✅')) \
+                                    and _dist <= _esa_bounce_max and z.is_resistance:
                                 _kind = 'sell'
-                            # E) breakdown — support broke (any zone now turning to resistance)
-                            elif _status_char == '💥' and _dist <= _esa_bounce_max:
+                            # E) breakdown — support BROKE downward only
+                            elif (_zstatus.startswith('💥') and 'هبوط' in _zstatus
+                                  and _dist <= _esa_bounce_max):
                                 _kind = 'sell'
 
                         if _kind:
