@@ -25,6 +25,9 @@ class ConfluenceZone:
     status: str = "⏸️ بعيد"      # ✅ ملموس / 🎯 قريب / ⚡ مكسور / ⏸️ بعيد
     signed_distance_pct: float = 0.0  # +ve = price above zone, -ve = below
     triggered_tfs: dict = field(default_factory=dict)  # {tf_name: bars_ago}
+    touch_count: int = 0        # distinct touch events in lookback window
+    inst_touches: int = 0       # touches on institutional volume (≥1.5× avg)
+    flipped: bool = False       # broke through recently → role reversed
 
     def to_dict(self) -> dict:
         return {
@@ -47,15 +50,60 @@ class ConfluenceEngine:
 
     def __init__(
         self,
-        cluster_pct: float = 0.5,    # Pine default
+        cluster_pct: float = 0.5,    # Pine default (fallback when ATR off)
         touch_pct: float = 0.5,      # Pine default
         max_dist_pct: float = 100.0, # Pine default = no filtering
         min_box_tfs: int = 2,        # Pine default
+        use_atr_cluster: bool = True,  # volatility-adaptive merging
+        atr_mult: float = 0.5,         # merge threshold = 0.5 × ATR(D,14)
+        vol_factor: float = 1.5,       # institutional-volume touch multiplier
     ):
         self.cluster_pct = cluster_pct
         self.touch_pct = touch_pct
         self.max_dist_pct = max_dist_pct
         self.min_box_tfs = min_box_tfs
+        self.use_atr_cluster = use_atr_cluster
+        self.atr_mult = atr_mult
+        self.vol_factor = vol_factor
+
+    @staticmethod
+    def _daily_atr(df: pd.DataFrame, period: int = 14):
+        """ATR(14) on the daily frame — volatility reference for clustering."""
+        if df is None or len(df) < period + 1:
+            return None
+        h, l, c = df['high'], df['low'], df['close']
+        prev_c = c.shift(1)
+        tr = pd.concat([h - l, (h - prev_c).abs(), (l - prev_c).abs()], axis=1).max(axis=1)
+        atr = tr.rolling(period).mean().iloc[-1]
+        return float(atr) if pd.notna(atr) else None
+
+    def _count_touches(self, zone_price: float, df: pd.DataFrame,
+                       touch_threshold: float, lookback: int = 200):
+        """
+        Count distinct touch events of a zone in the recent window.
+        A touch event = one or more consecutive bars whose [low, high]
+        range reaches the zone, separated by non-touching bars.
+        Returns (touches, institutional_touches) — the latter are touches
+        that happened on volume ≥ vol_factor × 20-bar average.
+        """
+        if df is None or len(df) < 5:
+            return 0, 0
+        recent = df.tail(lookback)
+        vols = recent['volume'].fillna(0)
+        vol_ma = vols.rolling(20, min_periods=5).mean()
+        touching = ((recent['low'] - touch_threshold) <= zone_price) & \
+                   (zone_price <= (recent['high'] + touch_threshold))
+        touches = inst = 0
+        prev = False
+        t_vals = touching.values
+        for i in range(len(t_vals)):
+            if t_vals[i] and not prev:
+                touches += 1
+                vm = vol_ma.iloc[i]
+                if pd.notna(vm) and vm > 0 and vols.iloc[i] >= self.vol_factor * vm:
+                    inst += 1
+            prev = t_vals[i]
+        return touches, inst
 
     def analyze(self, tf_data: Dict[str, pd.DataFrame], current_price: float) -> dict:
         """Run full multi-timeframe confluence analysis."""
@@ -86,8 +134,13 @@ class ConfluenceEngine:
         # 2. Collect raw levels
         raw_levels = self._collect_raw_levels(per_tf_data, current_price)
 
-        # 3. Cluster
-        clusters = cluster_levels(raw_levels, cluster_pct=self.cluster_pct)
+        # 3. Cluster — ATR-adaptive threshold when daily data available.
+        # 0.5×ATR(D) widens merging for volatile tickers (TSLA) and
+        # tightens it for calm ones (KO) without per-market tuning.
+        _atr_d = self._daily_atr(tf_data.get('D')) if self.use_atr_cluster else None
+        _abs_thr = (self.atr_mult * _atr_d) if _atr_d else None
+        clusters = cluster_levels(raw_levels, cluster_pct=self.cluster_pct,
+                                  abs_threshold=_abs_thr)
 
         # 4. Build zones — use 60m for interaction tracking (covers ~5-10 days
         # of price action with the 50-bar lookback, capturing bounces/breaks
@@ -140,7 +193,7 @@ class ConfluenceEngine:
         """
         if tf_lookback is None:
             # tuned for each TF — covers ~5 trading days each
-            tf_lookback = {'D': 5, '240': 30, '60': 50, '15': 100, '5': 200}
+            tf_lookback = {'W': 3, 'D': 5, '240': 30, '60': 50, '15': 100, '5': 200}
 
         triggers = {}
         for tf_name, df in (tf_data or {}).items():
@@ -258,6 +311,17 @@ class ConfluenceEngine:
                 cluster.price, tf_data, touch_threshold,
             ) if tf_data else {}
 
+            # Historical touch strength on the reference TF: how many
+            # distinct times was this zone defended, and how many of
+            # those defenses came on institutional volume?
+            touch_count, inst_touches = self._count_touches(
+                cluster.price, ref_df, touch_threshold, lookback=200,
+            )
+
+            # Flip: a 💥 break means the zone's role reversed —
+            # broken support acts as resistance and vice versa.
+            flipped = status.startswith('💥')
+
             zones.append(ConfluenceZone(
                 price=cluster.price,
                 is_resistance=cluster.is_resistance,
@@ -270,6 +334,9 @@ class ConfluenceEngine:
                 status=status,
                 signed_distance_pct=signed_dist,
                 triggered_tfs=triggered,
+                touch_count=touch_count,
+                inst_touches=inst_touches,
+                flipped=flipped,
             ))
         return zones
 

@@ -14,8 +14,9 @@ TF_BITS = {
     '60':   4,   # TF3 - 1 hour
     '15':   8,   # TF4 - 15 minutes
     '5':    16,  # TF5 - 5 minutes
+    'W':    32,  # TF6 - Weekly (sovereign horizon)
 }
-TF_LABELS = {1: 'D', 2: '4H', 4: '1H', 8: '15m', 16: '5m'}
+TF_LABELS = {32: 'W', 1: 'D', 2: '4H', 4: '1H', 8: '15m', 16: '5m'}
 
 
 @dataclass
@@ -39,12 +40,15 @@ class Cluster:
         return '·'.join(self.tf_names)
 
 
-def cluster_levels(raw_levels: List[dict], cluster_pct: float = 0.5) -> List[Cluster]:
+def cluster_levels(raw_levels: List[dict], cluster_pct: float = 0.5,
+                   abs_threshold: float = None) -> List[Cluster]:
     """
-    Cluster nearby levels (within cluster_pct%) into aggregated zones.
+    Cluster nearby levels into aggregated zones.
 
     raw_levels: list of {'price': float, 'is_resistance': bool, 'tf_bit': int}
-    cluster_pct: merge threshold as % of price
+    cluster_pct: merge threshold as % of price (fallback)
+    abs_threshold: absolute price distance (e.g. 0.5×ATR) — takes
+        precedence over cluster_pct when provided
     """
     clusters: List[Cluster] = []
 
@@ -56,7 +60,7 @@ def cluster_levels(raw_levels: List[dict], cluster_pct: float = 0.5) -> List[Clu
         if price is None or pd.isna(price) or price <= 0:
             continue
 
-        threshold = price * cluster_pct / 100
+        threshold = abs_threshold if abs_threshold else price * cluster_pct / 100
         merged = False
 
         for cluster in clusters:

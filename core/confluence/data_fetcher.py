@@ -13,6 +13,7 @@ import time
 # TF name -> (yfinance interval, period)
 # Aggressively trimmed for Streamlit Cloud (1GB memory ceiling).
 TF_CONFIG = {
+    'W':   {'interval': '1wk', 'period': '10y'},   # ~520 bars — sovereign horizon
     'D':   {'interval': '1d',  'period': '5y'},    # ~1250 bars — matches TV history depth
     '240': {'interval': '1h',  'period': '365d'},  # ~2200 1h → ~550 4h
     '60':  {'interval': '1h',  'period': '365d'},  # ~2200 bars
@@ -195,9 +196,11 @@ def fetch_multi_tf_data(
     return out
 
 
-def fetch_daily_batch(tickers: list, period: str = '5y') -> Dict[str, pd.DataFrame]:
+def fetch_daily_batch(tickers: list, period: str = '5y',
+                      interval: str = '1d') -> Dict[str, pd.DataFrame]:
     """
-    Bulk download daily OHLCV for many tickers in ONE yfinance call.
+    Bulk download OHLCV for many tickers in ONE yfinance call.
+    Works for any interval — pass interval='1wk' for weekly batches.
 
     Much faster than per-ticker calls when scanning a market:
     250 tickers × individual = ~250 requests
@@ -211,7 +214,7 @@ def fetch_daily_batch(tickers: list, period: str = '5y') -> Dict[str, pd.DataFra
         df_all = yf.download(
             tickers=' '.join(tickers),
             period=period,
-            interval='1d',
+            interval=interval,
             group_by='ticker',
             progress=False,
             auto_adjust=False,

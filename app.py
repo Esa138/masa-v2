@@ -8384,8 +8384,9 @@ elif page == "⭐ التلاقي الذهبي":
 
     # ── Always-visible color legend
     with st.container():
-        _lg_cols = st.columns(5)
+        _lg_cols = st.columns(6)
         _order = [
+            StrengthTier.SOVEREIGN,
             StrengthTier.PURE_STRONG,
             StrengthTier.MIXED_STRONG,
             StrengthTier.PURE_MEDIUM,
@@ -8449,7 +8450,7 @@ elif page == "⭐ التلاقي الذهبي":
     # Defaults match Pine v7.2 exactly
     _conf_cluster_pct = 0.5
     _conf_max_dist = 100.0
-    _conf_tfs = ['D', '240', '60', '15', '5']
+    _conf_tfs = ['W', 'D', '240', '60', '15', '5']
 
     with st.expander("⚙️ إعدادات متقدمة (اختياري)"):
         _ac1, _ac2 = st.columns(2)
@@ -8461,9 +8462,9 @@ elif page == "⭐ التلاقي الذهبي":
                 help="100 = بدون فلترة (Pine الافتراضي)")
         _conf_tfs = st.multiselect(
             "الفريمات",
-            options=['D', '240', '60', '15', '5'],
-            default=['D', '240', '60', '15', '5'],
-            format_func=lambda x: {'D':'يومي','240':'4 ساعات','60':'ساعة','15':'15د','5':'5د'}.get(x, x),
+            options=['W', 'D', '240', '60', '15', '5'],
+            default=['W', 'D', '240', '60', '15', '5'],
+            format_func=lambda x: {'W':'أسبوعي','D':'يومي','240':'4 ساعات','60':'ساعة','15':'15د','5':'5د'}.get(x, x),
         )
 
     # Market-specific index buttons
@@ -8520,7 +8521,7 @@ elif page == "⭐ التلاقي الذهبي":
         )
 
         with st.spinner(f"جاري جلب بيانات {_idx_label}..."):
-            _tasi_data = fetch_multi_tf_data(_idx_sym, timeframes=['D', '240', '60', '15', '5'])
+            _tasi_data = fetch_multi_tf_data(_idx_sym, timeframes=['W', 'D', '240', '60', '15', '5'])
 
         if not _tasi_data:
             st.error("تعذّر جلب بيانات المؤشر من yfinance")
@@ -8542,7 +8543,7 @@ elif page == "⭐ التلاقي الذهبي":
             from core.confluence import StrengthTier as _ST_t
             _tasi_purple = [
                 z for z in _tasi_res['zones']
-                if z.strength.tier in (_ST_t.PURE_STRONG, _ST_t.MIXED_STRONG)
+                if z.strength.tier in (_ST_t.SOVEREIGN, _ST_t.PURE_STRONG, _ST_t.MIXED_STRONG)
                 and z.tf_count >= 2 and (z.mask & 1)
                 and (z.status.startswith('✅') or z.status.startswith('🎯') or z.status.startswith('🔄') or z.status.startswith('💥'))
             ]
@@ -8599,7 +8600,7 @@ elif page == "⭐ التلاقي الذهبي":
                 _above = _d.get('price_above_gamma')
                 _slope = _d.get('gamma_slope')
                 _tasi_tf_rows.append({
-                    'الفريم': {'D':'يومي','240':'4 ساعات','60':'ساعة','15':'15د','5':'5د'}.get(_tf, _tf),
+                    'الفريم': {'W':'أسبوعي','D':'يومي','240':'4 ساعات','60':'ساعة','15':'15د','5':'5د'}.get(_tf, _tf),
                     'قاما 600': f"{_g:,.2f}" if _g else '—',
                     'الميل': _slope or '—',
                     'الموقع': '▲ فوق' if _above else '▼ تحت' if _above is False else '—',
@@ -8678,7 +8679,7 @@ elif page == "⭐ التلاقي الذهبي":
 
     # CRITICAL: invalidate cache when engine version changes (e.g. Gamma type
     # switch from HMA to SMA). Bump _ENGINE_VERSION to force re-scan.
-    _ENGINE_VERSION = "sma600-trend-v4"  # bumped when engine output structure changes
+    _ENGINE_VERSION = "atr-touch-w-v5"  # bumped when engine output structure changes
     _cached_scan = st.session_state.get(f'conf_cached_scan_{_conf_market}')
     if _cached_scan and _cached_scan.get('version') != _ENGINE_VERSION:
         # Old cache from previous engine version → drop it
@@ -8778,7 +8779,7 @@ elif page == "⭐ التلاقي الذهبي":
         # Scan uses D + 4H + 1H (covers all purple-tier detection).
         # 15m/5m skipped for speed; they don't change Pure/Mixed Strong
         # classifications (those depend on D/240). Single-stock view keeps all 5.
-        _scan_tfs = ['D', '240', '60']
+        _scan_tfs = ['W', 'D', '240', '60']
         _tickers = list(_stocks_dict.keys())
         _engine_scan = ConfluenceEngine(cluster_pct=_conf_cluster_pct, max_dist_pct=_conf_max_dist)
 
@@ -8798,10 +8799,12 @@ elif page == "⭐ التلاقي الذهبي":
     if _show_scan and _stocks_dict and _do_scan:
         # Fresh scan clicked → clear stale cache (regenerated below)
         st.session_state.pop(f'conf_cached_scan_{_conf_market}', None)
-        # PHASE 1: Bulk fetch all daily data in one yfinance call
+        # PHASE 1: Bulk fetch daily + weekly data (2 yfinance calls total)
         _progress = st.progress(0.0, text=f"📥 جلب البيانات اليومية لـ {len(_tickers)} سهم...")
         _daily_data = fetch_daily_batch(_tickers, period='5y')
-        _progress.progress(0.2, text=f"✅ جُلبت {len(_daily_data)} يومي · جاري جلب 4H + 1H...")
+        _progress.progress(0.15, text=f"✅ يومي {len(_daily_data)} · جاري جلب الأسبوعي...")
+        _weekly_data = fetch_daily_batch(list(_daily_data.keys()), period='10y', interval='1wk')
+        _progress.progress(0.2, text=f"✅ يومي + أسبوعي · جاري جلب 4H + 1H...")
 
         # PHASE 2: One 1h download per ticker — 4h derived locally
         # (halves the request count vs separate '240' + '60' fetches)
@@ -8835,6 +8838,8 @@ elif page == "⭐ التلاقي الذهبي":
                 _tfd = {}
                 if _tk in _daily_data:
                     _tfd['D'] = _daily_data[_tk]
+                if _tk in _weekly_data and not _weekly_data[_tk].empty:
+                    _tfd['W'] = _weekly_data[_tk]
                 _intra = _intraday.get(_tk, {})
                 if _intra.get('240') is not None and not _intra['240'].empty:
                     _tfd['240'] = _intra['240']
@@ -8855,8 +8860,9 @@ elif page == "⭐ التلاقي الذهبي":
         # Free the huge dataframes before processing rows (frees ~hundreds of MB)
         import gc
         _daily_data.clear()
+        _weekly_data.clear()
         _intraday.clear()
-        del _daily_data, _intraday
+        del _daily_data, _weekly_data, _intraday
         gc.collect()
 
         # Cache analyzed results so post-scan re-renders (e.g. after Order Flow
@@ -8886,7 +8892,7 @@ elif page == "⭐ التلاقي الذهبي":
                 # A genuine purple confluence anchors to the daily timeframe.
                 _purple_zones = [
                     z for z in _res['zones']
-                    if z.strength.tier in (_ST.PURE_STRONG, _ST.MIXED_STRONG)
+                    if z.strength.tier in (_ST.SOVEREIGN, _ST.PURE_STRONG, _ST.MIXED_STRONG)
                     and z.tf_count >= 2
                     and (z.mask & 1)
                     and (z.status.startswith('✅') or z.status.startswith('🎯') or z.status.startswith('🔄') or z.status.startswith('💥'))
@@ -8984,12 +8990,22 @@ elif page == "⭐ التلاقي الذهبي":
                 _p_above_gamma = '—'
                 _p_triggered = '—'
                 _p_latest_tf = '—'
+                _p_touches = '—'
                 # Prefer Esa zones (above gamma) when selecting which to display
                 _display_zones = _esa_zones if _esa_zones else _purple_zones
                 if _display_zones:
                     _pz = min(_display_zones, key=lambda z: z.distance_from_price_pct)
                     _p_status = _pz.status
-                    _p_kind = "🟢 دعم" if not _pz.is_resistance else "🔴 مقاومة"
+                    if getattr(_pz, 'flipped', False):
+                        # role reversed after the break — show origin
+                        _p_kind = ("🔃 مقاومة (دعم مكسور)" if _pz.is_resistance
+                                   else "🔃 دعم (مقاومة مخترقة)")
+                    else:
+                        _p_kind = "🟢 دعم" if not _pz.is_resistance else "🔴 مقاومة"
+                    _tc = getattr(_pz, 'touch_count', 0)
+                    _it = getattr(_pz, 'inst_touches', 0)
+                    if _tc:
+                        _p_touches = f"{_tc}" + (f" (🏦{_it})" if _it else "")
                     _p_price = round(_pz.price, 2)
                     _p_tfs = _pz.tf_names
                     _p_tier = f"{_pz.strength.label} {_pz.strength.stars}".strip()
@@ -8999,7 +9015,7 @@ elif page == "⭐ التلاقي الذهبي":
                         _p_above_gamma = f"{_gap:+.2f}%"
                     # Which TF(s) actually touched the zone, with bars-ago info
                     if _pz.triggered_tfs:
-                        _tf_label = {'D':'يومي','240':'4H','60':'1H','15':'15م','5':'5م'}
+                        _tf_label = {'W':'أسبوعي','D':'يومي','240':'4H','60':'1H','15':'15م','5':'5م'}
                         _trigs = sorted(_pz.triggered_tfs.items(), key=lambda x: x[1])
                         _p_triggered = ' · '.join([
                             f"{_tf_label.get(t,t)}({n}ش)" for t, n in _trigs
@@ -9057,6 +9073,7 @@ elif page == "⭐ التلاقي الذهبي":
                     'فوق Gamma': _p_above_gamma,
                     'البُعد': _p_dist,
                     'الفريمات': _p_tfs,
+                    '🖐️ لمسات': _p_touches,
                     '✅ تحقق على': _p_triggered,
                     '⚡ أحدث فريم': _p_latest_tf,
                     'التصنيف': _p_tier,
@@ -9462,6 +9479,7 @@ elif page == "⭐ التلاقي الذهبي":
                         'السعر': r['السعر'],
                         'سعر المنطقة': r['سعر المنطقة'],
                         'فوق Gamma': r.get('فوق Gamma', '—'),
+                        '🖐️ لمسات': r.get('🖐️ لمسات', '—'),
                         '⚡ أحدث فريم': r.get('⚡ أحدث فريم', '—'),
                         '✅ تحقق على': r.get('✅ تحقق على', '—'),
                         '🎪 أوبشن': r.get('🎪 أوبشن', '—'),
@@ -9607,7 +9625,7 @@ elif page == "⭐ التلاقي الذهبي":
         # to avoid intraday-only false positives from yfinance resampling.
         _purple_hits = [
             z for z in _result['zones']
-            if z.strength.tier in (_ST_single.PURE_STRONG, _ST_single.MIXED_STRONG)
+            if z.strength.tier in (_ST_single.SOVEREIGN, _ST_single.PURE_STRONG, _ST_single.MIXED_STRONG)
             and z.tf_count >= 2
             and (z.mask & 1)
             and (z.status.startswith('✅') or z.status.startswith('🎯') or z.status.startswith('🔄') or z.status.startswith('💥'))
