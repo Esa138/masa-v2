@@ -9,6 +9,7 @@ from .zero_reversal import compute_zr1_zr2
 from .gamma import compute_gamma, gamma_slope
 from .clustering import cluster_levels, Cluster, TF_BITS
 from .strength_tier import classify_strength, StrengthInfo
+from .gann import compute_gann_box, match_gann_level
 
 
 @dataclass
@@ -28,6 +29,7 @@ class ConfluenceZone:
     touch_count: int = 0        # distinct touch events in lookback window
     inst_touches: int = 0       # touches on institutional volume (≥1.5× avg)
     flipped: bool = False       # broke through recently → role reversed
+    gann_level: str = ''        # '61.8% ⭐' when zone sits on a Gann fib
 
     def to_dict(self) -> dict:
         return {
@@ -152,6 +154,15 @@ class ConfluenceEngine:
         # 5. Filter by max distance
         zones = [z for z in zones if z.distance_from_price_pct <= self.max_dist_pct]
 
+        # 5b. Gann box on the daily frame; annotate zones that coincide
+        # with a fib level (gold 50/61.8 confirm independently of ZR).
+        gann_box = compute_gann_box(tf_data.get('D'))
+        if gann_box:
+            for z in zones:
+                m = match_gann_level(z.price, gann_box)
+                if m:
+                    z.gann_level = m
+
         # 6. Sort: strength tier (ascending = strongest first) then distance
         zones.sort(key=lambda z: (z.strength.tier.value, z.distance_from_price_pct))
 
@@ -179,6 +190,7 @@ class ConfluenceEngine:
             'active_tfs': len(per_tf_data),
             'recent_trend': recent_trend,
             'recent_trend_tf': _ref_tf,
+            'gann': gann_box,
         }
 
     def _detect_trigger_tfs(self, zone_price: float, tf_data: dict, touch_threshold: float,

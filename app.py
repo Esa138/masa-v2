@@ -8699,7 +8699,7 @@ elif page == "⭐ التلاقي الذهبي":
 
     # CRITICAL: invalidate cache when engine version changes (e.g. Gamma type
     # switch from HMA to SMA). Bump _ENGINE_VERSION to force re-scan.
-    _ENGINE_VERSION = "atr-touch-w-v5"  # bumped when engine output structure changes
+    _ENGINE_VERSION = "gann-v6"  # bumped when engine output structure changes
     _cached_scan = st.session_state.get(f'conf_cached_scan_{_conf_market}')
     if _cached_scan and _cached_scan.get('version') != _ENGINE_VERSION:
         # Old cache from previous engine version → drop it
@@ -9011,6 +9011,7 @@ elif page == "⭐ التلاقي الذهبي":
                 _p_triggered = '—'
                 _p_latest_tf = '—'
                 _p_touches = '—'
+                _p_gann = '—'
                 # Prefer Esa zones (above gamma) when selecting which to display
                 _display_zones = _esa_zones if _esa_zones else _purple_zones
                 if _display_zones:
@@ -9026,6 +9027,31 @@ elif page == "⭐ التلاقي الذهبي":
                     _it = getattr(_pz, 'inst_touches', 0)
                     if _tc:
                         _p_touches = f"{_tc}" + (f" (🏦{_it})" if _it else "")
+                    # Gann fib coincidence + active time window marker
+                    _g_lbl = getattr(_pz, 'gann_level', '')
+                    _g_box = _res.get('gann')
+                    _g_time = ' ⏰' if (_g_box and _g_box.active_time_window) else ''
+                    if _g_lbl or _g_time:
+                        _p_gann = f"📐 {_g_lbl}{_g_time}".strip() if _g_lbl else f"⏰ نافذة زمنية"
+
+                # Gann targets + risk:reward for Esa picks
+                _g_targets = '—'
+                _g_rr = '—'
+                _g_pos = '—'
+                _g_box2 = _res.get('gann')
+                if _g_box2:
+                    _g_pos = f"{_g_box2.position_pct:.0f}%" + (' ⚠️منهك' if _g_box2.exhausted else '')
+                if _is_esa and _g_box2 and _p_price != '—':
+                    from core.confluence import gann_targets as _gt
+                    _side_kind = 'buy' if 'buy' in _esa_zone_kind.values() else 'sell'
+                    _tgts = _gt(_g_box2, _side_kind)
+                    if len(_tgts) >= 2:
+                        _t1, _t2 = _tgts[0][1], _tgts[1][1]
+                        _g_targets = f"{_t1:.2f} / {_t2:.2f}"
+                        _risk = abs(_cp - float(_p_price))
+                        _reward = abs(_t1 - _cp)
+                        if _risk > 0.0001:
+                            _g_rr = f"{_reward / _risk:.1f}"
                     _p_price = round(_pz.price, 2)
                     _p_tfs = _pz.tf_names
                     _p_tier = f"{_pz.strength.label} {_pz.strength.stars}".strip()
@@ -9094,6 +9120,10 @@ elif page == "⭐ التلاقي الذهبي":
                     'البُعد': _p_dist,
                     'الفريمات': _p_tfs,
                     '🖐️ لمسات': _p_touches,
+                    '📐 جان': _p_gann,
+                    '🎯 أهداف جان': _g_targets,
+                    'R:R': _g_rr,
+                    '📊 موقع الصندوق': _g_pos,
                     '✅ تحقق على': _p_triggered,
                     '⚡ أحدث فريم': _p_latest_tf,
                     'التصنيف': _p_tier,
@@ -9234,6 +9264,8 @@ elif page == "⭐ التلاقي الذهبي":
                         f"⚡ أحدث: <b style='color:#fff'>{p.get('⚡ أحدث فريم', '—')}</b><br>"
                         f"🎯 كل الفريمات: {p.get('✅ تحقق على', '—')}"
                         + (f"<br>🎪 أوبشن: <b style='color:#fff'>{p['🎪 أوبشن']}</b>" if p.get('🎪 أوبشن') and p['🎪 أوبشن'] != '—' else '')
+                        + (f"<br>🎯 أهداف: <b style='color:#fff59d'>{p['🎯 أهداف جان']}</b> · R:R <b style='color:#a5d6a7'>{p.get('R:R','—')}</b>" if p.get('🎯 أهداف جان') and p['🎯 أهداف جان'] != '—' else '')
+                        + (f"<br>📐 {p['📐 جان']} · موقع {p.get('📊 موقع الصندوق','—')}" if p.get('📐 جان') and p['📐 جان'] != '—' else '')
                         + f"</div>"
                         f"</span>"
                         for p in _esa_picks
@@ -9500,6 +9532,10 @@ elif page == "⭐ التلاقي الذهبي":
                         'سعر المنطقة': r['سعر المنطقة'],
                         'فوق Gamma': r.get('فوق Gamma', '—'),
                         '🖐️ لمسات': r.get('🖐️ لمسات', '—'),
+                        '📐 جان': r.get('📐 جان', '—'),
+                        '🎯 أهداف جان': r.get('🎯 أهداف جان', '—'),
+                        'R:R': r.get('R:R', '—'),
+                        '📊 موقع الصندوق': r.get('📊 موقع الصندوق', '—'),
                         '⚡ أحدث فريم': r.get('⚡ أحدث فريم', '—'),
                         '✅ تحقق على': r.get('✅ تحقق على', '—'),
                         '🎪 أوبشن': r.get('🎪 أوبشن', '—'),
@@ -9744,6 +9780,53 @@ elif page == "⭐ التلاقي الذهبي":
                     st.caption(f"أقرب انتهاءات: {' · '.join(_act['expirations'])} — بيانات yfinance (تأخير ~15د)")
             except Exception:
                 pass
+
+        # ── Gann Box — price & time
+        _gann = _result.get('gann')
+        if _gann:
+            st.markdown("### 📐 جان بوكس — السعر والزمن")
+            _gb1, _gb2, _gb3, _gb4 = st.columns(4)
+            _gb1.metric("نطاق الصندوق", f"{_gann.low:,.2f} → {_gann.high:,.2f}")
+            _gb2.metric("موقع السعر", f"{_gann.position_pct:.0f}%",
+                        help="0% = قاع الصندوق · 100% = قمته · فوق 100% = اختراق")
+            _gb3.metric("الاتجاه", "📈 صاعد" if _gann.direction == 'up' else "📉 هابط")
+            _gb4.metric("الحالة", "⚠️ منهك (تجاوز 161.8%)" if _gann.exhausted else "✅ نشط")
+
+            _gc1, _gc2 = st.columns(2)
+            with _gc1:
+                st.markdown("**مستويات فيبو السعرية:**")
+                _lvl_rows = []
+                for _frac in sorted(_gann.levels.keys()):
+                    _price_lvl = _gann.levels[_frac]
+                    _is_gold = _frac in (0.5, 0.618)
+                    _lvl_rows.append({
+                        'المستوى': f"{_frac*100:.1f}%" + (' ⭐' if _is_gold else ''),
+                        'السعر': round(_price_lvl, 2),
+                        'البُعد': f"{(_current_price - _price_lvl) / _price_lvl * 100:+.2f}%",
+                    })
+                for _f_ext, _p_ext in _gann.extensions.items():
+                    _lvl_rows.append({
+                        'المستوى': f"🎯 {_f_ext*100:.1f}% امتداد",
+                        'السعر': round(_p_ext, 2),
+                        'البُعد': f"{(_current_price - _p_ext) / _p_ext * 100:+.2f}%",
+                    })
+                st.dataframe(pd.DataFrame(_lvl_rows), use_container_width=True, hide_index=True)
+            with _gc2:
+                st.markdown("**⏰ النوافذ الزمنية المُسقطة:**")
+                if _gann.time_windows:
+                    _tw_rows = [{
+                        'النسبة': f"{w['fraction']*100:.1f}%" + (' ⭐' if w['is_gold'] else ''),
+                        'التاريخ': w['when'],
+                        'بعد (شموع)': w['bars_away'],
+                        'الحالة': '🔥 نشطة الآن' if (_gann.active_time_window is w) else
+                                  ('✔️ مرّت' if w['bars_away'] < 0 else '⏳ قادمة'),
+                    } for w in _gann.time_windows]
+                    st.dataframe(pd.DataFrame(_tw_rows), use_container_width=True, hide_index=True)
+                if _gann.active_time_window:
+                    st.success(
+                        f"🔥 نافذة زمنية نشطة الآن ({_gann.active_time_window['fraction']*100:.1f}%) — "
+                        f"الانعكاسات تتجمع إحصائياً في هذه النوافذ. راقب تفاعل السعر مع المناطق البنفسجية."
+                    )
 
         # ── Per-TF breakdown
         with st.expander("📊 تفاصيل كل فريم"):
