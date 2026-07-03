@@ -8378,6 +8378,26 @@ elif page == "⭐ التلاقي الذهبي":
             ConfluenceEngine, apply_all_filters,
             fetch_multi_tf_data, TIER_INFO, StrengthTier,
         )
+        # Hot-reload guard: after a deploy, Streamlit re-executes app.py but
+        # keeps previously-imported modules cached in sys.modules — a changed
+        # engine can be missing new attributes (e.g. StrengthTier.SOVEREIGN)
+        # until the process restarts. Detect and force-reload once.
+        if not hasattr(StrengthTier, 'SOVEREIGN'):
+            import importlib
+            import core.confluence.clustering as _m_cl
+            import core.confluence.gamma as _m_g
+            import core.confluence.zero_reversal as _m_zr
+            import core.confluence.strength_tier as _m_st
+            import core.confluence.data_fetcher as _m_df
+            import core.confluence.confluence_engine as _m_ce
+            import core.confluence.signal_filter as _m_sf
+            import core.confluence as _m_pkg
+            for _m in (_m_cl, _m_g, _m_zr, _m_st, _m_df, _m_ce, _m_sf, _m_pkg):
+                importlib.reload(_m)
+            from core.confluence import (
+                ConfluenceEngine, apply_all_filters,
+                fetch_multi_tf_data, TIER_INFO, StrengthTier,
+            )
     except Exception as _e:
         st.error(f"تعذّر تحميل وحدة التلاقي: {_e}")
         st.stop()
