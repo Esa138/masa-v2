@@ -9080,6 +9080,33 @@ elif page == "⭐ التلاقي الذهبي":
         except Exception:
             pass
 
+        # ── Options activity enrichment (US markets, purple rows only) ──
+        # Fetching chains for every scanned ticker would double scan time;
+        # the purple shortlist (~20-60) fetches in ~10s with 10 workers
+        # and results cache for 10 minutes.
+        if _is_us_market and _scan_rows:
+            try:
+                from core.options_activity import fetch_activity_batch, bias_label
+                _opts_cache = st.session_state.setdefault('conf_opts_cache', {})
+                _purple_tks = [r['الرمز'] for r in _scan_rows if r['_has_purple']]
+                if _purple_tks:
+                    with st.spinner(f"🎪 جلب نشاط الأوبشن لـ {len(_purple_tks)} سهم..."):
+                        fetch_activity_batch(_purple_tks, _opts_cache)
+                for r in _scan_rows:
+                    _act = (_opts_cache.get(r['الرمز']) or (None, None))[1]
+                    r['🎪 أوبشن'] = bias_label(_act)
+                    # Does options bias CONFIRM the Esa side?
+                    _side = r.get('اتجاه عيسى', '')
+                    if _act and r.get('_is_esa'):
+                        if ('CALL' in _side and _act['bias'] == 'call') or \
+                           ('PUT' in _side and _act['bias'] == 'put'):
+                            r['🎪 أوبشن'] += ' ✓يؤكد'
+                        elif ('CALL' in _side and _act['bias'] == 'put') or \
+                             ('PUT' in _side and _act['bias'] == 'call'):
+                            r['🎪 أوبشن'] += ' ✗يعارض'
+            except Exception:
+                pass
+
         if not _scan_rows:
             st.warning("ما طلعت نتائج. جرّب سوقاً آخر.")
         else:
@@ -9169,7 +9196,8 @@ elif page == "⭐ التلاقي الذهبي":
                         f"<div style='margin-top:4px;padding-top:4px;border-top:1px solid rgba(255,255,255,0.25);font-size:0.78em;color:#fffde7'>"
                         f"⚡ أحدث: <b style='color:#fff'>{p.get('⚡ أحدث فريم', '—')}</b><br>"
                         f"🎯 كل الفريمات: {p.get('✅ تحقق على', '—')}"
-                        f"</div>"
+                        + (f"<br>🎪 أوبشن: <b style='color:#fff'>{p['🎪 أوبشن']}</b>" if p.get('🎪 أوبشن') and p['🎪 أوبشن'] != '—' else '')
+                        + f"</div>"
                         f"</span>"
                         for p in _esa_picks
                     ])
@@ -9436,6 +9464,7 @@ elif page == "⭐ التلاقي الذهبي":
                         'فوق Gamma': r.get('فوق Gamma', '—'),
                         '⚡ أحدث فريم': r.get('⚡ أحدث فريم', '—'),
                         '✅ تحقق على': r.get('✅ تحقق على', '—'),
+                        '🎪 أوبشن': r.get('🎪 أوبشن', '—'),
                         'البُعد': r['البُعد'],
                         'الفريمات': r['الفريمات'],
                         'التصنيف': r['التصنيف'],
@@ -9639,6 +9668,44 @@ elif page == "⭐ التلاقي الذهبي":
             _rows = [z.to_dict() for z in _zones]
             _df_zones = pd.DataFrame(_rows)
             st.dataframe(_df_zones, use_container_width=True, hide_index=True)
+
+        # ── Options activity (US tickers with listed options)
+        if not _conf_ticker.endswith('.SR') and '-USD' not in _conf_ticker:
+            try:
+                from core.options_activity import get_options_activity
+                with st.spinner("🎪 جلب نشاط الأوبشن..."):
+                    _act = get_options_activity(_conf_ticker)
+                if _act:
+                    st.markdown("### 🎪 نشاط الأوبشن")
+                    _oc1, _oc2, _oc3, _oc4 = st.columns(4)
+                    _bias_ar = {'call': '🟢 ميل CALL', 'put': '🔴 ميل PUT', 'neutral': '⚪ متوازن'}
+                    _oc1.metric("الاتجاه", _bias_ar[_act['bias']])
+                    _oc2.metric("Call/Put", _act['cp_ratio'])
+                    _oc3.metric("حجم Calls", f"{_act['call_vol']:,}")
+                    _oc4.metric("حجم Puts", f"{_act['put_vol']:,}")
+                    _unusual_total = _act['unusual_calls'] + _act['unusual_puts']
+                    if _unusual_total:
+                        st.warning(
+                            f"⚡ نشاط غير اعتيادي: {_act['unusual_calls']} عقود Call + "
+                            f"{_act['unusual_puts']} عقود Put بحجم يفوق ضعف الـ Open Interest — "
+                            f"صفقات جديدة كبيرة اليوم."
+                        )
+                    _tc1, _tc2 = st.columns(2)
+                    with _tc1:
+                        st.markdown("**🟢 أنشط Calls:**")
+                        if _act['top_calls']:
+                            st.dataframe(pd.DataFrame(_act['top_calls']).rename(columns={
+                                'strike': 'Strike', 'volume': 'الحجم', 'oi': 'OI', 'iv': 'IV%',
+                            }), use_container_width=True, hide_index=True)
+                    with _tc2:
+                        st.markdown("**🔴 أنشط Puts:**")
+                        if _act['top_puts']:
+                            st.dataframe(pd.DataFrame(_act['top_puts']).rename(columns={
+                                'strike': 'Strike', 'volume': 'الحجم', 'oi': 'OI', 'iv': 'IV%',
+                            }), use_container_width=True, hide_index=True)
+                    st.caption(f"أقرب انتهاءات: {' · '.join(_act['expirations'])} — بيانات yfinance (تأخير ~15د)")
+            except Exception:
+                pass
 
         # ── Per-TF breakdown
         with st.expander("📊 تفاصيل كل فريم"):
