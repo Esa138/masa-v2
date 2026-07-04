@@ -30,6 +30,7 @@ class ConfluenceZone:
     inst_touches: int = 0       # touches on institutional volume (≥1.5× avg)
     flipped: bool = False       # broke through recently → role reversed
     gann_level: str = ''        # '61.8% ⭐' when zone sits on a Gann fib
+    origin: str = ''            # 'floor'/'ceiling'/'mixed' — what the zone is made of
 
     def to_dict(self) -> dict:
         return {
@@ -237,6 +238,8 @@ class ConfluenceEngine:
                     'is_resistance': is_res,
                     'tf_bit': tf_bit,
                     'source': f"{tf_name}-{key}",
+                    # origin: z1l/z2l are pivot LOWS (floors), z1h/z2h HIGHS
+                    'kind': 'floor' if key.endswith('l') else 'ceiling',
                 })
         return levels
 
@@ -350,6 +353,7 @@ class ConfluenceEngine:
                 touch_count=touch_count,
                 inst_touches=inst_touches,
                 flipped=flipped,
+                origin=cluster.origin,
             ))
         return zones
 

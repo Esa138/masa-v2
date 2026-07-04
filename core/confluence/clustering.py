@@ -26,6 +26,17 @@ class Cluster:
     is_resistance: bool
     mask: int = 0
     levels: List[float] = field(default_factory=list)
+    floor_count: int = 0    # levels sourced from pivot LOWS (z1l/z2l)
+    ceil_count: int = 0     # levels sourced from pivot HIGHS (z1h/z2h)
+
+    @property
+    def origin(self) -> str:
+        """What the zone is MADE OF — independent of current price side."""
+        if self.floor_count > self.ceil_count:
+            return 'floor'
+        if self.ceil_count > self.floor_count:
+            return 'ceiling'
+        return 'mixed'
 
     @property
     def tf_count(self) -> int:
@@ -56,6 +67,7 @@ def cluster_levels(raw_levels: List[dict], cluster_pct: float = 0.5,
         price = level.get('price')
         is_res = level.get('is_resistance', False)
         tf_bit = level.get('tf_bit', 0)
+        kind = level.get('kind', '')  # 'floor' / 'ceiling'
 
         if price is None or pd.isna(price) or price <= 0:
             continue
@@ -73,6 +85,10 @@ def cluster_levels(raw_levels: List[dict], cluster_pct: float = 0.5,
                 cluster.price = (cluster.price * count + price) / (count + 1)
                 cluster.mask |= tf_bit
                 cluster.levels.append(price)
+                if kind == 'floor':
+                    cluster.floor_count += 1
+                elif kind == 'ceiling':
+                    cluster.ceil_count += 1
                 merged = True
                 break
 
@@ -82,6 +98,8 @@ def cluster_levels(raw_levels: List[dict], cluster_pct: float = 0.5,
                 is_resistance=is_res,
                 mask=tf_bit,
                 levels=[price],
+                floor_count=1 if kind == 'floor' else 0,
+                ceil_count=1 if kind == 'ceiling' else 0,
             ))
 
     return clusters

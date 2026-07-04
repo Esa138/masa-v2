@@ -8383,7 +8383,7 @@ elif page == "⭐ التلاقي الذهبي":
         # engine keeps serving OLD code until the process restarts. Compare
         # the package's ENGINE_SIGNATURE with the version this app.py
         # expects and force-reload on mismatch.
-        _EXPECTED_ENGINE = "rr-age-v7"  # keep in sync with _ENGINE_VERSION below
+        _EXPECTED_ENGINE = "origin-v8"  # keep in sync with _ENGINE_VERSION below
         import core.confluence as _conf_pkg
         if getattr(_conf_pkg, 'ENGINE_SIGNATURE', '') != _EXPECTED_ENGINE:
             import importlib
@@ -8738,7 +8738,7 @@ elif page == "⭐ التلاقي الذهبي":
 
     # CRITICAL: invalidate cache when engine version changes (e.g. Gamma type
     # switch from HMA to SMA). Bump _ENGINE_VERSION to force re-scan.
-    _ENGINE_VERSION = "rr-age-v7"  # bumped when engine output structure changes
+    _ENGINE_VERSION = "origin-v8"  # bumped when engine output structure changes
     _cached_scan = st.session_state.get(f'conf_cached_scan_{_conf_market}')
     if _cached_scan and _cached_scan.get('version') != _ENGINE_VERSION:
         # Old cache from previous engine version → drop it
@@ -8986,20 +8986,29 @@ elif page == "⭐ التلاقي الذهبي":
                         _dist = z.distance_from_price_pct
                         _zstatus = z.status or ''
                         _kind = None
+                        # Effective side: when price is INSIDE the zone the
+                        # price-side call flips on a hair (أرامكو case) —
+                        # decide by the zone's ORIGIN (pivot lows = support,
+                        # pivot highs = resistance) instead.
+                        _z_origin = getattr(z, 'origin', '')
+                        if _zstatus.startswith('✅') and _z_origin in ('floor', 'ceiling'):
+                            _z_is_res = (_z_origin == 'ceiling')
+                        else:
+                            _z_is_res = z.is_resistance
 
                         # ── BUY scenarios (above-Gamma band only) ──
                         # A) approach DOWN to support: price above the zone,
                         #    actually FALLING toward it (trend check), gap 1-approach%
                         if (_in_above and _price_above_zone
                                 and 1.0 <= _dist <= _esa_approach_max
-                                and not z.is_resistance
+                                and not _z_is_res
                                 and _zstatus.startswith(('🎯', '⏸️'))
                                 and _recent_trend == 'down'):
                             _kind = 'buy'
                         # B) bounce UP from support (exact status text) or sitting in it
                         elif _in_above and ((_zstatus.startswith('🔄') and 'الدعم' in _zstatus)
                               or _zstatus.startswith('✅')) \
-                                and _dist <= _esa_bounce_max and not z.is_resistance:
+                                and _dist <= _esa_bounce_max and not _z_is_res:
                             _kind = 'buy'
                         # F) breakout UP through resistance — bullish continuation
                         elif (_in_above and _zstatus.startswith('💥') and 'صعود' in _zstatus
@@ -9011,14 +9020,14 @@ elif page == "⭐ التلاقي الذهبي":
                             # C) approach UP to resistance: price below, actually RISING
                             if (not _price_above_zone
                                     and 1.0 <= _dist <= _esa_approach_max
-                                    and z.is_resistance
+                                    and _z_is_res
                                     and _zstatus.startswith(('🎯', '⏸️'))
                                     and _recent_trend == 'up'):
                                 _kind = 'sell'
                             # D) rejected DOWN from resistance (exact status) or sitting in it
                             elif ((_zstatus.startswith('🔄') and 'المقاومة' in _zstatus)
                                   or _zstatus.startswith('✅')) \
-                                    and _dist <= _esa_bounce_max and z.is_resistance:
+                                    and _dist <= _esa_bounce_max and _z_is_res:
                                 _kind = 'sell'
                             # E) breakdown — support BROKE downward only
                             elif (_zstatus.startswith('💥') and 'هبوط' in _zstatus
@@ -9065,15 +9074,21 @@ elif page == "⭐ التلاقي الذهبي":
                 if _display_zones:
                     _pz = min(_display_zones, key=lambda z: z.distance_from_price_pct)
                     _p_status = _pz.status
-                    _zone_side = 'res' if _pz.is_resistance else 'sup'
+                    _pz_origin = getattr(_pz, 'origin', '')
+                    if _p_status.startswith('✅') and _pz_origin in ('floor', 'ceiling'):
+                        # inside the zone: side from what the zone is MADE OF
+                        # (pivot lows/highs), not from which side of its center
+                        # price momentarily sits (أرامكو case)
+                        _zone_side = 'res' if _pz_origin == 'ceiling' else 'sup'
+                    else:
+                        _zone_side = 'res' if _pz.is_resistance else 'sup'
                     if getattr(_pz, 'flipped', False):
                         # role reversed after the break — show origin
                         _p_kind = ("🔃 مقاومة (دعم مكسور)" if _pz.is_resistance
                                    else "🔃 دعم (مقاومة مخترقة)")
                     elif _p_status.startswith('✅'):
-                        # price sits INSIDE the zone — the sup/res call flips
-                        # on a hair's width there (أرامكو case); stay neutral
-                        _p_kind = "⚪ داخل المنطقة"
+                        _origin_ar = {'floor': 'أصلها دعم', 'ceiling': 'أصلها مقاومة'}.get(_pz_origin, '')
+                        _p_kind = f"⚪ داخل المنطقة ({_origin_ar})" if _origin_ar else "⚪ داخل المنطقة"
                     else:
                         _p_kind = "🟢 دعم" if not _pz.is_resistance else "🔴 مقاومة"
                     _tc = getattr(_pz, 'touch_count', 0)
