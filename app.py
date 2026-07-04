@@ -9024,10 +9024,18 @@ elif page == "⭐ التلاقي الذهبي":
                                     and _zstatus.startswith(('🎯', '⏸️'))
                                     and _recent_trend == 'up'):
                                 _kind = 'sell'
-                            # D) rejected DOWN from resistance (exact status) or sitting in it
-                            elif ((_zstatus.startswith('🔄') and 'المقاومة' in _zstatus)
-                                  or _zstatus.startswith('✅')) \
+                            # D) rejected DOWN from resistance — allowed in both
+                            #    bands (an actual rejection is direction proof).
+                            #    Merely SITTING inside a ceiling only counts in
+                            #    the below-Gamma band: in an uptrend (+10% above
+                            #    Gamma) price entering a ceiling zone is as
+                            #    likely a breakout as a rejection — don't fire
+                            #    counter-trend sells there (الكهرباء case).
+                            elif (_zstatus.startswith('🔄') and 'المقاومة' in _zstatus) \
                                     and _dist <= _esa_bounce_max and _z_is_res:
+                                _kind = 'sell'
+                            elif (_in_below and _zstatus.startswith('✅')
+                                  and _dist <= _esa_bounce_max and _z_is_res):
                                 _kind = 'sell'
                             # E) breakdown — support BROKE downward only
                             elif (_zstatus.startswith('💥') and 'هبوط' in _zstatus
