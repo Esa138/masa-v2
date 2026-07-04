@@ -11,6 +11,11 @@ Modules:
 - signal_filter: 6-filter quality gate
 """
 
+# Bump on EVERY engine change — app.py compares this against its expected
+# version and force-reloads the package when the cached module is stale
+# (Streamlit keeps imported modules across deploys until process restart).
+ENGINE_SIGNATURE = "gann-v6"
+
 from .confluence_engine import ConfluenceEngine, ConfluenceZone
 from .signal_filter import apply_all_filters, QualityFilters
 from .strength_tier import classify_strength, StrengthTier, TIER_INFO

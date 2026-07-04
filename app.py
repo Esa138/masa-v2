@@ -8380,9 +8380,12 @@ elif page == "⭐ التلاقي الذهبي":
         )
         # Hot-reload guard: after a deploy, Streamlit re-executes app.py but
         # keeps previously-imported modules cached in sys.modules — a changed
-        # engine can be missing new attributes (e.g. StrengthTier.SOVEREIGN)
-        # until the process restarts. Detect and force-reload once.
-        if not hasattr(StrengthTier, 'SOVEREIGN'):
+        # engine keeps serving OLD code until the process restarts. Compare
+        # the package's ENGINE_SIGNATURE with the version this app.py
+        # expects and force-reload on mismatch.
+        _EXPECTED_ENGINE = "gann-v6"  # keep in sync with _ENGINE_VERSION below
+        import core.confluence as _conf_pkg
+        if getattr(_conf_pkg, 'ENGINE_SIGNATURE', '') != _EXPECTED_ENGINE:
             import importlib
             import core.confluence.clustering as _m_cl
             import core.confluence.gamma as _m_g
