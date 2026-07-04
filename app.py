@@ -8383,7 +8383,7 @@ elif page == "⭐ التلاقي الذهبي":
         # engine keeps serving OLD code until the process restarts. Compare
         # the package's ENGINE_SIGNATURE with the version this app.py
         # expects and force-reload on mismatch.
-        _EXPECTED_ENGINE = "gann-v6"  # keep in sync with _ENGINE_VERSION below
+        _EXPECTED_ENGINE = "rr-age-v7"  # keep in sync with _ENGINE_VERSION below
         import core.confluence as _conf_pkg
         if getattr(_conf_pkg, 'ENGINE_SIGNATURE', '') != _EXPECTED_ENGINE:
             import importlib
@@ -8404,6 +8404,42 @@ elif page == "⭐ التلاقي الذهبي":
     except Exception as _e:
         st.error(f"تعذّر تحميل وحدة التلاقي: {_e}")
         st.stop()
+
+    # ── Trading-hours aware signal age ──
+    # Counting wall-clock minutes made every evening signal 'expired' by
+    # morning (overnight = market closed = no bars = no real aging).
+    # Sessions in UTC (Streamlit Cloud clock): TADAWUL 07:00-12:10 Sun-Thu,
+    # US 13:30-20:00 Mon-Fri, crypto 24/7.
+    def _trading_minutes(_start, _end, _ticker=''):
+        from datetime import datetime as _dtt, timedelta as _td, time as _time
+        if _end <= _start:
+            return 0
+        _t = str(_ticker).upper()
+        if _t.endswith('-USD') or _t.endswith('=X'):
+            return int((_end - _start).total_seconds() // 60)
+        if _t.endswith('.SR'):
+            _o, _c, _days = _time(7, 0), _time(12, 10), {6, 0, 1, 2, 3}   # Sun-Thu
+        else:
+            _o, _c, _days = _time(13, 30), _time(20, 0), {0, 1, 2, 3, 4}  # Mon-Fri
+        _total = 0
+        for _i in range(15):  # cap: two weeks back
+            _d = _start.date() + _td(days=_i)
+            if _d > _end.date():
+                break
+            if _d.weekday() not in _days:
+                continue
+            _s = _dtt.combine(_d, _o)
+            _e = _dtt.combine(_d, _c)
+            _lo = max(_s, _start)
+            _hi = min(_e, _end)
+            if _hi > _lo:
+                _total += int((_hi - _lo).total_seconds() // 60)
+        return _total
+
+    def _fmt_age(_m):
+        if _m < 60:
+            return f"{_m}د"
+        return f"{_m // 60}س {_m % 60}د"
 
     # ── Always-visible color legend
     with st.container():
@@ -8702,7 +8738,7 @@ elif page == "⭐ التلاقي الذهبي":
 
     # CRITICAL: invalidate cache when engine version changes (e.g. Gamma type
     # switch from HMA to SMA). Bump _ENGINE_VERSION to force re-scan.
-    _ENGINE_VERSION = "gann-v6"  # bumped when engine output structure changes
+    _ENGINE_VERSION = "rr-age-v7"  # bumped when engine output structure changes
     _cached_scan = st.session_state.get(f'conf_cached_scan_{_conf_market}')
     if _cached_scan and _cached_scan.get('version') != _ENGINE_VERSION:
         # Old cache from previous engine version → drop it
@@ -8933,36 +8969,44 @@ elif page == "⭐ التلاقي الذهبي":
                 _esa_zones = []
                 _esa_zone_kind: dict = {}  # zone id → 'buy'/'sell'
                 if _daily_gamma and _daily_gamma > 0:
+                    # Above-Gamma band → BUY/CALL setups (uptrend context)
                     _g_min = _daily_gamma * (1 + _esa_min_gamma_pct / 100)
                     _g_max = _daily_gamma * (1 + _esa_max_gamma_pct / 100)
+                    # Mirrored below-Gamma band → SELL/PUT setups (downtrend).
+                    # Without this, a bearish market (most zones under Gamma,
+                    # e.g. TASI vs SMA600) produces almost no Esa signals.
+                    _g_min_b = _daily_gamma * (1 - _esa_max_gamma_pct / 100)
+                    _g_max_b = _daily_gamma * (1 - _esa_min_gamma_pct / 100)
                     for z in _purple_zones:
-                        if not (_g_min <= z.price <= _g_max):
+                        _in_above = _g_min <= z.price <= _g_max
+                        _in_below = _g_min_b <= z.price <= _g_max_b
+                        if not (_in_above or (_in_below and _esa_include_sell)):
                             continue
                         _price_above_zone = z.signed_distance_pct > 0
                         _dist = z.distance_from_price_pct
                         _zstatus = z.status or ''
                         _kind = None
 
-                        # ── BUY scenarios ──
+                        # ── BUY scenarios (above-Gamma band only) ──
                         # A) approach DOWN to support: price above the zone,
                         #    actually FALLING toward it (trend check), gap 1-approach%
-                        if (_price_above_zone
+                        if (_in_above and _price_above_zone
                                 and 1.0 <= _dist <= _esa_approach_max
                                 and not z.is_resistance
                                 and _zstatus.startswith(('🎯', '⏸️'))
                                 and _recent_trend == 'down'):
                             _kind = 'buy'
                         # B) bounce UP from support (exact status text) or sitting in it
-                        elif ((_zstatus.startswith('🔄') and 'الدعم' in _zstatus)
+                        elif _in_above and ((_zstatus.startswith('🔄') and 'الدعم' in _zstatus)
                               or _zstatus.startswith('✅')) \
                                 and _dist <= _esa_bounce_max and not z.is_resistance:
                             _kind = 'buy'
                         # F) breakout UP through resistance — bullish continuation
-                        elif (_zstatus.startswith('💥') and 'صعود' in _zstatus
+                        elif (_in_above and _zstatus.startswith('💥') and 'صعود' in _zstatus
                               and _dist <= _esa_bounce_max):
                             _kind = 'buy'
 
-                        # ── SELL scenarios (optional) ──
+                        # ── SELL scenarios (either band) ──
                         if _esa_include_sell and _kind is None:
                             # C) approach UP to resistance: price below, actually RISING
                             if (not _price_above_zone
@@ -9017,13 +9061,19 @@ elif page == "⭐ التلاقي الذهبي":
                 _p_gann = '—'
                 # Prefer Esa zones (above gamma) when selecting which to display
                 _display_zones = _esa_zones if _esa_zones else _purple_zones
+                _zone_side = ''   # 'sup' / 'res' — machine-readable side
                 if _display_zones:
                     _pz = min(_display_zones, key=lambda z: z.distance_from_price_pct)
                     _p_status = _pz.status
+                    _zone_side = 'res' if _pz.is_resistance else 'sup'
                     if getattr(_pz, 'flipped', False):
                         # role reversed after the break — show origin
                         _p_kind = ("🔃 مقاومة (دعم مكسور)" if _pz.is_resistance
                                    else "🔃 دعم (مقاومة مخترقة)")
+                    elif _p_status.startswith('✅'):
+                        # price sits INSIDE the zone — the sup/res call flips
+                        # on a hair's width there (أرامكو case); stay neutral
+                        _p_kind = "⚪ داخل المنطقة"
                     else:
                         _p_kind = "🟢 دعم" if not _pz.is_resistance else "🔴 مقاومة"
                     _tc = getattr(_pz, 'touch_count', 0)
@@ -9047,32 +9097,57 @@ elif page == "⭐ التلاقي الذهبي":
                     if _pz.triggered_tfs:
                         _tf_label = {'W':'أسبوعي','D':'يومي','240':'4H','60':'1H','15':'15م','5':'5م'}
                         _trigs = sorted(_pz.triggered_tfs.items(), key=lambda x: x[1])
-                        _p_triggered = ' · '.join([
-                            f"{_tf_label.get(t,t)}({n}ش)" for t, n in _trigs
-                        ])
+                        if all(n == 0 for _, n in _trigs):
+                            # price is in the zone right now on every TF —
+                            # per-TF zeros carry no information
+                            _p_triggered = f"الآن ✓ ({len(_trigs)} فريمات)"
+                        else:
+                            _p_triggered = ' · '.join([
+                                f"{_tf_label.get(t,t)}({n}ش)" for t, n in _trigs
+                            ])
                         # Most-recent (smallest bars-ago) trigger TF — the
                         # actual signal-firing timeframe
                         _latest = _trigs[0]
                         _p_latest_tf = f"{_tf_label.get(_latest[0], _latest[0])} (قبل {_latest[1]}ش)"
 
-                # Gann targets + risk:reward for Esa picks
+                # Gann targets + stop-based R:R — for EVERY active purple row
+                # (not just Esa). Direction from the zone side; risk measured
+                # to a real stop-loss (zone ± 0.5×ATR), never to the raw zone
+                # price which → 0 when price sits inside the zone.
                 _g_targets = '—'
                 _g_rr = '—'
+                _g_stop = '—'
                 _g_pos = '—'
                 _g_box2 = _res.get('gann')
+                _atr_d_row = _res.get('atr_d')
                 if _g_box2:
                     _g_pos = f"{_g_box2.position_pct:.0f}%" + (' ⚠️منهك' if _g_box2.exhausted else '')
-                if _is_esa and _g_box2 and _p_price != '—':
+                if (_g_box2 and _p_price != '—' and _zone_side
+                        and str(_p_status)[:1] in ('✅', '🔄', '🎯', '💥')):
                     from core.confluence import gann_targets as _gt
-                    _side_kind = 'buy' if 'buy' in _esa_zone_kind.values() else 'sell'
+                    # Esa side wins when known; otherwise zone side decides
+                    if _is_esa and _esa_zone_kind:
+                        _side_kind = 'buy' if 'buy' in _esa_zone_kind.values() else 'sell'
+                    else:
+                        _side_kind = 'buy' if _zone_side == 'sup' else 'sell'
                     _tgts = _gt(_g_box2, _side_kind)
-                    if len(_tgts) >= 2:
+                    if len(_tgts) >= 2 and _atr_d_row:
                         _t1, _t2 = _tgts[0][1], _tgts[1][1]
-                        _g_targets = f"{_t1:.2f} / {_t2:.2f}"
-                        _risk = abs(_cp - float(_p_price))
-                        _reward = abs(_t1 - _cp)
-                        if _risk > 0.0001:
-                            _g_rr = f"{_reward / _risk:.1f}"
+                        _zp = float(_p_price)
+                        if _side_kind == 'buy':
+                            _stop = _zp - 0.5 * _atr_d_row
+                            _risk = _cp - _stop
+                            _reward = _t1 - _cp
+                        else:
+                            _stop = _zp + 0.5 * _atr_d_row
+                            _risk = _stop - _cp
+                            _reward = _cp - _t1
+                        # Only meaningful when the target lies ahead of price
+                        if _risk > 0 and _reward > 0:
+                            _g_targets = f"{_t1:.2f} / {_t2:.2f}"
+                            _g_stop = f"{_stop:.2f}"
+                            _rr_val = _reward / _risk
+                            _g_rr = "20+" if _rr_val > 20 else f"{_rr_val:.1f}"
 
                 # ── Time stamp / age tracking ─────────────
                 # Persisted in SQLite (survives browser refresh + app restarts).
@@ -9090,7 +9165,8 @@ elif page == "⭐ التلاقي الذهبي":
                     _entry = {'status': _p_status, 'first_seen': _fs_dt}
 
                 if _entry:
-                    _age_min = int((_now_ts - _entry['first_seen']).total_seconds() / 60)
+                    # Trading-hours age: overnight/weekend doesn't count
+                    _age_min = _trading_minutes(_entry['first_seen'], _now_ts, _tk)
                     _first_seen_str = _entry['first_seen'].strftime('%H:%M')
                     # Traffic light by age
                     if _age_min < 15:
@@ -9101,7 +9177,7 @@ elif page == "⭐ التلاقي الذهبي":
                         _freshness = '🟠'
                     else:
                         _freshness = '🔴'
-                    _age_str = f"{_age_min}د"
+                    _age_str = _fmt_age(_age_min)
                 else:
                     _first_seen_str = '—'
                     _age_str = '—'
@@ -9125,6 +9201,7 @@ elif page == "⭐ التلاقي الذهبي":
                     '🖐️ لمسات': _p_touches,
                     '📐 جان': _p_gann,
                     '🎯 أهداف جان': _g_targets,
+                    '🛑 وقف': _g_stop,
                     'R:R': _g_rr,
                     '📊 موقع الصندوق': _g_pos,
                     '✅ تحقق على': _p_triggered,
@@ -9135,9 +9212,10 @@ elif page == "⭐ التلاقي الذهبي":
                     '_final': _flt.final_buy_signal,
                     '_passed': _flt.passed_count(),
                     '_has_purple': bool(_purple_zones),
+                    '_zone_side': _zone_side,
                     '_is_esa': _is_esa,
                     '_purple_dist': min((z.distance_from_price_pct for z in _purple_zones), default=999),
-                    '_age_min': int((_now_ts - _entry['first_seen']).total_seconds() / 60) if _entry else 99999,
+                    '_age_min': _age_min if _entry else 99999,
                 }
                 if _only_purple and not _purple_zones:
                     continue
@@ -9190,7 +9268,7 @@ elif page == "⭐ التلاقي الذهبي":
                 ['_is_esa', '_has_purple', '_status_rank', '_age_min', '_purple_dist', '_final', '_passed'],
                 ascending=[False, False, True, True, True, False, False],
             )
-            _df_scan = _df_scan.drop(columns=['_final', '_passed', '_has_purple', '_is_esa', '_purple_dist', '_status_rank', '_age_min'])
+            _df_scan = _df_scan.drop(columns=['_final', '_passed', '_has_purple', '_is_esa', '_purple_dist', '_status_rank', '_age_min', '_zone_side'])
 
             _golden_cnt = sum(1 for r in _scan_rows if r['_final'])
             _strong_cnt = sum(1 for r in _scan_rows if r['_passed'] >= 4)
@@ -9476,7 +9554,7 @@ elif page == "⭐ التلاقي الذهبي":
                         _tv_url = f"https://tradingview.com/chart/?symbol={_tv_sym}"
                     # Combined recommendation: zone status × Order Flow
                     _zone_st = str(r['🟣 الحالة'])[:1]
-                    _is_support = r['النوع'] == '🟢 دعم'
+                    _is_support = r.get('_zone_side') == 'sup'  # machine side — النوع may show '⚪ داخل'
                     _phase_raw = str(_of.get('phase', '')).lower()
                     _aggr_raw = str(_of.get('aggressor', '')).lower()
                     _action = "—"   # clear action: ادخل / راقب / تجنب / تأكد
@@ -9537,6 +9615,7 @@ elif page == "⭐ التلاقي الذهبي":
                         '🖐️ لمسات': r.get('🖐️ لمسات', '—'),
                         '📐 جان': r.get('📐 جان', '—'),
                         '🎯 أهداف جان': r.get('🎯 أهداف جان', '—'),
+                        '🛑 وقف': r.get('🛑 وقف', '—'),
                         'R:R': r.get('R:R', '—'),
                         '📊 موقع الصندوق': r.get('📊 موقع الصندوق', '—'),
                         '⚡ أحدث فريم': r.get('⚡ أحدث فريم', '—'),

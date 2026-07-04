@@ -14,7 +14,7 @@ Modules:
 # Bump on EVERY engine change — app.py compares this against its expected
 # version and force-reloads the package when the cached module is stale
 # (Streamlit keeps imported modules across deploys until process restart).
-ENGINE_SIGNATURE = "gann-v6"
+ENGINE_SIGNATURE = "rr-age-v7"
 
 from .confluence_engine import ConfluenceEngine, ConfluenceZone
 from .signal_filter import apply_all_filters, QualityFilters

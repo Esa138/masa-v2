@@ -139,8 +139,8 @@ class ConfluenceEngine:
         # 3. Cluster — ATR-adaptive threshold when daily data available.
         # 0.5×ATR(D) widens merging for volatile tickers (TSLA) and
         # tightens it for calm ones (KO) without per-market tuning.
-        _atr_d = self._daily_atr(tf_data.get('D')) if self.use_atr_cluster else None
-        _abs_thr = (self.atr_mult * _atr_d) if _atr_d else None
+        _atr_d = self._daily_atr(tf_data.get('D'))  # also used for stop-loss/R:R
+        _abs_thr = (self.atr_mult * _atr_d) if (_atr_d and self.use_atr_cluster) else None
         clusters = cluster_levels(raw_levels, cluster_pct=self.cluster_pct,
                                   abs_threshold=_abs_thr)
 
@@ -191,6 +191,7 @@ class ConfluenceEngine:
             'recent_trend': recent_trend,
             'recent_trend_tf': _ref_tf,
             'gann': gann_box,
+            'atr_d': _atr_d,
         }
 
     def _detect_trigger_tfs(self, zone_price: float, tf_data: dict, touch_threshold: float,
