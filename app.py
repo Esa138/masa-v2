@@ -9033,6 +9033,24 @@ elif page == "⭐ التلاقي الذهبي":
                     _g_time = ' ⏰' if (_g_box and _g_box.active_time_window) else ''
                     if _g_lbl or _g_time:
                         _p_gann = f"📐 {_g_lbl}{_g_time}".strip() if _g_lbl else f"⏰ نافذة زمنية"
+                    _p_price = round(_pz.price, 2)
+                    _p_tfs = _pz.tf_names
+                    _p_tier = f"{_pz.strength.label} {_pz.strength.stars}".strip()
+                    _p_dist = f"{_pz.signed_distance_pct:+.2f}%"
+                    if _daily_gamma and _daily_gamma > 0:
+                        _gap = (_pz.price - _daily_gamma) / _daily_gamma * 100
+                        _p_above_gamma = f"{_gap:+.2f}%"
+                    # Which TF(s) actually touched the zone, with bars-ago info
+                    if _pz.triggered_tfs:
+                        _tf_label = {'W':'أسبوعي','D':'يومي','240':'4H','60':'1H','15':'15م','5':'5م'}
+                        _trigs = sorted(_pz.triggered_tfs.items(), key=lambda x: x[1])
+                        _p_triggered = ' · '.join([
+                            f"{_tf_label.get(t,t)}({n}ش)" for t, n in _trigs
+                        ])
+                        # Most-recent (smallest bars-ago) trigger TF — the
+                        # actual signal-firing timeframe
+                        _latest = _trigs[0]
+                        _p_latest_tf = f"{_tf_label.get(_latest[0], _latest[0])} (قبل {_latest[1]}ش)"
 
                 # Gann targets + risk:reward for Esa picks
                 _g_targets = '—'
@@ -9052,24 +9070,6 @@ elif page == "⭐ التلاقي الذهبي":
                         _reward = abs(_t1 - _cp)
                         if _risk > 0.0001:
                             _g_rr = f"{_reward / _risk:.1f}"
-                    _p_price = round(_pz.price, 2)
-                    _p_tfs = _pz.tf_names
-                    _p_tier = f"{_pz.strength.label} {_pz.strength.stars}".strip()
-                    _p_dist = f"{_pz.signed_distance_pct:+.2f}%"
-                    if _daily_gamma and _daily_gamma > 0:
-                        _gap = (_pz.price - _daily_gamma) / _daily_gamma * 100
-                        _p_above_gamma = f"{_gap:+.2f}%"
-                    # Which TF(s) actually touched the zone, with bars-ago info
-                    if _pz.triggered_tfs:
-                        _tf_label = {'W':'أسبوعي','D':'يومي','240':'4H','60':'1H','15':'15م','5':'5م'}
-                        _trigs = sorted(_pz.triggered_tfs.items(), key=lambda x: x[1])
-                        _p_triggered = ' · '.join([
-                            f"{_tf_label.get(t,t)}({n}ش)" for t, n in _trigs
-                        ])
-                        # Most-recent (smallest bars-ago) trigger TF — the
-                        # actual signal-firing timeframe
-                        _latest = _trigs[0]
-                        _p_latest_tf = f"{_tf_label.get(_latest[0], _latest[0])} (قبل {_latest[1]}ش)"
 
                 # ── Time stamp / age tracking ─────────────
                 # Persisted in SQLite (survives browser refresh + app restarts).
